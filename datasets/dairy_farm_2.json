@@ -1,0 +1,20 @@
+{
+    "farm_name": "Sunny Acres Dairy",
+    "milking_cows": 200,
+    "litres_per_cow": 6000,
+    "milk_price": 0.44,
+    "opening_cash_balance": 10000,
+    "biss": 18000,
+    "acres": 7000,
+    "scheme_payment_months": {
+        "biss": 10,
+        "acres": 12
+    },
+    "feed": 120000,
+    "fertiliser": 45000,
+    "vet": 18000,
+    "contractor": 30000,
+    "labour": 65000,
+    "insurance": 10000,
+    "loan_repayments": 50000
+  }

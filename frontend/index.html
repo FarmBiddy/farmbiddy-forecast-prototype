@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FarmBiddy Financial Forecast</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <div class="brand">
+      <span class="brand-icon">🌾</span>
+      <div>
+        <h1>FarmBiddy Financial Forecast</h1>
+        <p class="subtitle">Dairy farm profitability &amp; risk analysis</p>
+      </div>
+    </div>
+    <a class="docs-link" href="/docs" target="_blank">API Docs</a>
+  </header>
+
+  <div class="layout">
+    <!-- Sidebar: user inputs -->
+    <aside class="sidebar">
+      <section class="panel">
+        <h2>Select Farms</h2>
+        <p class="hint">Choose one farm for a dashboard, or multiple to compare.</p>
+        <div id="farm-list" class="checkbox-list">
+          <p class="loading">Loading farms…</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Analysis Options</h2>
+        <div class="checkbox-list" id="output-options">
+          <label><input type="checkbox" name="output" value="forecast_summary" checked /> Forecast summary</label>
+          <label><input type="checkbox" name="output" value="monthly_forecast" checked /> Monthly cashflow</label>
+          <label><input type="checkbox" name="output" value="alerts" checked /> Alerts</label>
+          <label><input type="checkbox" name="output" value="risk_level" checked /> Risk level</label>
+          <label><input type="checkbox" name="output" value="top_risk_drivers" checked /> Top risk drivers</label>
+          <label><input type="checkbox" name="output" value="profitability_dashboard" /> Profitability dashboard</label>
+          <label><input type="checkbox" name="output" value="advisory_summary" checked /> Advisory summary</label>
+          <label><input type="checkbox" name="output" value="scenarios" /> Scenarios</label>
+          <label><input type="checkbox" name="output" value="forecast_comparison" checked /> Forecast comparison</label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Charts</h2>
+        <label class="toggle-all">
+          <input type="checkbox" id="charts-enabled" /> Generate charts
+        </label>
+        <div class="checkbox-list" id="chart-options">
+          <label><input type="checkbox" name="chart" value="running_balance" checked /> Running Balance</label>
+          <label><input type="checkbox" name="chart" value="revenue_vs_costs" checked /> Revenue vs Costs</label>
+          <label><input type="checkbox" name="chart" value="cost_breakdown" checked /> Cost Breakdown</label>
+          <label><input type="checkbox" name="chart" value="scenario_profit" /> Scenario Profit Comparison</label>
+        </div>
+      </section>
+
+      <button id="run-analysis-btn" class="btn btn-primary">Run Analysis</button>
+    </aside>
+
+    <!-- Main dashboard area -->
+    <main class="main-content">
+      <div id="status-message" class="status-message hidden"></div>
+
+      <section id="welcome" class="welcome-panel">
+        <h2>Welcome</h2>
+        <p>Select one or more farms, choose the analysis you need, and click <strong>Run Analysis</strong>.</p>
+        <ul>
+          <li><strong>One farm</strong> — full dashboard with KPIs, alerts, cashflow, and charts.</li>
+          <li><strong>Two or more farms</strong> — side-by-side comparison table and KPI cards.</li>
+        </ul>
+      </section>
+
+      <section id="results" class="hidden"></section>
+
+      <!-- Advisor Sandbox -->
+      <section class="sandbox-section panel-wide">
+        <h2>Advisor Sandbox</h2>
+        <p class="hint">Test what-if changes without modifying the original farm file.</p>
+
+        <div class="sandbox-grid">
+          <label>
+            Farm
+            <select id="sandbox-farm"></select>
+          </label>
+          <label>
+            Milk price (€)
+            <input type="number" id="sandbox-milk-price" step="0.01" placeholder="e.g. 0.39" />
+          </label>
+          <label>
+            Feed cost (€)
+            <input type="number" id="sandbox-feed" step="100" placeholder="e.g. 95000" />
+          </label>
+          <label>
+            Fertiliser cost (€)
+            <input type="number" id="sandbox-fertiliser" step="100" />
+          </label>
+          <label>
+            Labour cost (€)
+            <input type="number" id="sandbox-labour" step="100" />
+          </label>
+          <label>
+            Loan repayments (€)
+            <input type="number" id="sandbox-loans" step="100" />
+          </label>
+          <label>
+            Milking cows
+            <input type="number" id="sandbox-cows" step="1" />
+          </label>
+          <label>
+            Litres per cow
+            <input type="number" id="sandbox-litres" step="50" />
+          </label>
+          <label>
+            Opening cash balance (€)
+            <input type="number" id="sandbox-cash" step="500" />
+          </label>
+        </div>
+
+        <button id="run-sandbox-btn" class="btn btn-secondary">Run Sandbox Forecast</button>
+        <div id="sandbox-results" class="hidden"></div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">
+    FarmBiddy Financial Forecast Skill · Prototype
+  </footer>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+ENV/
+
+# Environment secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Generated runtime outputs (recreated on the server)
+outputs/history/*
+outputs/charts/*
+outputs/comparisons/*
+outputs/sandbox/*
+!outputs/history/.gitkeep
+!outputs/charts/.gitkeep
+!outputs/comparisons/.gitkeep
+!outputs/sandbox/.gitkeep
+
+# Legacy flat output files
+outputs/*.json
+
+# IDE / editor
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test / cache
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Logs
+*.log

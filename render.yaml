@@ -1,0 +1,33 @@
+# Render deployment configuration for FarmBiddy Financial Forecast Skill
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: farmbiddy-forecast
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/status
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+
+# ---------------------------------------------------------------------------
+# OPTIONAL — persistent storage (Render Starter plan or higher, ~$7/month)
+# Uncomment the disk block below and add this environment variable:
+#
+#   STORAGE_PATH=/opt/render/project/data
+#
+# This keeps forecast history and charts across restarts and redeploys.
+# ---------------------------------------------------------------------------
+#
+#    disk:
+#      name: farmbiddy-data
+#      mountPath: /opt/render/project/data
+#      sizeGB: 1
+#
+#    envVars:
+#      - key: STORAGE_PATH
+#        value: /opt/render/project/data
