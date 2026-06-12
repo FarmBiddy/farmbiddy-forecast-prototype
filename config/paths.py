@@ -13,10 +13,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Read-only farm datasets (committed to Git)
 DATASETS_DIR = os.path.join(BASE_DIR, "datasets")
 
-# Writable storage — defaults to outputs/ locally
-STORAGE_ROOT = os.environ.get(
-    "STORAGE_PATH",
-    os.path.join(BASE_DIR, "outputs"),
+# Writable storage — defaults to outputs/ when STORAGE_PATH is unset or empty
+_storage_env = os.environ.get("STORAGE_PATH", "").strip()
+STORAGE_ROOT = (
+    _storage_env if _storage_env else os.path.join(BASE_DIR, "outputs")
 )
 
 HISTORY_DIR = os.path.join(STORAGE_ROOT, "history")

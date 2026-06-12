@@ -32,9 +32,14 @@ app = FastAPI(
 )
 
 
+# Create writable/output folders before StaticFiles mounts (required on fresh deploy).
+ensure_output_dirs()
+os.makedirs(FRONTEND_DIR, exist_ok=True)
+
+
 @app.on_event("startup")
 def startup():
-    """Ensure writable folders exist (important on cloud deployments)."""
+    """Re-ensure folders exist after redeploy or storage path changes."""
     ensure_output_dirs()
     os.makedirs(FRONTEND_DIR, exist_ok=True)
 
