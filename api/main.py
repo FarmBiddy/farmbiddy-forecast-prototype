@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import router as api_router
-from config.paths import CHARTS_DIR, FRONTEND_DIR, ensure_output_dirs
+from config.paths import CHARTS_DIR, FRONTEND_DIR, REPORTS_DIR, ensure_output_dirs
 from services.forecast_service import (
     FarmFileNotFoundError,
     ForecastFileNotFoundError,
@@ -20,15 +20,14 @@ from services.forecast_service import (
 )
 
 app = FastAPI(
-    title="FarmBiddy Financial Forecast Skill",
+    title="FarmBiddy Farmer Edition",
     description=(
-        "Professional dairy farm financial forecasting platform for advisors. "
-        "Open the home page for the visual demo interface, or use /api/... "
+        "Professional dairy farm financial management for farmers. "
+        "Open the home page for the Farmer Edition dashboard, or use /api/... "
         "endpoints and /docs for the JSON API."
     ),
-    version="prototype",
+    version="1.0.0",
     contact={"name": "FarmBiddy"},
-    license_info={"name": "Prototype"},
 )
 
 
@@ -79,6 +78,7 @@ async def invalid_farm_handler(_request, exc: InvalidFarmDataError):
 
 app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="assets")
 app.mount("/chart-files", StaticFiles(directory=CHARTS_DIR), name="chart_files")
+app.mount("/report-files", StaticFiles(directory=REPORTS_DIR), name="report_files")
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,8 @@
+{
+  "edition": "farmer",
+  "active_farm_file": "dairy_farm_1.json",
+  "farm_display_name": "Green Valley Dairy",
+  "milk_processor": "Lakeland Dairies",
+  "owner_name": "Farmer",
+  "location": "County Tipperary, Ireland"
+}

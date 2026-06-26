@@ -7,4 +7,6 @@ def calculate_costs(farm):
         + farm["labour"]
         + farm["insurance"]
         + farm["loan_repayments"]
+        + float(farm.get("fuel", 0))
+        + float(farm.get("electricity", 0))
     )

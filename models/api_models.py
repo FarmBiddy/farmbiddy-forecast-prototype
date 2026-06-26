@@ -271,3 +271,180 @@ class AnalyseResponse(BaseModel):
     comparison: Optional[List[Dict[str, Any]]] = None
     comparison_metrics: Optional[List[str]] = None
 
+
+# ---------------------------------------------------------------------------
+# Farmer Edition
+# ---------------------------------------------------------------------------
+
+class FarmerProfileResponse(BaseModel):
+    success: bool
+    farm_file: str
+    farm_name: str
+    milking_cows: Optional[int] = None
+    litres_per_cow: Optional[float] = None
+    milk_price: Optional[float] = None
+    opening_cash_balance: Optional[float] = None
+    milk_processor: Optional[str] = None
+    location: Optional[str] = None
+    owner_name: Optional[str] = None
+    last_updated: Optional[str] = None
+
+
+class FarmerDashboardResponse(BaseModel):
+    success: bool
+    profile: Dict[str, Any]
+    kpis: List[Dict[str, Any]]
+    has_analysis: bool = False
+    farms: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class FarmerAdvancedForecastResponse(BaseModel):
+    success: bool
+    farm_file: str
+    profile: Dict[str, Any]
+    generated_at: Optional[str] = None
+    forecast_summary: Optional[Dict[str, Any]] = None
+    monthly_forecast: List[Dict[str, Any]] = Field(default_factory=list)
+    profitability_dashboard: Optional[Dict[str, Any]] = None
+    kpis: Optional[Dict[str, Any]] = None
+    alerts: List[str] = Field(default_factory=list)
+    risk_level: Optional[str] = None
+    top_risk_drivers: List[Dict[str, Any]] = Field(default_factory=list)
+    advisory_summary: Optional[Dict[str, Any]] = None
+    scenarios: List[Dict[str, Any]] = Field(default_factory=list)
+    monte_carlo: Dict[str, Any] = Field(default_factory=dict)
+    charts: Dict[str, str] = Field(default_factory=dict)
+    interpretation: str = ""
+    recommendations: List[Dict[str, Any]] = Field(default_factory=list)
+    cashflow_chart_data: List[Dict[str, Any]] = Field(default_factory=list)
+    profit_chart_data: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class FarmerMonteCarloRequest(BaseModel):
+    farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
+    iterations: int = Field(default=1000, ge=100, le=10000)
+
+
+class FarmerMonteCarloResponse(BaseModel):
+    success: bool
+    farm_file: str
+    profile: Dict[str, Any]
+    monte_carlo: Dict[str, Any]
+    scenarios: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ScenarioSandboxRequest(BaseModel):
+    farm_file: Optional[str] = None
+    milk_price_cents_change: float = 0
+    milk_price_pct_change: float = 0
+    feed_pct_change: float = 0
+    fertiliser_pct_change: float = 0
+    labour_pct_change: float = 0
+    vet_pct_change: float = 0
+    fuel_pct_change: float = 0
+    electricity_pct_change: float = 0
+    loan_repayments: Optional[float] = None
+    milking_cows: Optional[int] = None
+    litres_per_cow: Optional[float] = None
+    opening_cash_balance: Optional[float] = None
+
+
+class ScenarioSandboxResponse(BaseModel):
+    success: bool
+    farm_file: str
+    farm_name: str
+    changes_applied: Dict[str, Any] = Field(default_factory=dict)
+    comparison: Dict[str, Any] = Field(default_factory=dict)
+    summary: str = ""
+    recommendations: List[Dict[str, Any]] = Field(default_factory=list)
+    base: Dict[str, Any] = Field(default_factory=dict)
+    scenario: Dict[str, Any] = Field(default_factory=dict)
+    monthly_forecast_base: List[Dict[str, Any]] = Field(default_factory=list)
+    monthly_forecast_scenario: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class FarmerRunAnalysisRequest(BaseModel):
+    farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
+
+
+class FinancialIntelligenceResponse(BaseModel):
+    success: bool
+    farm_file: str
+    farm_name: Optional[str] = None
+    profile: Dict[str, Any] = Field(default_factory=dict)
+    health_score: Dict[str, Any] = Field(default_factory=dict)
+    key_strengths: List[str] = Field(default_factory=list)
+    key_weaknesses: List[str] = Field(default_factory=list)
+    biggest_risks: List[Dict[str, Any]] = Field(default_factory=list)
+    opportunities: List[str] = Field(default_factory=list)
+    recommended_actions: List[Dict[str, Any]] = Field(default_factory=list)
+    plain_summary: str = ""
+    alerts: List[str] = Field(default_factory=list)
+    forecast_summary: Dict[str, Any] = Field(default_factory=dict)
+    advisor_headline: str = ""
+
+
+class AskAdvisorRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    farm_file: Optional[str] = None
+
+
+class AskAdvisorResponse(BaseModel):
+    success: bool
+    question: str
+    answer: str
+    details: List[str] = Field(default_factory=list)
+
+
+class FarmerReportRequest(BaseModel):
+    farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
+    report_type: str = Field(default="full", description="executive | full | scenario | investment")
+    report_date: Optional[str] = Field(default=None, description="Display date on cover page")
+
+
+class FarmerReportResponse(BaseModel):
+    success: bool
+    farm_file: str
+    farm_name: str
+    report_type: str
+    report_type_label: str
+    report_date: str
+    filename: str
+    download_url: str
+    page_count: int
+    executive_summary: str
+    generated_at: str
+
+
+class FarmerReportPreviewResponse(BaseModel):
+    success: bool
+    farm_file: str
+    farm_name: str
+    report_type: str
+    report_type_label: str
+    report_date: str
+    executive_summary: str
+    health_score: Dict[str, Any] = Field(default_factory=dict)
+    kpis: Dict[str, Any] = Field(default_factory=dict)
+    page_count_estimate: int
+    sections: List[str] = Field(default_factory=list)
+
+
+class FarmerAnalysisResponse(BaseModel):
+    success: bool
+    generated_at: Optional[str] = None
+    profile: Dict[str, Any]
+    kpis: List[Dict[str, Any]]
+    alerts: List[str] = Field(default_factory=list)
+    recommendations: List[Dict[str, Any]] = Field(default_factory=list)
+    health: Dict[str, Any] = Field(default_factory=dict)
+    scenario_snapshots: List[Dict[str, Any]] = Field(default_factory=list)
+    charts: Dict[str, str] = Field(default_factory=dict)
+    monthly_forecast: List[Dict[str, Any]] = Field(default_factory=list)
+    profit_chart_data: List[Dict[str, Any]] = Field(default_factory=list)
+    cashflow_chart_data: List[Dict[str, Any]] = Field(default_factory=list)
+    recent_updates: List[Dict[str, Any]] = Field(default_factory=list)
+    upcoming_payments: List[Dict[str, Any]] = Field(default_factory=list)
+    forecast_summary: Optional[Dict[str, Any]] = None
+    top_risk_drivers: List[Dict[str, Any]] = Field(default_factory=list)
+

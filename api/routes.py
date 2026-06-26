@@ -25,9 +25,36 @@ from models.api_models import (
     ForecastResponse,
     SandboxRequest,
     SandboxResponse,
+    FarmerProfileResponse,
+    FarmerDashboardResponse,
+    FarmerAnalysisResponse,
+    FarmerAdvancedForecastResponse,
+    FarmerMonteCarloRequest,
+    FarmerMonteCarloResponse,
+    FarmerRunAnalysisRequest,
+    ScenarioSandboxRequest,
+    ScenarioSandboxResponse,
+    FinancialIntelligenceResponse,
+    AskAdvisorRequest,
+    AskAdvisorResponse,
+    FarmerReportRequest,
+    FarmerReportResponse,
+    FarmerReportPreviewResponse,
 )
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
+from services.financial_intelligence_service import ask_farm_advisor, get_financial_intelligence
+from services.report_service import generate_farmer_report, get_report_preview
+from services.farmer_dashboard_service import (
+    get_farmer_dashboard_preview,
+    get_farmer_profile,
+    list_farms_for_selector,
+    run_advanced_forecast,
+    run_farmer_analysis,
+    run_monte_carlo_for_farm,
+    resolve_farm_file,
+)
+from services.scenario_sandbox_service import run_scenario_sandbox
 from services.forecast_service import (
     list_available_farms,
     run_chart_generation,
@@ -51,10 +78,174 @@ router = APIRouter()
 )
 def application_status():
     return ApplicationStatus(
-        application="FarmBiddy Financial Forecast Skill",
-        version="prototype",
+        application="FarmBiddy Farmer Edition",
+        version="1.0.0",
         status="running",
     )
+
+
+# ---------------------------------------------------------------------------
+# Farmer Edition
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/farmer/profile",
+    response_model=FarmerProfileResponse,
+    tags=["Farmer Edition"],
+    summary="Active farm profile",
+)
+def farmer_profile(farm_id: Optional[str] = Query(default=None, alias="farm_file")):
+    return FarmerProfileResponse(**get_farmer_profile(farm_id))
+
+
+@router.get(
+    "/farmer/dashboard",
+    response_model=FarmerDashboardResponse,
+    tags=["Farmer Edition"],
+    summary="Dashboard preview with fallback KPIs",
+)
+def farmer_dashboard(farm_id: Optional[str] = Query(default=None, alias="farm_file")):
+    data = get_farmer_dashboard_preview(farm_id)
+    return FarmerDashboardResponse(**data)
+
+
+@router.post(
+    "/farmer/run-analysis",
+    response_model=FarmerAnalysisResponse,
+    tags=["Farmer Edition"],
+    summary="Run forecast and populate farmer dashboard",
+)
+def farmer_run_analysis(request: FarmerRunAnalysisRequest = FarmerRunAnalysisRequest()):
+    try:
+        return FarmerAnalysisResponse(**run_farmer_analysis(request.farm_file, save_result=True))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/run-advanced-forecast",
+    response_model=FarmerAdvancedForecastResponse,
+    tags=["Farmer Edition"],
+    summary="Run advanced forecast with Monte Carlo and scenarios",
+)
+def farmer_advanced_forecast(request: FarmerRunAnalysisRequest = FarmerRunAnalysisRequest()):
+    try:
+        return FarmerAdvancedForecastResponse(**run_advanced_forecast(request.farm_file))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/run-monte-carlo",
+    response_model=FarmerMonteCarloResponse,
+    tags=["Farmer Edition"],
+    summary="Run Monte Carlo simulation",
+)
+def farmer_monte_carlo(request: FarmerMonteCarloRequest):
+    try:
+        return FarmerMonteCarloResponse(**run_monte_carlo_for_farm(request.farm_file, request.iterations))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/scenario-sandbox",
+    response_model=ScenarioSandboxResponse,
+    tags=["Farmer Edition"],
+    summary="Compare base case vs scenario assumptions",
+)
+def farmer_scenario_sandbox(request: ScenarioSandboxRequest):
+    try:
+        farm_file = resolve_farm_file(request.farm_file)
+        payload = run_scenario_sandbox(farm_file, request.model_dump())
+        return ScenarioSandboxResponse(**payload)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get(
+    "/farm-profile",
+    response_model=FarmerProfileResponse,
+    tags=["Farmer Edition"],
+    summary="Alias for active farm profile",
+    include_in_schema=True,
+)
+def farm_profile_alias(farm_id: Optional[str] = Query(default=None, alias="farm_file")):
+    return FarmerProfileResponse(**get_farmer_profile(farm_id))
+
+
+@router.get(
+    "/farmer/financial-intelligence",
+    response_model=FinancialIntelligenceResponse,
+    tags=["Farmer Edition"],
+    summary="Financial intelligence for the selected farm",
+)
+def farmer_financial_intelligence(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        return FinancialIntelligenceResponse(**get_financial_intelligence(farm_id))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/ask-advisor",
+    response_model=AskAdvisorResponse,
+    tags=["Farmer Edition"],
+    summary="Ask the rule-based farm advisor",
+)
+def farmer_ask_advisor(request: AskAdvisorRequest):
+    try:
+        return AskAdvisorResponse(**ask_farm_advisor(request.question, request.farm_file))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/report",
+    response_model=FarmerReportPreviewResponse,
+    tags=["Farmer Edition"],
+    summary="Preview report content before PDF generation",
+)
+def farmer_report_preview(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    report_type: str = Query(default="full"),
+    report_date: Optional[str] = Query(default=None),
+):
+    try:
+        return FarmerReportPreviewResponse(**get_report_preview(farm_id, report_type, report_date))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/report",
+    response_model=FarmerReportResponse,
+    tags=["Farmer Edition"],
+    summary="Generate a professional PDF farm report",
+)
+def farmer_generate_report(request: FarmerReportRequest):
+    try:
+        return FarmerReportResponse(**generate_farmer_report(
+            request.farm_file,
+            request.report_type,
+            request.report_date,
+        ))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 # ---------------------------------------------------------------------------

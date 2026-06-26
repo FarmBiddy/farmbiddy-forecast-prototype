@@ -1,569 +1,670 @@
 /**
- * FarmBiddy visual interface — fetches from /api/... and renders results.
+ * FarmBiddy Farmer Edition — dashboard with farm selection, advanced forecast, sandbox
  */
 
 const API = "/api";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+let state = {
+  profile: null,
+  analysis: null,
+  farms: [],
+  selectedFarm: null,
+  view: "dashboard",
+};
 
-function formatEuro(value) {
-  if (value === null || value === undefined) return "—";
-  return "€" + Number(value).toLocaleString("en-IE", { maximumFractionDigits: 0 });
+const $ = (id) => document.getElementById(id);
+
+function showStatus(msg, type = "info") {
+  const bar = $("status-bar");
+  if (!bar) return;
+  bar.textContent = msg;
+  bar.className = `status-bar ${type}`;
+  bar.classList.remove("hidden");
 }
 
-function formatPercent(value) {
-  if (value === null || value === undefined) return "—";
-  return Number(value).toFixed(1) + "%";
+function farmQuery() {
+  return state.selectedFarm ? `?farm_file=${encodeURIComponent(state.selectedFarm)}` : "";
 }
 
-function riskClass(level) {
-  if (!level) return "";
-  return "risk-" + level.toLowerCase();
+function farmBody(extra = {}) {
+  return JSON.stringify({ farm_file: state.selectedFarm, ...extra });
 }
 
-function chartUrl(filePath) {
-  const fileName = filePath.replace(/\\/g, "/").split("/").pop();
-  return "/chart-files/" + fileName;
+async function api(path, options = {}) {
+  const res = await fetch(API + path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+  return data;
 }
 
-function chartLabel(type) {
-  const labels = {
-    running_balance: "Running Balance",
-    revenue_vs_costs: "Revenue vs Costs",
-    cost_breakdown: "Cost Breakdown",
-    scenario_profit: "Scenario Profit Comparison",
-    kpi_comparison: "KPI Comparison",
-    historical_profit_trend: "Historical Profit Trend",
-  };
-  return labels[type] || type;
-}
-
-function showStatus(message, type) {
-  const el = document.getElementById("status-message");
-  el.textContent = message;
-  el.className = "status-message " + type;
-  el.classList.remove("hidden");
-}
-
-function hideStatus() {
-  document.getElementById("status-message").classList.add("hidden");
-}
-
-function getSelectedFarms() {
-  return [...document.querySelectorAll("#farm-list input:checked")].map(
-    (cb) => cb.value
-  );
-}
-
-function getOutputOptions() {
-  const outputs = { kpis: true, charts: false };
-
-  document.querySelectorAll('#output-options input[name="output"]').forEach((cb) => {
-    outputs[cb.value] = cb.checked;
-  });
-
-  outputs.charts = document.getElementById("charts-enabled").checked;
-  return outputs;
-}
-
-function getChartTypes() {
-  if (!document.getElementById("charts-enabled").checked) return [];
-
-  return [...document.querySelectorAll('#chart-options input[name="chart"]:checked')].map(
-    (cb) => cb.value
-  );
-}
-
-async function apiFetch(path, options) {
-  const response = await fetch(API + path, options);
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || "Request failed");
-  }
-
-  return response.json();
-}
-
-// ---------------------------------------------------------------------------
-// Load farms on startup
-// ---------------------------------------------------------------------------
-
-async function loadFarms() {
-  const farmList = document.getElementById("farm-list");
-  const sandboxSelect = document.getElementById("sandbox-farm");
-
-  try {
-    const data = await apiFetch("/farms");
-    farmList.innerHTML = "";
-    sandboxSelect.innerHTML = "";
-
-    data.farms.forEach((farm) => {
-      // Farm checkboxes
-      const item = document.createElement("label");
-      item.className = "farm-item";
-      item.innerHTML =
-        `<input type="checkbox" value="${farm.farm_file}" />` +
-        `<strong>${farm.farm_name}</strong>` +
-        `<span class="farm-meta">${farm.milking_cows || "—"} cows · €${farm.milk_price || "—"}/L</span>`;
-      farmList.appendChild(item);
-
-      // Sandbox dropdown
-      const option = document.createElement("option");
-      option.value = farm.farm_file;
-      option.textContent = farm.farm_name;
-      sandboxSelect.appendChild(option);
+function setGreeting() {
+  const hour = new Date().getHours();
+  const name = state.profile?.owner_name?.split(" ")[0] || "Farmer";
+  const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  if ($("greeting")) $("greeting").textContent = `${greet}, ${name}!`;
+  if ($("today-date")) {
+    $("today-date").textContent = new Date().toLocaleDateString("en-IE", {
+      weekday: "short", day: "numeric", month: "short", year: "numeric",
     });
-  } catch (error) {
-    farmList.innerHTML = `<p class="loading">Could not load farms: ${error.message}</p>`;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Render single-farm dashboard
-// ---------------------------------------------------------------------------
-
-function renderKpiCards(summary, kpis, riskLevel) {
-  const monthlyCashflow = kpis ? kpis.monthly_cashflow : null;
-
-  return `
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="label">Annual Revenue</div>
-        <div class="value">${formatEuro(summary.annual_revenue)}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="label">Annual Costs</div>
-        <div class="value">${formatEuro(summary.annual_costs)}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="label">Annual Profit</div>
-        <div class="value">${formatEuro(summary.annual_profit)}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="label">Profit Margin</div>
-        <div class="value">${formatPercent(summary.profit_margin)}</div>
-      </div>
-      <div class="kpi-card ${riskClass(riskLevel)}">
-        <div class="label">Risk Level</div>
-        <div class="value">${riskLevel || "—"}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="label">Monthly Cashflow</div>
-        <div class="value">${formatEuro(monthlyCashflow)}</div>
-      </div>
-    </div>
-  `;
+function renderFarmSelect(farms) {
+  const sel = $("farm-select");
+  if (!sel) return;
+  sel.innerHTML = farms.map((f) =>
+    `<option value="${f.farm_file}" ${f.is_default ? "selected" : ""}>${f.farm_name} (${f.milking_cows || "?"} cows)</option>`
+  ).join("");
+  const selected = sel.value;
+  state.selectedFarm = selected;
+  state.farms = farms;
 }
 
-function renderAlerts(alerts) {
-  if (!alerts || alerts.length === 0) {
-    return `<p class="no-alerts">No major alerts.</p>`;
-  }
-
-  return `<div class="alert-box"><ul>${alerts.map((a) => `<li>${a}</li>`).join("")}</ul></div>`;
+function renderSidebar(profile) {
+  if (!profile) return;
+  $("sf-farm-name").textContent = profile.farm_name || "My Farm";
+  $("sf-herd").textContent = `${profile.milking_cows || "—"} Milking Cows`;
+  $("sf-milk").textContent = `Milk Price: €${Number(profile.milk_price || 0).toFixed(2)}/L`;
+  $("sf-processor").textContent = `Processor: ${profile.milk_processor || "—"}`;
+  $("sf-updated").textContent = `Last Updated: ${profile.last_updated || "Today"}`;
+  if ($("settings-farm")) $("settings-farm").textContent = profile.farm_name;
 }
 
-function renderRiskDrivers(drivers) {
-  if (!drivers || drivers.length === 0) {
-    return `<p class="no-alerts">No major risk drivers identified.</p>`;
-  }
-
-  return drivers
-    .map(
-      (d) =>
-        `<div class="risk-driver">` +
-        `<strong>${d.driver}</strong> ` +
-        `<span class="risk-badge ${d.risk}">${d.risk}</span>` +
-        `<p>${d.commentary}</p></div>`
-    )
-    .join("");
+function renderProfileDetail(profile) {
+  const box = $("farm-profile-detail");
+  if (!box || !profile) return;
+  box.innerHTML = `
+    <div class="profile-item"><span>Farm file</span><strong>${profile.farm_file}</strong></div>
+    <div class="profile-item"><span>Farm</span><strong>${profile.farm_name}</strong></div>
+    <div class="profile-item"><span>Herd</span><strong>${profile.milking_cows} cows</strong></div>
+    <div class="profile-item"><span>Milk price</span><strong>€${profile.milk_price}/L</strong></div>
+    <div class="profile-item"><span>Cash opening</span><strong>€${Number(profile.opening_cash_balance || 0).toLocaleString()}</strong></div>
+    <div class="profile-item"><span>Processor</span><strong>${profile.milk_processor}</strong></div>`;
 }
 
-function renderMonthlyTable(monthly) {
-  if (!monthly || monthly.length === 0) return "";
-
-  const rows = monthly
-    .map(
-      (m) =>
-        `<tr>` +
-        `<td>Month ${m.month}</td>` +
-        `<td class="num">${formatEuro(m.revenue)}</td>` +
-        `<td class="num">${formatEuro(m.costs)}</td>` +
-        `<td class="num">${formatEuro(m.cashflow)}</td>` +
-        `<td class="num">${formatEuro(m.running_balance)}</td>` +
-        `</tr>`
-    )
-    .join("");
-
-  return `
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Month</th>
-          <th class="num">Revenue</th>
-          <th class="num">Costs</th>
-          <th class="num">Cashflow</th>
-          <th class="num">Running Balance</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
+function renderKpis(kpis, containerId = "kpi-row") {
+  const row = $(containerId);
+  if (!row || !kpis) return;
+  row.innerHTML = kpis.map((k) => `
+    <div class="kpi-card">
+      <div class="kpi-title">${k.title}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub ${k.trend === "down" ? "down" : k.trend === "neutral" ? "neutral" : ""}">${k.subtitle || ""}</div>
+    </div>`).join("");
 }
 
-function renderAdvisory(advisory) {
-  if (!advisory) return "";
-
-  const strengths = (advisory.key_strengths || [])
-    .map((s) => `<li>${s}</li>`)
-    .join("");
-  const concerns = (advisory.key_concerns || [])
-    .map((c) => `<li>${c}</li>`)
-    .join("");
-
-  return `
-    <div class="advisory-block"><strong>Headline:</strong> ${advisory.headline}</div>
-    <div class="advisory-block"><strong>Financial position:</strong> ${advisory.financial_position}</div>
-    <div class="advisory-block"><strong>Cashflow:</strong> ${advisory.cashflow_commentary}</div>
-    <div class="advisory-block"><strong>Risk:</strong> ${advisory.risk_commentary}</div>
-    <div class="advisory-block"><strong>Key strengths:</strong><ul class="advisory-list">${strengths}</ul></div>
-    <div class="advisory-block"><strong>Key concerns:</strong><ul class="advisory-list">${concerns}</ul></div>
-    <div class="advisory-block"><strong>Recommendation:</strong> ${advisory.advisor_recommendation}</div>
-  `;
+function renderMetricCards(items, containerId) {
+  const box = $(containerId);
+  if (!box) return;
+  box.innerHTML = items.map((i) => `
+    <div class="kpi-card">
+      <div class="kpi-title">${i.label}</div>
+      <div class="kpi-value">${i.value}</div>
+      ${i.sub ? `<div class="kpi-sub">${i.sub}</div>` : ""}
+    </div>`).join("");
 }
 
-function renderScenarios(scenarios) {
-  if (!scenarios || scenarios.length === 0) return "";
-
-  const rows = scenarios
-    .map(
-      (s) =>
-        `<tr><td>${s.name}</td><td class="num">€${s.milk_price}</td>` +
-        `<td class="num">${formatEuro(s.revenue)}</td>` +
-        `<td class="num">${formatEuro(s.profit)}</td></tr>`
-    )
-    .join("");
-
-  return `
-    <table class="data-table">
-      <thead>
-        <tr><th>Scenario</th><th class="num">Milk Price</th><th class="num">Revenue</th><th class="num">Profit</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-}
-
-function renderCharts(charts) {
-  if (!charts || Object.keys(charts).length === 0) return "";
-
-  const cards = Object.entries(charts)
-    .map(([type, path]) => {
-      const url = chartUrl(path);
-      return `
-        <div class="chart-card">
-          <div class="chart-card-header">
-            <span>${chartLabel(type)}</span>
-            <a href="${url}" target="_blank">Open full screen</a>
-          </div>
-          <iframe class="chart-iframe" src="${url}" title="${chartLabel(type)}"></iframe>
-        </div>
-      `;
-    })
-    .join("");
-
-  return `<div class="charts-grid">${cards}</div>`;
-}
-
-function renderSingleFarm(result) {
-  const summary = result.forecast_summary || {};
-  const kpis = result.kpis || {};
-
-  let html = `<h2 class="farm-title">${summary.farm_name || result.farm_file}</h2>`;
-  html += renderKpiCards(summary, kpis, result.risk_level);
-
-  if (result.alerts) {
-    html += `<div class="result-section"><h3>Alerts</h3>${renderAlerts(result.alerts)}</div>`;
-  }
-
-  if (result.top_risk_drivers) {
-    html += `<div class="result-section"><h3>Top Risk Drivers</h3>${renderRiskDrivers(result.top_risk_drivers)}</div>`;
-  }
-
-  if (result.advisory_summary) {
-    html += `<div class="result-section"><h3>Advisory Summary</h3>${renderAdvisory(result.advisory_summary)}</div>`;
-  }
-
-  if (result.monthly_forecast) {
-    html += `<div class="result-section"><h3>Monthly Cashflow Forecast</h3>${renderMonthlyTable(result.monthly_forecast)}</div>`;
-  }
-
-  if (result.scenarios) {
-    html += `<div class="result-section"><h3>Scenarios</h3>${renderScenarios(result.scenarios)}</div>`;
-  }
-
-  if (result.profitability_dashboard) {
-    const d = result.profitability_dashboard;
-    html += `
-      <div class="result-section">
-        <h3>Profitability Dashboard</h3>
-        <div class="kpi-grid">
-          <div class="kpi-card"><div class="label">Revenue / Cow</div><div class="value">${formatEuro(d.revenue_per_cow)}</div></div>
-          <div class="kpi-card"><div class="label">Cost / Cow</div><div class="value">${formatEuro(d.cost_per_cow)}</div></div>
-          <div class="kpi-card"><div class="label">Profit / Cow</div><div class="value">${formatEuro(d.profit_per_cow)}</div></div>
-          <div class="kpi-card"><div class="label">Feed Cost Ratio</div><div class="value">${formatPercent(d.feed_cost_ratio)}</div></div>
-          <div class="kpi-card"><div class="label">Lowest Cash Balance</div><div class="value">${formatEuro(d.lowest_cash_balance)}</div></div>
-          <div class="kpi-card"><div class="label">Lowest Balance Month</div><div class="value" style="font-size:1rem">${d.lowest_cash_balance_month}</div></div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (result.charts) {
-    html += `<div class="result-section"><h3>Charts</h3>${renderCharts(result.charts)}</div>`;
-  }
-
-  return html;
-}
-
-// ---------------------------------------------------------------------------
-// Render multi-farm comparison
-// ---------------------------------------------------------------------------
-
-function renderComparisonTable(comparison) {
-  if (!comparison || comparison.length === 0) return "";
-
-  // Find best profit for highlighting
-  const maxProfit = Math.max(...comparison.map((r) => r.annual_profit || 0));
-
-  const rows = comparison
-    .map((row) => {
-      const highlight = row.annual_profit === maxProfit ? "compare-best" : "";
-      return `
-        <tr class="${highlight}">
-          <td><strong>${row.farm_name}</strong></td>
-          <td class="num">${formatEuro(row.annual_profit)}</td>
-          <td class="num">${formatPercent(row.profit_margin)}</td>
-          <td><span class="risk-badge ${row.risk_level}">${row.risk_level || "—"}</span></td>
-          <td class="num">${formatEuro(row.revenue_per_cow)}</td>
-          <td class="num">${formatEuro(row.profit_per_cow)}</td>
-          <td class="num">${formatPercent(row.feed_cost_ratio)}</td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  return `
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Farm</th>
-          <th class="num">Annual Profit</th>
-          <th class="num">Profit Margin</th>
-          <th>Risk Level</th>
-          <th class="num">Revenue / Cow</th>
-          <th class="num">Profit / Cow</th>
-          <th class="num">Feed Cost Ratio</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-}
-
-function renderComparisonCards(comparison) {
-  return comparison
-    .map((row) => {
-      return `
-        <div class="result-section">
-          <h3>${row.farm_name}</h3>
-          <div class="kpi-grid">
-            <div class="kpi-card"><div class="label">Annual Profit</div><div class="value">${formatEuro(row.annual_profit)}</div></div>
-            <div class="kpi-card"><div class="label">Profit Margin</div><div class="value">${formatPercent(row.profit_margin)}</div></div>
-            <div class="kpi-card ${riskClass(row.risk_level)}"><div class="label">Risk</div><div class="value">${row.risk_level}</div></div>
-            <div class="kpi-card"><div class="label">Profit / Cow</div><div class="value">${formatEuro(row.profit_per_cow)}</div></div>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function renderComparisonMode(data) {
-  let html = `<h2 class="farm-title">Farm Comparison (${data.comparison.length} farms)</h2>`;
-
-  html += `<div class="result-section"><h3>Comparison Table</h3>${renderComparisonTable(data.comparison)}</div>`;
-  html += renderComparisonCards(data.comparison);
-
-  // Show charts from each farm if generated
-  data.results.forEach((result) => {
-    if (result.charts && Object.keys(result.charts).length > 0) {
-      const name = (result.forecast_summary || {}).farm_name || result.farm_file;
-      html += `<div class="result-section"><h3>Charts — ${name}</h3>${renderCharts(result.charts)}</div>`;
-    }
-  });
-
-  // Per-farm detail sections (alerts, advisory) when available
-  data.results.forEach((result) => {
-    const name = (result.forecast_summary || {}).farm_name || result.farm_file;
-
-    if (result.alerts && result.alerts.length > 0) {
-      html += `<div class="result-section"><h3>Alerts — ${name}</h3>${renderAlerts(result.alerts)}</div>`;
-    }
-
-    if (result.advisory_summary) {
-      html += `<div class="result-section"><h3>Advisory — ${name}</h3>${renderAdvisory(result.advisory_summary)}</div>`;
-    }
-  });
-
-  return html;
-}
-
-// ---------------------------------------------------------------------------
-// Run analysis
-// ---------------------------------------------------------------------------
-
-async function runAnalysis() {
-  const farms = getSelectedFarms();
-
-  if (farms.length === 0) {
-    showStatus("Please select at least one farm.", "error");
+function renderBarChart(containerId, data, keys) {
+  const el = $(containerId);
+  if (!el || !data?.length) {
+    if (el) el.innerHTML = `<p class="muted">No chart data yet.</p>`;
     return;
   }
-
-  const outputs = getOutputOptions();
-  const chartTypes = getChartTypes();
-
-  if (outputs.charts && chartTypes.length === 0) {
-    showStatus("Select at least one chart type, or disable chart generation.", "error");
-    return;
-  }
-
-  const btn = document.getElementById("run-analysis-btn");
-  btn.disabled = true;
-  showStatus("Running analysis…", "loading");
-
-  document.getElementById("welcome").classList.add("hidden");
-  const resultsEl = document.getElementById("results");
-  resultsEl.classList.add("hidden");
-  resultsEl.innerHTML = "";
-
-  try {
-    const payload = {
-      farm_files: farms,
-      outputs: outputs,
-      chart_types: chartTypes.length > 0 ? chartTypes : null,
-      save_result: true,
-    };
-
-    const data = await apiFetch("/analyse", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (data.mode === "single") {
-      resultsEl.innerHTML = renderSingleFarm(data.results[0]);
-    } else {
-      resultsEl.innerHTML = renderComparisonMode(data);
-    }
-
-    resultsEl.classList.remove("hidden");
-    hideStatus();
-    showStatus(`Analysis complete — ${farms.length} farm(s) processed.`, "success");
-  } catch (error) {
-    showStatus("Error: " + error.message, "error");
-  } finally {
-    btn.disabled = false;
-  }
+  const max = Math.max(...data.flatMap((d) => keys.map((k) => Math.abs(d[k] || 0))), 1);
+  el.innerHTML = `<div class="chart-bars">${data.slice(0, 12).map((d) => {
+    const bars = keys.map((k) => {
+      const h = Math.max(4, (Math.abs(d[k] || 0) / max) * 160);
+      const cls = k.includes("out") || k === "costs" ? "bar-out" : k.includes("profit") || k === "net" ? "bar-profit" : "bar-in";
+      return `<div class="bar ${cls}" style="height:${h}px" title="${k}: ${d[k]}"></div>`;
+    }).join("");
+    return `<div class="bar-group">${bars}<span class="bar-label">M${d.month}</span></div>`;
+  }).join("")}</div>`;
 }
 
-// ---------------------------------------------------------------------------
-// Sandbox
-// ---------------------------------------------------------------------------
-
-async function runSandbox() {
-  const farmFile = document.getElementById("sandbox-farm").value;
-
-  if (!farmFile) {
-    showStatus("Select a farm for the sandbox.", "error");
+function renderEngineCharts(charts, containerId = "engine-charts") {
+  const box = $(containerId);
+  if (!box) return;
+  if (!charts || !Object.keys(charts).length) {
+    box.innerHTML = `<p class="muted">Charts appear after analysis.</p>`;
     return;
   }
+  box.innerHTML = Object.entries(charts).map(([name, path]) => {
+    const file = path.replace(/\\/g, "/").split("/").pop();
+    return `<iframe src="/chart-files/${file}" title="${name.replace(/_/g, " ")}"></iframe>`;
+  }).join("");
+}
 
-  const changes = {};
-  const fields = [
-    ["sandbox-milk-price", "milk_price"],
-    ["sandbox-feed", "feed"],
-    ["sandbox-fertiliser", "fertiliser"],
-    ["sandbox-labour", "labour"],
-    ["sandbox-loans", "loan_repayments"],
-    ["sandbox-cows", "milking_cows"],
-    ["sandbox-litres", "litres_per_cow"],
-    ["sandbox-cash", "opening_cash_balance"],
+function renderAlerts(alerts, listId = "alerts-list") {
+  const list = $(listId);
+  if (!list) return;
+  list.innerHTML = (alerts?.length ? alerts : ["No critical alerts right now."]).map((a) => `<li>${a}</li>`).join("");
+}
+
+function renderHealth(health) {
+  const box = $("health-score");
+  if (!box || !health) return;
+  box.innerHTML = `
+    <div class="health-score">${health.score} / 100</div>
+    <div class="health-label">${health.label || "Good"}</div>
+    <div class="health-rows">
+      <div class="health-row"><span>Profitability</span><strong>${health.profitability}</strong></div>
+      <div class="health-row"><span>Liquidity</span><strong>${health.liquidity}</strong></div>
+      <div class="health-row"><span>Solvency</span><strong>${health.solvency}</strong></div>
+      <div class="health-row"><span>Efficiency</span><strong>${health.efficiency}</strong></div>
+    </div>`;
+}
+
+function renderRecommendations(recs, listId = "recommendations") {
+  const list = $(listId);
+  if (!list) return;
+  list.innerHTML = (recs || []).map((r) =>
+    `<li><strong>${r.rank ? r.rank + ". " : ""}${r.title}</strong>${r.reason || r.description ? `<br><span class="muted">${r.reason || r.description}</span>` : ""}</li>`
+  ).join("") || "<li>Run analysis to see recommendations.</li>";
+}
+
+function renderScenarios(snapshots) {
+  const box = $("scenario-snapshots");
+  if (!box) return;
+  box.innerHTML = (snapshots || []).map((s) => `
+    <div class="scenario-item">
+      <strong>${s.label}</strong>
+      Annual Profit: €${Number(s.annual_profit || 0).toLocaleString()} (${s.profit_impact || ""})
+      <br><span class="muted">Risk: ${s.risk_level}</span>
+    </div>`).join("");
+}
+
+function renderQuickActions() {
+  const box = $("quick-actions");
+  if (!box) return;
+  const actions = [
+    { icon: "🐄", label: "Select Farm", action: "focus-farm" },
+    { icon: "↗", label: "Run Advanced Forecast", view: "forecasts", trigger: "advanced" },
+    { icon: "◆", label: "Open Scenario Sandbox", view: "scenarios" },
+    { icon: "💡", label: "Ask AI Advisor", view: "intelligence" },
+    { icon: "↑", label: "Upload Financial File", view: "settings" },
+    { icon: "◎", label: "Run Monte Carlo Simulation", view: "forecasts", trigger: "monte" },
+    { icon: "📄", label: "Generate Farmer Report", view: "reports" },
   ];
-
-  fields.forEach(([elementId, fieldName]) => {
-    const value = document.getElementById(elementId).value;
-    if (value !== "") {
-      changes[fieldName] = elementId === "sandbox-cows"
-        ? parseInt(value, 10)
-        : parseFloat(value);
-    }
+  box.innerHTML = actions.map((a) =>
+    `<button type="button" class="qa-btn" data-view="${a.view || ""}" data-action="${a.action || ""}" data-trigger="${a.trigger || ""}"><span>${a.icon}</span>${a.label}</button>`
+  ).join("");
+  box.querySelectorAll(".qa-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.action === "focus-farm") $("farm-select")?.focus();
+      else if (btn.dataset.view) {
+        navigate(btn.dataset.view);
+        if (btn.dataset.trigger === "advanced") runAdvancedForecast();
+        if (btn.dataset.trigger === "monte") runMonteCarlo();
+      }
+    });
   });
+}
 
-  if (Object.keys(changes).length === 0) {
-    showStatus("Enter at least one sandbox change.", "error");
-    return;
+function renderDashboardResults(data) {
+  $("dashboard-empty")?.classList.add("hidden");
+  $("dashboard-results")?.classList.remove("hidden");
+  renderKpis(data.kpis);
+  renderAlerts(data.alerts);
+  renderAlerts(data.alerts, "alerts-full");
+  renderHealth(data.health);
+  renderRecommendations(data.recommendations);
+  renderScenarios(data.scenario_snapshots);
+  renderBarChart("chart-cashflow", data.cashflow_chart_data, ["cash_in", "cash_out"]);
+  renderBarChart("chart-profit", data.profit_chart_data, ["profit"]);
+  renderEngineCharts(data.charts);
+  if ($("recent-updates")) {
+    $("recent-updates").innerHTML = (data.recent_updates || []).map((u) =>
+      `<li><strong>${u.label}</strong><br><span class="muted">${u.detail} · ${u.when}</span></li>`).join("");
   }
+  if ($("upcoming-payments")) {
+    $("upcoming-payments").innerHTML = (data.upcoming_payments || []).map((p) =>
+      `<li><strong>${p.label}</strong> — €${Number(p.amount || 0).toLocaleString()} (${p.due})</li>`).join("");
+  }
+}
 
-  const btn = document.getElementById("run-sandbox-btn");
-  btn.disabled = true;
-  showStatus("Running sandbox forecast…", "loading");
+function renderForecastResults(data) {
+  $("forecast-results")?.classList.remove("hidden");
+  if ($("forecast-interpretation")) $("forecast-interpretation").textContent = data.interpretation || "";
+  const s = data.forecast_summary || {};
+  renderMetricCards([
+    { label: "Annual Revenue", value: `€${Number(s.annual_revenue || 0).toLocaleString()}` },
+    { label: "Annual Profit", value: `€${Number(s.annual_profit || 0).toLocaleString()}` },
+    { label: "Profit Margin", value: `${s.profit_margin || 0}%` },
+    { label: "Risk Level", value: data.risk_level || "—" },
+  ], "forecast-kpis");
+  renderBarChart("forecast-cashflow-chart", data.cashflow_chart_data, ["cash_in", "cash_out"]);
+  renderBarChart("forecast-profit-chart", data.profit_chart_data, ["profit"]);
+  renderEngineCharts(data.charts, "forecast-engine-charts");
+  renderMonteCarlo(data.monte_carlo);
+  const scenBox = $("forecast-scenarios");
+  if (scenBox) {
+    scenBox.innerHTML = (data.scenarios || []).map((s) =>
+      `<div class="scenario-item"><strong>${s.name}</strong> — Profit €${Number(s.profit).toLocaleString()} @ €${s.milk_price}/L</div>`
+    ).join("");
+  }
+}
 
-  const resultsEl = document.getElementById("sandbox-results");
-  resultsEl.classList.add("hidden");
+function renderMonteCarlo(monte) {
+  const box = $("monte-carlo-panel");
+  if (!box || !monte) return;
+  box.innerHTML = `
+    <div class="health-rows">
+      <div class="health-row"><span>Expected profit</span><strong>€${Number(monte.expected_profit || 0).toLocaleString()}</strong></div>
+      <div class="health-row"><span>Best case (90th)</span><strong>€${Number(monte.best_case || 0).toLocaleString()}</strong></div>
+      <div class="health-row"><span>Expected case</span><strong>€${Number(monte.expected_case || 0).toLocaleString()}</strong></div>
+      <div class="health-row"><span>Worst case (10th)</span><strong>€${Number(monte.worst_case || 0).toLocaleString()}</strong></div>
+      <div class="health-row"><span>Confidence range</span><strong>€${monte.confidence_range?.[0]?.toLocaleString()} – €${monte.confidence_range?.[1]?.toLocaleString()}</strong></div>
+      <div class="health-row"><span>P(loss)</span><strong>${((monte.probability_of_loss || 0) * 100).toFixed(1)}%</strong></div>
+    </div>
+    <p class="muted" style="margin-top:0.75rem">${monte.interpretation || ""}</p>`;
+}
 
+function renderSandboxResults(data) {
+  $("sandbox-results")?.classList.remove("hidden");
+  if ($("sandbox-summary")) $("sandbox-summary").textContent = data.summary || "";
+  const c = data.comparison || {};
+  renderMetricCards([
+    { label: "Profit (base)", value: `€${Number(c.profit_base || 0).toLocaleString()}` },
+    { label: "Profit (scenario)", value: `€${Number(c.profit_scenario || 0).toLocaleString()}` },
+    { label: "Difference", value: `€${Number(c.profit_difference || 0).toLocaleString()}`, sub: c.profit_difference >= 0 ? "Better" : "Worse" },
+    { label: "Risk change", value: `${c.risk_base} → ${c.risk_scenario}` },
+  ], "sandbox-comparison");
+  const table = $("sandbox-table");
+  if (table) {
+    table.innerHTML = `<table class="data-table"><tbody>
+      <tr><td>Revenue</td><td>€${Number(c.revenue_base).toLocaleString()}</td><td>€${Number(c.revenue_scenario).toLocaleString()}</td><td>€${Number(c.revenue_difference).toLocaleString()}</td></tr>
+      <tr><td>Monthly profit</td><td>€${Number(c.monthly_profit_base).toLocaleString()}</td><td>€${Number(c.monthly_profit_scenario).toLocaleString()}</td><td>—</td></tr>
+      <tr><td>Monthly cashflow</td><td>€${Number(c.monthly_cashflow_base).toLocaleString()}</td><td>€${Number(c.monthly_cashflow_scenario).toLocaleString()}</td><td>—</td></tr>
+      <tr><td>Lowest cash</td><td>€${Number(c.min_cash_base).toLocaleString()}</td><td>€${Number(c.min_cash_scenario).toLocaleString()}</td><td>—</td></tr>
+    </tbody></table>`;
+  }
+  renderRecommendations(data.recommendations, "sandbox-recommendations");
+}
+
+function getSandboxInputs() {
+  const val = (id) => { const v = $(id)?.value; return v === "" || v == null ? undefined : parseFloat(v); };
+  const intVal = (id) => { const v = $(id)?.value; return v === "" || v == null ? undefined : parseInt(v, 10); };
+  return {
+    milk_price_cents_change: val("sb-milk-cents") || 0,
+    milk_price_pct_change: val("sb-milk-pct") || 0,
+    feed_pct_change: val("sb-feed-pct") || 0,
+    fertiliser_pct_change: val("sb-fert-pct") || 0,
+    labour_pct_change: val("sb-labour-pct") || 0,
+    vet_pct_change: val("sb-vet-pct") || 0,
+    fuel_pct_change: val("sb-fuel-pct") || 0,
+    electricity_pct_change: val("sb-elec-pct") || 0,
+    loan_repayments: val("sb-loans"),
+    milking_cows: intVal("sb-cows"),
+    litres_per_cow: val("sb-litres"),
+    opening_cash_balance: val("sb-cash"),
+  };
+}
+
+const REPORT_SECTIONS = {
+  full: [
+    "Cover page and executive summary",
+    "Farm profile and financial snapshot",
+    "Profitability and cashflow charts",
+    "12-month forecast and Monte Carlo",
+    "Scenario comparison table",
+    "Financial intelligence and recommendations",
+    "Risk dashboard and 90-day action plan",
+    "Investment readiness score",
+  ],
+  executive: [
+    "Cover page and executive summary",
+    "Financial intelligence highlights",
+    "Top 5 recommended actions",
+    "AI farm advisor summary",
+  ],
+  scenario: [
+    "Executive summary",
+    "Scenario comparison table and charts",
+    "Risk dashboard",
+    "Recommended actions",
+  ],
+  investment: [
+    "Executive summary and financial snapshot",
+    "Investment readiness score",
+    "AI advisor summary for banks and investors",
+  ],
+};
+
+function initReportDate() {
+  const input = $("report-date");
+  if (input && !input.value) {
+    input.value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+function updateReportSections() {
+  const type = $("report-type")?.value || "full";
+  const list = $("report-sections");
+  if (!list) return;
+  list.innerHTML = (REPORT_SECTIONS[type] || REPORT_SECTIONS.full)
+    .map((s) => `<li>${s}</li>`).join("");
+}
+
+function formatReportDate(isoDate) {
+  if (!isoDate) return "";
+  const d = new Date(isoDate + "T12:00:00");
+  return d.toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function getReportParams() {
+  const reportType = $("report-type")?.value || "full";
+  const dateVal = $("report-date")?.value;
+  const params = new URLSearchParams();
+  if (state.selectedFarm) params.set("farm_file", state.selectedFarm);
+  params.set("report_type", reportType);
+  if (dateVal) params.set("report_date", formatReportDate(dateVal));
+  return {
+    reportType,
+    reportDate: dateVal ? formatReportDate(dateVal) : null,
+    query: `?${params.toString()}`,
+  };
+}
+
+function renderReportPreview(data, downloadUrl) {
+  $("report-preview")?.classList.remove("hidden");
+  if ($("report-preview-headline")) {
+    $("report-preview-headline").textContent = `${data.report_type_label} — ${data.farm_name}`;
+  }
+  const k = data.kpis || {};
+  const h = data.health_score || {};
+  if ($("report-preview-kpis")) {
+    $("report-preview-kpis").innerHTML = `
+      <div class="kpi-card"><span class="kpi-label">Cash Available</span><span class="kpi-value">€${Number(k.cash_available || 0).toLocaleString()}</span></div>
+      <div class="kpi-card"><span class="kpi-label">Annual Profit</span><span class="kpi-value">€${Number(k.annual_profit || 0).toLocaleString()}</span></div>
+      <div class="kpi-card"><span class="kpi-label">Risk Level</span><span class="kpi-value">${k.risk_level || "—"}</span></div>
+      <div class="kpi-card"><span class="kpi-label">Health Score</span><span class="kpi-value">${h.score ?? k.health_score ?? "—"}/100</span></div>`;
+  }
+  if ($("report-preview-summary")) {
+    $("report-preview-summary").textContent = data.executive_summary || "";
+  }
+  const link = $("report-download-link");
+  if (link && downloadUrl) {
+    link.href = downloadUrl;
+    link.classList.remove("hidden");
+  } else if (link) {
+    link.classList.add("hidden");
+  }
+}
+
+async function previewReport() {
+  const btn = $("preview-report-btn");
+  if (btn) btn.disabled = true;
+  setReportStatus("Building preview…");
   try {
-    const data = await apiFetch("/sandbox", {
+    const { query } = getReportParams();
+    const data = await api(`/farmer/report${query}`);
+    renderReportPreview(data);
+    setReportStatus(`Preview ready — ${data.page_count_estimate} sections planned.`, "success");
+    showStatus("Report preview loaded.", "success");
+  } catch (err) {
+    setReportStatus(err.message, "error");
+    showStatus(err.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function generateReport() {
+  const btn = $("generate-report-btn");
+  if (btn) btn.disabled = true;
+  setReportStatus("Generating PDF report…");
+  showStatus("Generating professional PDF…", "info");
+  try {
+    const { reportType, reportDate } = getReportParams();
+    const data = await api("/farmer/report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        farm_file: farmFile,
-        changes: changes,
-        outputs: {
-          forecast_summary: true,
-          monthly_forecast: true,
-          alerts: true,
-          risk_level: true,
-          top_risk_drivers: true,
-          kpis: true,
-        },
+        farm_file: state.selectedFarm,
+        report_type: reportType,
+        report_date: reportDate,
       }),
     });
-
-    resultsEl.innerHTML =
-      `<h3>Sandbox Results</h3>` +
-      `<p><em>Original farm file was not modified.</em></p>` +
-      renderSingleFarm(data);
-
-    resultsEl.classList.remove("hidden");
-    hideStatus();
-    showStatus("Sandbox forecast complete.", "success");
-  } catch (error) {
-    showStatus("Sandbox error: " + error.message, "error");
+    renderReportPreview(data, data.download_url);
+    setReportStatus(`PDF ready — ${data.page_count} pages. Downloading…`, "success");
+    showStatus("Report generated successfully.", "success");
+    window.open(data.download_url, "_blank");
+  } catch (err) {
+    setReportStatus(err.message, "error");
+    showStatus(err.message, "error");
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Initialise
-// ---------------------------------------------------------------------------
+function setReportStatus(msg, type = "info") {
+  const el = $("report-status");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `report-status ${type}`;
+  el.classList.remove("hidden");
+}
 
-document.getElementById("run-analysis-btn").addEventListener("click", runAnalysis);
-document.getElementById("run-sandbox-btn").addEventListener("click", runSandbox);
+function navigate(view) {
+  state.view = view;
+  document.querySelectorAll(".nav-link").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+  document.querySelectorAll(".view").forEach((v) => { v.classList.remove("active"); v.classList.add("hidden"); });
+  const section = $(`view-${view}`);
+  if (section) { section.classList.add("active"); section.classList.remove("hidden"); }
+  if (view === "intelligence") loadFinancialIntelligence();
+  if (view === "reports") {
+    initReportDate();
+    updateReportSections();
+  }
+}
 
-loadFarms();
+function renderFinancialIntelligence(data) {
+  $("intelligence-loading")?.classList.add("hidden");
+  $("intelligence-content")?.classList.remove("hidden");
+
+  const h = data.health_score || {};
+  if ($("intel-summary")) $("intel-summary").textContent = data.advisor_headline || data.plain_summary || "";
+  if ($("intel-plain")) $("intel-plain").textContent = data.plain_summary || "";
+
+  const healthBox = $("intel-health");
+  if (healthBox) {
+    healthBox.innerHTML = `
+      <div class="health-score">${h.score ?? "—"} / 100</div>
+      <div class="health-label">${h.label || "—"}</div>
+      <div class="health-rows">
+        <div class="health-row"><span>Profitability</span><strong>${h.profitability || "—"}</strong></div>
+        <div class="health-row"><span>Cashflow</span><strong>${h.cashflow || "—"}</strong></div>
+        <div class="health-row"><span>Feed pressure</span><strong>${h.feed_pressure || "—"}</strong></div>
+        <div class="health-row"><span>Debt pressure</span><strong>${h.debt_pressure || "—"}</strong></div>
+        <div class="health-row"><span>Risk level</span><strong>${h.risk_level || "—"}</strong></div>
+      </div>`;
+  }
+
+  const listHtml = (items) => (items?.length ? items.map((i) => `<li>${i}</li>`).join("") : "<li>None flagged — keep monitoring.</li>");
+  if ($("intel-strengths")) $("intel-strengths").innerHTML = listHtml(data.key_strengths);
+  if ($("intel-weaknesses")) $("intel-weaknesses").innerHTML = listHtml(data.key_weaknesses);
+  if ($("intel-opportunities")) $("intel-opportunities").innerHTML = listHtml(data.opportunities);
+
+  const risksBox = $("intel-risks");
+  if (risksBox) {
+    risksBox.innerHTML = (data.biggest_risks || []).map((r) => `
+      <div class="scenario-item">
+        <strong>${r.driver}</strong> — ${r.severity}
+        ${r.commentary ? `<br><span class="muted">${r.commentary}</span>` : ""}
+      </div>`).join("") || "<p class='muted'>No major risks identified.</p>";
+  }
+
+  renderRecommendations(data.recommended_actions, "intel-actions");
+}
+
+async function loadFinancialIntelligence() {
+  $("intelligence-loading")?.classList.remove("hidden");
+  $("intelligence-content")?.classList.add("hidden");
+  try {
+    const data = await api(`/farmer/financial-intelligence${farmQuery()}`);
+    state.intelligence = data;
+    renderFinancialIntelligence(data);
+  } catch (err) {
+    if ($("intelligence-loading")) $("intelligence-loading").textContent = `Could not load: ${err.message}`;
+    showStatus(err.message, "error");
+  }
+}
+
+async function askAdvisor() {
+  const question = $("advisor-question")?.value?.trim();
+  if (!question) {
+    showStatus("Type a question first.", "error");
+    return;
+  }
+  const btn = $("ask-advisor-btn");
+  if (btn) btn.disabled = true;
+  try {
+    const data = await api("/farmer/ask-advisor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, farm_file: state.selectedFarm }),
+    });
+    const box = $("advisor-answer");
+    if (box) {
+      box.classList.remove("hidden");
+      box.innerHTML = `
+        <p><strong>Q:</strong> ${data.question}</p>
+        <p><strong>A:</strong> ${data.answer}</p>
+        ${(data.details || []).map((d) => `<p class="muted">${d}</p>`).join("")}`;
+    }
+    showStatus("Answer ready.", "success");
+  } catch (err) {
+    showStatus(err.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function refreshFarmData() {
+  const data = await api(`/farmer/dashboard${farmQuery()}`);
+  state.profile = data.profile;
+  setGreeting();
+  renderSidebar(data.profile);
+  renderProfileDetail(data.profile);
+  renderKpis(data.kpis);
+  if (state.analysis) await runAnalysis(false);
+}
+
+async function onFarmChange() {
+  state.selectedFarm = $("farm-select")?.value;
+  showStatus("Loading farm data…", "info");
+  try {
+    await refreshFarmData();
+    if (state.view === "intelligence") await loadFinancialIntelligence();
+    if (state.view === "reports") $("report-preview")?.classList.add("hidden");
+    showStatus(`Now viewing ${state.profile.farm_name}`, "success");
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+async function loadInitial() {
+  const data = await api(`/farmer/dashboard${farmQuery()}`);
+  state.farms = data.farms || [];
+  if (!state.farms.length) {
+    const farmsRes = await api("/farms");
+    state.farms = farmsRes.farms.map((f) => ({ ...f, is_default: f.farm_file === "dairy_farm_1.json" }));
+  }
+  renderFarmSelect(state.farms);
+  state.profile = data.profile;
+  setGreeting();
+  renderSidebar(data.profile);
+  renderProfileDetail(data.profile);
+  renderKpis(data.kpis);
+  renderQuickActions();
+}
+
+async function runAnalysis(showMsg = true) {
+  const btn = $("run-analysis-btn");
+  if (btn) btn.disabled = true;
+  if (showMsg) showStatus("Running analysis…", "info");
+  try {
+    const data = await api("/farmer/run-analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: farmBody() });
+    state.analysis = data;
+    state.profile = data.profile;
+    renderSidebar(data.profile);
+    renderDashboardResults(data);
+    if (showMsg) showStatus("Analysis complete.", "success");
+  } catch (err) {
+    if (showMsg) showStatus(err.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function runAdvancedForecast() {
+  const btn = $("run-advanced-forecast-btn");
+  if (btn) btn.disabled = true;
+  showStatus("Running advanced forecast…", "info");
+  try {
+    const data = await api("/farmer/run-advanced-forecast", { method: "POST", headers: { "Content-Type": "application/json" }, body: farmBody() });
+    renderForecastResults(data);
+    showStatus("Advanced forecast complete.", "success");
+  } catch (err) {
+    showStatus(err.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function runMonteCarlo() {
+  showStatus("Running Monte Carlo simulation…", "info");
+  try {
+    const data = await api("/farmer/run-monte-carlo", { method: "POST", headers: { "Content-Type": "application/json" }, body: farmBody({ iterations: 1000 }) });
+    renderMonteCarlo(data.monte_carlo);
+    $("forecast-results")?.classList.remove("hidden");
+    showStatus("Monte Carlo complete.", "success");
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+async function runSandbox() {
+  const btn = $("run-sandbox-btn");
+  if (btn) btn.disabled = true;
+  showStatus("Running scenario…", "info");
+  try {
+    const data = await api("/farmer/scenario-sandbox", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: farmBody(getSandboxInputs()),
+    });
+    renderSandboxResults(data);
+    showStatus("Scenario complete.", "success");
+  } catch (err) {
+    showStatus(err.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setupNav() {
+  document.querySelectorAll(".nav-link").forEach((btn) => {
+    btn.addEventListener("click", () => navigate(btn.dataset.view));
+  });
+  $("run-analysis-btn")?.addEventListener("click", () => runAnalysis());
+  $("run-advanced-forecast-btn")?.addEventListener("click", runAdvancedForecast);
+  $("run-monte-carlo-btn")?.addEventListener("click", runMonteCarlo);
+  $("run-sandbox-btn")?.addEventListener("click", runSandbox);
+  $("farm-select")?.addEventListener("change", onFarmChange);
+  $("refresh-intelligence-btn")?.addEventListener("click", loadFinancialIntelligence);
+  $("ask-advisor-btn")?.addEventListener("click", askAdvisor);
+  $("advisor-question")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") askAdvisor();
+  });
+  $("preview-report-btn")?.addEventListener("click", previewReport);
+  $("generate-report-btn")?.addEventListener("click", generateReport);
+  $("report-type")?.addEventListener("change", updateReportSections);
+  initReportDate();
+  updateReportSections();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  setupNav();
+  loadInitial().catch((err) => showStatus(err.message, "error"));
+});

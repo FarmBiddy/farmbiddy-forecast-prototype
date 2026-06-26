@@ -400,6 +400,8 @@ def apply_sandbox_changes(farm: dict, changes: dict) -> Tuple[dict, dict]:
         "opening_cash_balance",
         "biss",
         "acres",
+        "fuel",
+        "electricity",
     }
 
     for field, new_value in changes.items():

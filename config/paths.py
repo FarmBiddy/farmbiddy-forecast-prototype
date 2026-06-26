@@ -12,6 +12,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Read-only farm datasets (committed to Git)
 DATASETS_DIR = os.path.join(BASE_DIR, "datasets")
+FARM_PROFILE_PATH = os.path.join(BASE_DIR, "config", "farm_profile.json")
 
 # Writable storage — defaults to outputs/ when STORAGE_PATH is unset or empty
 _storage_env = os.environ.get("STORAGE_PATH", "").strip()
@@ -23,6 +24,7 @@ HISTORY_DIR = os.path.join(STORAGE_ROOT, "history")
 CHARTS_DIR = os.path.join(STORAGE_ROOT, "charts")
 COMPARISONS_DIR = os.path.join(STORAGE_ROOT, "comparisons")
 SANDBOX_DIR = os.path.join(STORAGE_ROOT, "sandbox")
+REPORTS_DIR = os.path.join(STORAGE_ROOT, "reports")
 
 # Frontend assets (committed to Git, served by FastAPI)
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
@@ -30,5 +32,5 @@ FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 def ensure_output_dirs():
     """Create writable output folders if they do not exist."""
-    for folder in (HISTORY_DIR, CHARTS_DIR, COMPARISONS_DIR, SANDBOX_DIR):
+    for folder in (HISTORY_DIR, CHARTS_DIR, COMPARISONS_DIR, SANDBOX_DIR, REPORTS_DIR):
         os.makedirs(folder, exist_ok=True)
