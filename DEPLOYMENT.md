@@ -188,7 +188,13 @@ Render dashboard → **Logs** tab. Watch for:
 ```powershell
 cd "C:\Users\User\Desktop\CODE FARMBIDDY\TEST\DAIRY FINANCIALS"
 python -m pip install -r requirements.txt
-uvicorn api.main:app --reload
+.\start.bat
+```
+
+Or run directly (use `python -m` on Windows if `uvicorn` is not recognized):
+
+```powershell
+python -m uvicorn api.main:app --reload
 ```
 
 Open http://127.0.0.1:8000
@@ -291,7 +297,8 @@ git push
 
 # Local test
 python -m pip install -r requirements.txt
-uvicorn api.main:app --reload
+.\start.bat
+# or: python -m uvicorn api.main:app --reload
 ```
 
 Your boss opens: **https://YOUR-SERVICE-NAME.onrender.com**

@@ -10,7 +10,7 @@
         "biss": 10,
         "acres": 12
     },
-    "feed": 85000,
+    "feed": 85150.0,
     "fertiliser": 30000,
     "vet": 12000,
     "contractor": 22000,
@@ -25,5 +25,6 @@
             "cashflow": 3267,
             "running_balance": 13267
         }
-    ]
+    ],
+    "last_daily_update": "2026-06-26T15:33:44.190115+00:00"
 }

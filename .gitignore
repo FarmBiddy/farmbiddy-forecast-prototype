@@ -19,13 +19,20 @@ outputs/history/*
 outputs/charts/*
 outputs/comparisons/*
 outputs/sandbox/*
+outputs/uploads/*
+outputs/reports/*
+outputs/farm_events/*
 !outputs/history/.gitkeep
 !outputs/charts/.gitkeep
 !outputs/comparisons/.gitkeep
 !outputs/sandbox/.gitkeep
+!outputs/uploads/.gitkeep
+!outputs/reports/.gitkeep
+!outputs/farm_events/.gitkeep
 
 # Legacy flat output files
 outputs/*.json
+outputs/daily_updates.json
 
 # IDE / editor
 .cursor/
