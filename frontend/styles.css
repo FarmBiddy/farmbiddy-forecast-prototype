@@ -304,14 +304,124 @@ body {
 .exec-alerts li.alert-low { border-left-color: #94a3b8; background: #f8fafc; }
 .exec-alerts li.alert-info { border-left-color: var(--green); background: var(--green-light); }
 
-.overview-chart-area .chart-bars {
-  overflow-x: auto;
-  min-width: 100%;
+.overview-chart-area {
+  min-height: 280px;
+  padding: 0;
+  overflow: visible;
 }
 
-.overview-chart-area .bar-group {
-  min-width: 28px;
-  flex: 0 0 28px;
+.overview-chart-wrap {
+  position: relative;
+  width: 100%;
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.overview-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.overview-chart-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 0 0.5rem 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.overview-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.overview-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.overview-legend-revenue { background: var(--green); }
+.overview-legend-costs { background: #94a3b8; }
+
+.overview-grid-line {
+  stroke: #e8edf2;
+  stroke-width: 1;
+}
+
+.overview-axis-line {
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+
+.overview-axis-y {
+  font-size: 10px;
+  fill: #64748b;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.overview-axis-x {
+  font-size: 10px;
+  fill: #475569;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.overview-bar {
+  transition: opacity 0.15s ease;
+}
+
+.overview-bar-revenue {
+  fill: var(--green);
+  opacity: 0.88;
+}
+
+.overview-bar-costs {
+  fill: #94a3b8;
+  opacity: 0.82;
+}
+
+.overview-bar-group:hover .overview-bar,
+.overview-bar-group:focus .overview-bar {
+  opacity: 1;
+}
+
+.overview-chart-tooltip {
+  position: absolute;
+  z-index: 10;
+  min-width: 150px;
+  padding: 0.55rem 0.7rem;
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+}
+
+.overview-tooltip-month {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.overview-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.overview-tooltip-row strong {
+  font-weight: 600;
+}
+
+.overview-tooltip-diff {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(248, 250, 252, 0.15);
 }
 
 .historical-sector-block {

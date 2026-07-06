@@ -231,26 +231,152 @@ function renderSectorTable(rows) {
     </table>`;
 }
 
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatChartEuro(value) {
+  return `€${Number(value || 0).toLocaleString("en-IE", { maximumFractionDigits: 0 })}`;
+}
+
+function formatOverviewMonthLabel(d) {
+  if (d.period) {
+    const parts = d.period.split("-");
+    const year = parts[0] || "";
+    const month = parseInt(parts[1], 10);
+    if (month >= 1 && month <= 12) {
+      return `${MONTH_SHORT[month - 1]} ${year.slice(-2)}`;
+    }
+  }
+  return d.month ? `M${d.month}` : "";
+}
+
+function niceChartTicks(maxValue, count = 5) {
+  if (maxValue <= 0) return [0];
+  const rough = maxValue / count;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+  const residual = rough / magnitude;
+  let niceUnit = magnitude;
+  if (residual > 5) niceUnit = 10 * magnitude;
+  else if (residual > 2) niceUnit = 5 * magnitude;
+  else if (residual > 1) niceUnit = 2 * magnitude;
+  const ticks = [];
+  for (let v = 0; v <= maxValue + niceUnit * 0.01; v += niceUnit) {
+    ticks.push(v);
+  }
+  if (ticks[ticks.length - 1] < maxValue) ticks.push(ticks[ticks.length - 1] + niceUnit);
+  return ticks;
+}
+
 function renderOverviewChart(data) {
   const el = $("overview-chart");
   if (!el || !data?.length) {
     if (el) el.innerHTML = `<p class="muted">No chart data yet.</p>`;
     return;
   }
-  const max = Math.max(...data.flatMap((d) => [Math.abs(d.revenue || 0), Math.abs(d.costs || 0)]), 1);
-  const barMaxPx = 150;
-  el.innerHTML = `<div class="chart-bars">${data.map((d) => {
-    const revH = Math.max(3, (Math.abs(d.revenue || 0) / max) * barMaxPx);
-    const costH = Math.max(3, (Math.abs(d.costs || 0) / max) * barMaxPx);
-    const label = d.period ? d.period.slice(2) : `${d.month}`;
-    return `<div class="bar-group">
-      <div class="bar-stack">
-        <div class="bar bar-in" style="height:${revH}px" title="Revenue: €${d.revenue}"></div>
-        <div class="bar bar-out" style="height:${costH}px" title="Costs: €${d.costs}"></div>
+
+  el._lastChartData = data;
+  if (!el._resizeObs) {
+    el._resizeObs = new ResizeObserver(() => {
+      if (el._lastChartData) renderOverviewChart(el._lastChartData);
+    });
+    el._resizeObs.observe(el);
+  }
+
+  const width = Math.max(el.clientWidth || 0, 640);
+  const height = 280;
+  const padL = 68;
+  const padR = 24;
+  const padT = 36;
+  const padB = 40;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+
+  const maxVal = Math.max(...data.flatMap((d) => [Math.abs(d.revenue || 0), Math.abs(d.costs || 0)]), 1);
+  const yTicks = niceChartTicks(maxVal, 5);
+  const yMax = yTicks[yTicks.length - 1] || maxVal;
+
+  const n = data.length;
+  const slotW = plotW / n;
+  const barW = Math.min(11, Math.max(5, slotW * 0.28));
+  const barGap = 3;
+
+  const yScale = (v) => padT + plotH - (v / yMax) * plotH;
+
+  const gridLines = yTicks.map((tick) => {
+    const y = yScale(tick);
+    return `<line class="overview-grid-line" x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" />`;
+  }).join("");
+
+  const yLabels = yTicks.map((tick) => {
+    const y = yScale(tick);
+    return `<text class="overview-axis-y" x="${padL - 8}" y="${y + 4}" text-anchor="end">${formatChartEuro(tick)}</text>`;
+  }).join("");
+
+  const bars = data.map((d, i) => {
+    const cx = padL + slotW * i + slotW / 2;
+    const rev = Math.abs(d.revenue || 0);
+    const cost = Math.abs(d.costs || 0);
+    const revH = Math.max(2, (rev / yMax) * plotH);
+    const costH = Math.max(2, (cost / yMax) * plotH);
+    const revX = cx - barGap / 2 - barW;
+    const costX = cx + barGap / 2;
+    const baseY = padT + plotH;
+    const label = formatOverviewMonthLabel(d);
+    return `
+      <g class="overview-bar-group" data-idx="${i}" tabindex="0">
+        <rect class="overview-bar overview-bar-revenue" x="${revX}" y="${baseY - revH}" width="${barW}" height="${revH}" rx="3" ry="3" />
+        <rect class="overview-bar overview-bar-costs" x="${costX}" y="${baseY - costH}" width="${barW}" height="${costH}" rx="3" ry="3" />
+        <text class="overview-axis-x" x="${cx}" y="${height - 12}" text-anchor="middle">${label}</text>
+      </g>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="overview-chart-wrap">
+      <div class="overview-chart-legend" aria-hidden="true">
+        <span class="overview-legend-item"><i class="overview-legend-swatch overview-legend-revenue"></i>Revenue</span>
+        <span class="overview-legend-item"><i class="overview-legend-swatch overview-legend-costs"></i>Costs</span>
       </div>
-      <span class="bar-label">${label}</span>
+      <svg class="overview-chart-svg" width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Revenue vs costs over 24 months">
+        ${gridLines}
+        ${yLabels}
+        <line class="overview-axis-line" x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}" />
+        ${bars}
+      </svg>
+      <div class="overview-chart-tooltip hidden" id="overview-chart-tooltip"></div>
     </div>`;
-  }).join("")}</div>`;
+
+  const tooltip = el.querySelector("#overview-chart-tooltip");
+  const showTooltip = (idx, clientX, clientY) => {
+    const d = data[idx];
+    if (!d || !tooltip) return;
+    const rev = d.revenue || 0;
+    const cost = d.costs || 0;
+    const label = formatOverviewMonthLabel(d);
+    tooltip.innerHTML = `
+      <div class="overview-tooltip-month">${label}</div>
+      <div class="overview-tooltip-row"><span>Revenue</span><strong>${formatChartEuro(rev)}</strong></div>
+      <div class="overview-tooltip-row"><span>Costs</span><strong>${formatChartEuro(cost)}</strong></div>
+      <div class="overview-tooltip-row overview-tooltip-diff"><span>Difference</span><strong>${formatChartEuro(rev - cost)}</strong></div>`;
+    tooltip.classList.remove("hidden");
+    const wrap = el.querySelector(".overview-chart-wrap");
+    const rect = wrap.getBoundingClientRect();
+    const left = Math.min(Math.max(clientX - rect.left + 12, 8), rect.width - 168);
+    const top = Math.max(clientY - rect.top - 80, 8);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  };
+
+  const hideTooltip = () => tooltip?.classList.add("hidden");
+
+  el.querySelectorAll(".overview-bar-group").forEach((group) => {
+    group.addEventListener("mouseenter", (e) => showTooltip(+group.dataset.idx, e.clientX, e.clientY));
+    group.addEventListener("mousemove", (e) => showTooltip(+group.dataset.idx, e.clientX, e.clientY));
+    group.addEventListener("mouseleave", hideTooltip);
+    group.addEventListener("focus", (e) => {
+      const r = group.getBoundingClientRect();
+      showTooltip(+group.dataset.idx, r.left + r.width / 2, r.top);
+    });
+    group.addEventListener("blur", hideTooltip);
+  });
 }
 
 function renderExecutiveAlerts(alerts, listId = "alerts-list") {
