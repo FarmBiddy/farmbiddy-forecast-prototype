@@ -640,6 +640,7 @@ async function loadInitial() {
   renderProfileDetail(data.profile);
   renderKpis(data.kpis);
   renderQuickActions();
+  await runAnalysis(false);
 }
 
 async function runAnalysis(showMsg = true) {
@@ -655,7 +656,7 @@ async function runAnalysis(showMsg = true) {
     renderDashboardResults(data);
     if (showMsg) showStatus("Analysis complete.", "success");
   } catch (err) {
-    if (showMsg) showStatus(err.message, "error");
+    showStatus(err.message, "error");
   } finally {
     if (btn) btn.disabled = false;
   }
