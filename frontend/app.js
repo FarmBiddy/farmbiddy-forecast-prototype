@@ -150,13 +150,14 @@ function renderBarChart(containerId, data, keys) {
     return;
   }
   const max = Math.max(...data.flatMap((d) => keys.map((k) => Math.abs(d[k] || 0))), 1);
+  const barMaxPx = 150;
   el.innerHTML = `<div class="chart-bars">${data.slice(0, 12).map((d) => {
     const bars = keys.map((k) => {
-      const h = Math.max(4, (Math.abs(d[k] || 0) / max) * 160);
+      const h = Math.max(3, (Math.abs(d[k] || 0) / max) * barMaxPx);
       const cls = k.includes("out") || k === "costs" ? "bar-out" : k.includes("profit") || k === "net" ? "bar-profit" : "bar-in";
       return `<div class="bar ${cls}" style="height:${h}px" title="${k}: ${d[k]}"></div>`;
     }).join("");
-    return `<div class="bar-group">${bars}<span class="bar-label">M${d.month}</span></div>`;
+    return `<div class="bar-group"><div class="bar-stack">${bars}</div><span class="bar-label">M${d.month}</span></div>`;
   }).join("")}</div>`;
 }
 
