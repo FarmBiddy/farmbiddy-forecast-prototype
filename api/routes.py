@@ -40,6 +40,7 @@ from models.api_models import (
     FarmerReportRequest,
     FarmerReportResponse,
     FarmerReportPreviewResponse,
+    SectorListResponse,
 )
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
@@ -48,6 +49,7 @@ from services.report_service import generate_farmer_report, get_report_preview
 from services.farmer_dashboard_service import (
     get_farmer_dashboard_preview,
     get_farmer_profile,
+    get_sectors_list,
     list_farms_for_selector,
     run_advanced_forecast,
     run_farmer_analysis,
@@ -64,6 +66,12 @@ from services.forecast_service import (
 )
 
 router = APIRouter()
+
+
+def _parse_sectors_query(sectors: Optional[str] = None) -> Optional[list[str]]:
+    if not sectors:
+        return None
+    return [part.strip() for part in sectors.split(",") if part.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -94,8 +102,25 @@ def application_status():
     tags=["Farmer Edition"],
     summary="Active farm profile",
 )
-def farmer_profile(farm_id: Optional[str] = Query(default=None, alias="farm_file")):
-    return FarmerProfileResponse(**get_farmer_profile(farm_id))
+def farmer_profile(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    return FarmerProfileResponse(**get_farmer_profile(farm_id, _parse_sectors_query(sectors)))
+
+
+@router.get(
+    "/farmer/sectors",
+    response_model=SectorListResponse,
+    tags=["Farmer Edition"],
+    summary="List available farm sectors",
+)
+def farmer_sectors(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    payload = get_sectors_list(farm_id, _parse_sectors_query(sectors))
+    return SectorListResponse(success=True, **payload)
 
 
 @router.get(
@@ -104,8 +129,11 @@ def farmer_profile(farm_id: Optional[str] = Query(default=None, alias="farm_file
     tags=["Farmer Edition"],
     summary="Dashboard preview with fallback KPIs",
 )
-def farmer_dashboard(farm_id: Optional[str] = Query(default=None, alias="farm_file")):
-    data = get_farmer_dashboard_preview(farm_id)
+def farmer_dashboard(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    data = get_farmer_dashboard_preview(farm_id, _parse_sectors_query(sectors))
     return FarmerDashboardResponse(**data)
 
 
@@ -117,7 +145,11 @@ def farmer_dashboard(farm_id: Optional[str] = Query(default=None, alias="farm_fi
 )
 def farmer_run_analysis(request: FarmerRunAnalysisRequest = FarmerRunAnalysisRequest()):
     try:
-        return FarmerAnalysisResponse(**run_farmer_analysis(request.farm_file, save_result=True))
+        return FarmerAnalysisResponse(**run_farmer_analysis(
+            request.farm_file,
+            save_result=True,
+            sectors=request.sectors,
+        ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
@@ -132,7 +164,10 @@ def farmer_run_analysis(request: FarmerRunAnalysisRequest = FarmerRunAnalysisReq
 )
 def farmer_advanced_forecast(request: FarmerRunAnalysisRequest = FarmerRunAnalysisRequest()):
     try:
-        return FarmerAdvancedForecastResponse(**run_advanced_forecast(request.farm_file))
+        return FarmerAdvancedForecastResponse(**run_advanced_forecast(
+            request.farm_file,
+            sectors=request.sectors,
+        ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
@@ -147,7 +182,11 @@ def farmer_advanced_forecast(request: FarmerRunAnalysisRequest = FarmerRunAnalys
 )
 def farmer_monte_carlo(request: FarmerMonteCarloRequest):
     try:
-        return FarmerMonteCarloResponse(**run_monte_carlo_for_farm(request.farm_file, request.iterations))
+        return FarmerMonteCarloResponse(**run_monte_carlo_for_farm(
+            request.farm_file,
+            request.iterations,
+            sectors=request.sectors,
+        ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -188,9 +227,13 @@ def farm_profile_alias(farm_id: Optional[str] = Query(default=None, alias="farm_
 )
 def farmer_financial_intelligence(
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
 ):
     try:
-        return FinancialIntelligenceResponse(**get_financial_intelligence(farm_id))
+        return FinancialIntelligenceResponse(**get_financial_intelligence(
+            farm_id,
+            sectors=_parse_sectors_query(sectors),
+        ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
@@ -205,7 +248,11 @@ def farmer_financial_intelligence(
 )
 def farmer_ask_advisor(request: AskAdvisorRequest):
     try:
-        return AskAdvisorResponse(**ask_farm_advisor(request.question, request.farm_file))
+        return AskAdvisorResponse(**ask_farm_advisor(
+            request.question,
+            request.farm_file,
+            sectors=request.sectors,
+        ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -220,9 +267,15 @@ def farmer_report_preview(
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
     report_type: str = Query(default="full"),
     report_date: Optional[str] = Query(default=None),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
 ):
     try:
-        return FarmerReportPreviewResponse(**get_report_preview(farm_id, report_type, report_date))
+        return FarmerReportPreviewResponse(**get_report_preview(
+            farm_id,
+            report_type,
+            report_date,
+            sectors=_parse_sectors_query(sectors),
+        ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
@@ -241,6 +294,7 @@ def farmer_generate_report(request: FarmerReportRequest):
             request.farm_file,
             request.report_type,
             request.report_date,
+            sectors=request.sectors,
         ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

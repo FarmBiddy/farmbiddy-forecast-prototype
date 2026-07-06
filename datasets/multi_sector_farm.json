@@ -1,0 +1,2997 @@
+{
+  "schema_version": "2.0",
+  "farm_name": "Knockrow Mixed Farm",
+  "identity": {
+    "legal_entity": {
+      "name": "Knockrow Mixed Farm Ltd",
+      "type": "Private Company Limited by Shares",
+      "registration_number": "IE-4829173",
+      "vat_number": "IE9847291K"
+    },
+    "farmer": {
+      "name": "Patrick O'Sullivan",
+      "client_id": "FB-CL-10482",
+      "phone": "+353 87 123 4567",
+      "email": "patrick.osullivan@knockrowfarm.ie",
+      "address": "Knockrow, Cahir, Co. Tipperary, E21 XY12"
+    },
+    "location": {
+      "county": "Tipperary",
+      "country": "Ireland",
+      "herd_number": "IE-3728491",
+      "coordinates": {
+        "lat": 52.376,
+        "lng": -7.921
+      }
+    }
+  },
+  "farm_summary": {
+    "total_hectares": 185,
+    "opening_cash_balance": 28500,
+    "debtors": 14200,
+    "creditors": 19600,
+    "loans": [
+      {
+        "lender": "AIB Agri Finance",
+        "principal": 185000,
+        "monthly_repayment": 2100,
+        "rate": 4.85,
+        "maturity": "2031-06"
+      },
+      {
+        "lender": "Credit Union Cahir",
+        "principal": 35000,
+        "monthly_repayment": 680,
+        "rate": 5.2,
+        "maturity": "2028-03"
+      }
+    ],
+    "supplier_credit": [
+      {
+        "supplier": "Dairygold Co-op",
+        "balance": 8400,
+        "terms_days": 30
+      },
+      {
+        "supplier": "Tipperary Co-op Store",
+        "balance": 3200,
+        "terms_days": 45
+      }
+    ],
+    "notes": "Mixed enterprise \u2014 dairy, beef finishing, and sheep. Family labour with one part-time employee."
+  },
+  "scheme_payments": {
+    "biss": 22400,
+    "acres": 9200,
+    "other_grants": 3500,
+    "scheme_payment_months": {
+      "biss": 10,
+      "acres": 12,
+      "other_grants": 11
+    }
+  },
+  "available_sectors": [
+    "dairy",
+    "beef",
+    "lamb"
+  ],
+  "sectors": {
+    "dairy": {
+      "display_name": "Dairy",
+      "processor": "Lakeland Dairies",
+      "herd": {
+        "milking_cows": 98,
+        "dry_cows": 12,
+        "calves": 8,
+        "replacement_heifers": 24
+      },
+      "monthly": [
+        {
+          "year": 2024,
+          "month": 1,
+          "period": "2024-01",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 29956.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.398
+          },
+          "revenue": {
+            "milk": 11922.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 11922.0
+          },
+          "costs": {
+            "feed": 11156.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 706.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 912.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20814.0
+          },
+          "notes": "Higher concentrate use in winter"
+        },
+        {
+          "year": 2024,
+          "month": 2,
+          "period": "2024-02",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 32240.0,
+            "calves": 10,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.405
+          },
+          "revenue": {
+            "milk": 13057.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 13057.0
+          },
+          "costs": {
+            "feed": 10948.0,
+            "vet": 1300,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 695.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 890.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20973.0
+          },
+          "notes": "Higher concentrate use in winter"
+        },
+        {
+          "year": 2024,
+          "month": 3,
+          "period": "2024-03",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 35360.0,
+            "calves": 10,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.411
+          },
+          "revenue": {
+            "milk": 14533.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 14533.0
+          },
+          "costs": {
+            "feed": 10665.0,
+            "vet": 1300,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 680.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 860.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 21345.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 4,
+          "period": "2024-04",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 38480.0,
+            "calves": 10,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.416
+          },
+          "revenue": {
+            "milk": 16008.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 16008.0
+          },
+          "costs": {
+            "feed": 10382.0,
+            "vet": 900,
+            "breeding": 350,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 665.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 830.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20847.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 5,
+          "period": "2024-05",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 40764.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.419
+          },
+          "revenue": {
+            "milk": 17080.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 17080.0
+          },
+          "costs": {
+            "feed": 10174.0,
+            "vet": 900,
+            "breeding": 350,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 654.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 808.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 19906.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 6,
+          "period": "2024-06",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 41600.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.42
+          },
+          "revenue": {
+            "milk": 17472.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 17472.0
+          },
+          "costs": {
+            "feed": 10098.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 650.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 800.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 19588.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 7,
+          "period": "2024-07",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 40764.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.419
+          },
+          "revenue": {
+            "milk": 17080.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 17080.0
+          },
+          "costs": {
+            "feed": 10174.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 654.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 808.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 19676.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 8,
+          "period": "2024-08",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 38480.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.416
+          },
+          "revenue": {
+            "milk": 16008.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 16008.0
+          },
+          "costs": {
+            "feed": 10382.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 665.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 830.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20617.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 9,
+          "period": "2024-09",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 35360.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.411
+          },
+          "revenue": {
+            "milk": 14533.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 14533.0
+          },
+          "costs": {
+            "feed": 10665.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 680.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 860.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20945.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 10,
+          "period": "2024-10",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 32240.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.405
+          },
+          "revenue": {
+            "milk": 13057.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 13057.0
+          },
+          "costs": {
+            "feed": 10948.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 695.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 890.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20573.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 11,
+          "period": "2024-11",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 29956.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.398
+          },
+          "revenue": {
+            "milk": 11922.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 11922.0
+          },
+          "costs": {
+            "feed": 11156.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 706.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 912.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20814.0
+          },
+          "notes": "Higher concentrate use in winter"
+        },
+        {
+          "year": 2024,
+          "month": 12,
+          "period": "2024-12",
+          "operational": {
+            "milking_cows": 96,
+            "milk_litres": 29120.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.39
+          },
+          "revenue": {
+            "milk": 11357.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 11357.0
+          },
+          "costs": {
+            "feed": 11232.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 710.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 920.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20902.0
+          },
+          "notes": "Higher concentrate use in winter"
+        },
+        {
+          "year": 2025,
+          "month": 1,
+          "period": "2025-01",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 30580.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.398
+          },
+          "revenue": {
+            "milk": 12171.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 12171.0
+          },
+          "costs": {
+            "feed": 11156.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 706.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 912.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20814.0
+          },
+          "notes": "Higher concentrate use in winter"
+        },
+        {
+          "year": 2025,
+          "month": 2,
+          "period": "2025-02",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 32912.0,
+            "calves": 10,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.405
+          },
+          "revenue": {
+            "milk": 13329.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 13329.0
+          },
+          "costs": {
+            "feed": 10948.0,
+            "vet": 1300,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 695.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 890.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20973.0
+          },
+          "notes": "Higher concentrate use in winter"
+        },
+        {
+          "year": 2025,
+          "month": 3,
+          "period": "2025-03",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 36097.0,
+            "calves": 10,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.411
+          },
+          "revenue": {
+            "milk": 14836.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 14836.0
+          },
+          "costs": {
+            "feed": 10665.0,
+            "vet": 1300,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 680.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 860.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 21345.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 4,
+          "period": "2025-04",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 39282.0,
+            "calves": 10,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.416
+          },
+          "revenue": {
+            "milk": 16341.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 16341.0
+          },
+          "costs": {
+            "feed": 10382.0,
+            "vet": 900,
+            "breeding": 350,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 665.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 830.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20847.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 5,
+          "period": "2025-05",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 41613.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.419
+          },
+          "revenue": {
+            "milk": 17436.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 17436.0
+          },
+          "costs": {
+            "feed": 10174.0,
+            "vet": 900,
+            "breeding": 350,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 654.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 808.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 19906.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 6,
+          "period": "2025-06",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 42467.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.42
+          },
+          "revenue": {
+            "milk": 17836.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 17836.0
+          },
+          "costs": {
+            "feed": 10098.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 650.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 800.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 19588.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 7,
+          "period": "2025-07",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 41613.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.419
+          },
+          "revenue": {
+            "milk": 17436.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 17436.0
+          },
+          "costs": {
+            "feed": 10174.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 654.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 808.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 19676.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 8,
+          "period": "2025-08",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 39282.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.416
+          },
+          "revenue": {
+            "milk": 16341.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 16341.0
+          },
+          "costs": {
+            "feed": 10382.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 665.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 830.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20617.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 9,
+          "period": "2025-09",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 36097.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.411
+          },
+          "revenue": {
+            "milk": 14836.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 14836.0
+          },
+          "costs": {
+            "feed": 10665.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 680.0,
+            "fertiliser": 1100,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 860.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20945.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 10,
+          "period": "2025-10",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 32912.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.405
+          },
+          "revenue": {
+            "milk": 13329.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 13329.0
+          },
+          "costs": {
+            "feed": 10948.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 695.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 890.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20573.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 11,
+          "period": "2025-11",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 30580.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.398
+          },
+          "revenue": {
+            "milk": 12171.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 12171.0
+          },
+          "costs": {
+            "feed": 11156.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 706.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 912.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20814.0
+          },
+          "notes": "Higher concentrate use in winter"
+        },
+        {
+          "year": 2025,
+          "month": 12,
+          "period": "2025-12",
+          "operational": {
+            "milking_cows": 98,
+            "milk_litres": 29727.0,
+            "calves": 6,
+            "dry_cows": 12
+          },
+          "pricing": {
+            "milk_price_per_litre": 0.39
+          },
+          "revenue": {
+            "milk": 11594.0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 11594.0
+          },
+          "costs": {
+            "feed": 11232.0,
+            "vet": 900,
+            "breeding": 120,
+            "labour": 4800,
+            "machinery": 900,
+            "fuel": 710.0,
+            "fertiliser": 400,
+            "insurance": 420,
+            "rent_land_lease": 0,
+            "contractor": 920.0,
+            "animal_purchases": 0,
+            "housing": 280,
+            "equipment": 220,
+            "total": 20902.0
+          },
+          "notes": "Higher concentrate use in winter"
+        }
+      ]
+    },
+    "beef": {
+      "display_name": "Beef",
+      "herd": {
+        "cattle_on_farm": 50,
+        "finishing_units": 28
+      },
+      "monthly": [
+        {
+          "year": 2024,
+          "month": 1,
+          "period": "2024-01",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 3,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1320.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4770.0,
+            "vet": 650,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 5200,
+            "housing": 350,
+            "equipment": 150,
+            "total": 15180.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 2,
+          "period": "2024-02",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1410.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4688.0,
+            "vet": 650,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9898.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 3,
+          "period": "2024-03",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 2,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1476.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 2952.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 2952.0
+          },
+          "costs": {
+            "feed": 4575.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9585.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 4,
+          "period": "2024-04",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 3,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1500.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4462.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 5200,
+            "housing": 350,
+            "equipment": 150,
+            "total": 14672.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 5,
+          "period": "2024-05",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1476.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4380.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9390.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 6,
+          "period": "2024-06",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 4,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1410.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 5640.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 5640.0
+          },
+          "costs": {
+            "feed": 4350.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9360.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 7,
+          "period": "2024-07",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 2,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1320.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 2640.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 2640.0
+          },
+          "costs": {
+            "feed": 4380.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9390.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 8,
+          "period": "2024-08",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1230.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4462.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9472.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 9,
+          "period": "2024-09",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 4,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1164.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 4656.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 4656.0
+          },
+          "costs": {
+            "feed": 4575.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9585.0
+          },
+          "notes": "Store cattle sales in autumn"
+        },
+        {
+          "year": 2024,
+          "month": 10,
+          "period": "2024-10",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 3,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1140.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4688.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 5200,
+            "housing": 350,
+            "equipment": 150,
+            "total": 14898.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 11,
+          "period": "2024-11",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 4,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1164.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 4656.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 4656.0
+          },
+          "costs": {
+            "feed": 4770.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9780.0
+          },
+          "notes": "Store cattle sales in autumn"
+        },
+        {
+          "year": 2024,
+          "month": 12,
+          "period": "2024-12",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1230.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4800.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9810.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 1,
+          "period": "2025-01",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 3,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1320.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4770.0,
+            "vet": 650,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 5200,
+            "housing": 350,
+            "equipment": 150,
+            "total": 15180.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 2,
+          "period": "2025-02",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1410.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4688.0,
+            "vet": 650,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9898.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 3,
+          "period": "2025-03",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 2,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1476.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 2952.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 2952.0
+          },
+          "costs": {
+            "feed": 4575.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9585.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 4,
+          "period": "2025-04",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 3,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1500.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4462.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 5200,
+            "housing": 350,
+            "equipment": 150,
+            "total": 14672.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 5,
+          "period": "2025-05",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1476.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4380.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9390.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 6,
+          "period": "2025-06",
+          "operational": {
+            "cattle_on_farm": 52,
+            "cattle_purchased": 0,
+            "cattle_sold": 4,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1410.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 5640.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 5640.0
+          },
+          "costs": {
+            "feed": 4350.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9360.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 7,
+          "period": "2025-07",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 2,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1320.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 2640.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 2640.0
+          },
+          "costs": {
+            "feed": 4380.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9390.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 8,
+          "period": "2025-08",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1230.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4462.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9472.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 9,
+          "period": "2025-09",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 4,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1164.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 4656.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 4656.0
+          },
+          "costs": {
+            "feed": 4575.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9585.0
+          },
+          "notes": "Store cattle sales in autumn"
+        },
+        {
+          "year": 2025,
+          "month": 10,
+          "period": "2025-10",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 3,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1140.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4688.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 5200,
+            "housing": 350,
+            "equipment": 150,
+            "total": 14898.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 11,
+          "period": "2025-11",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 4,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1164.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 4656.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 4656.0
+          },
+          "costs": {
+            "feed": 4770.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9780.0
+          },
+          "notes": "Store cattle sales in autumn"
+        },
+        {
+          "year": 2025,
+          "month": 12,
+          "period": "2025-12",
+          "operational": {
+            "cattle_on_farm": 48,
+            "cattle_purchased": 0,
+            "cattle_sold": 0,
+            "finishing_units": 28
+          },
+          "pricing": {
+            "beef_sale_price_per_head": 1230.0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0.0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0.0
+          },
+          "costs": {
+            "feed": 4800.0,
+            "vet": 450,
+            "breeding": 80,
+            "labour": 2200,
+            "machinery": 500,
+            "fuel": 380,
+            "fertiliser": 300,
+            "insurance": 180,
+            "rent_land_lease": 0,
+            "contractor": 420,
+            "animal_purchases": 0,
+            "housing": 350,
+            "equipment": 150,
+            "total": 9810.0
+          },
+          "notes": ""
+        }
+      ]
+    },
+    "lamb": {
+      "display_name": "Lamb / Sheep",
+      "flock": {
+        "ewes": 228,
+        "lambs": 180,
+        "rams": 6
+      },
+      "monthly": [
+        {
+          "year": 2024,
+          "month": 1,
+          "period": "2024-01",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.0,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3484.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7494.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 2,
+          "period": "2024-02",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 5.71,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3385.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7395.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 3,
+          "period": "2024-03",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 180,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": "Minor ewe losses at lambing"
+          },
+          "pricing": {
+            "lamb_price_per_kg": 5.6,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 7000,
+            "vet": 3000,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 13410
+          },
+          "notes": "Peak lambing \u2014 elevated vet and feed"
+        },
+        {
+          "year": 2024,
+          "month": 4,
+          "period": "2024-04",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 90,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 5.71,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 7000,
+            "vet": 3000,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 13410
+          },
+          "notes": "Peak lambing \u2014 elevated vet and feed"
+        },
+        {
+          "year": 2024,
+          "month": 5,
+          "period": "2024-05",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.0,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3016.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7026.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 6,
+          "period": "2024-06",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.4,
+            "wool_income": 850
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 850,
+            "other": 0,
+            "total": 850
+          },
+          "costs": {
+            "feed": 2980.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 6990.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 7,
+          "period": "2024-07",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 45,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.8,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 12852.0,
+            "wool": 0,
+            "other": 0,
+            "total": 12852.0
+          },
+          "costs": {
+            "feed": 3016.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7026.0
+          },
+          "notes": "Main lamb sales window"
+        },
+        {
+          "year": 2024,
+          "month": 8,
+          "period": "2024-08",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 45,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 7.09,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 13400.0,
+            "wool": 0,
+            "other": 0,
+            "total": 13400.0
+          },
+          "costs": {
+            "feed": 3115.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7125.0
+          },
+          "notes": "Main lamb sales window"
+        },
+        {
+          "year": 2024,
+          "month": 9,
+          "period": "2024-09",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 45,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 7.2,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 13608.0,
+            "wool": 0,
+            "other": 0,
+            "total": 13608.0
+          },
+          "costs": {
+            "feed": 3250.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7260.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 10,
+          "period": "2024-10",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 25,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 7.09,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 7444.0,
+            "wool": 0,
+            "other": 0,
+            "total": 7444.0
+          },
+          "costs": {
+            "feed": 3385.0,
+            "vet": 600,
+            "breeding": 200,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7545.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 11,
+          "period": "2024-11",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.8,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3484.0,
+            "vet": 600,
+            "breeding": 200,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7644.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2024,
+          "month": 12,
+          "period": "2024-12",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.4,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3520.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7530.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 1,
+          "period": "2025-01",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.0,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3484.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7494.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 2,
+          "period": "2025-02",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 5.71,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3385.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7395.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 3,
+          "period": "2025-03",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 180,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": "Minor ewe losses at lambing"
+          },
+          "pricing": {
+            "lamb_price_per_kg": 5.6,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 7000,
+            "vet": 3000,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 13410
+          },
+          "notes": "Peak lambing \u2014 elevated vet and feed"
+        },
+        {
+          "year": 2025,
+          "month": 4,
+          "period": "2025-04",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 90,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 5.71,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 7000,
+            "vet": 3000,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 13410
+          },
+          "notes": "Peak lambing \u2014 elevated vet and feed"
+        },
+        {
+          "year": 2025,
+          "month": 5,
+          "period": "2025-05",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.0,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3016.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7026.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 6,
+          "period": "2025-06",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.4,
+            "wool_income": 850
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 850,
+            "other": 0,
+            "total": 850
+          },
+          "costs": {
+            "feed": 2980.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 6990.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 7,
+          "period": "2025-07",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 45,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.8,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 12852.0,
+            "wool": 0,
+            "other": 0,
+            "total": 12852.0
+          },
+          "costs": {
+            "feed": 3016.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7026.0
+          },
+          "notes": "Main lamb sales window"
+        },
+        {
+          "year": 2025,
+          "month": 8,
+          "period": "2025-08",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 45,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 7.09,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 13400.0,
+            "wool": 0,
+            "other": 0,
+            "total": 13400.0
+          },
+          "costs": {
+            "feed": 3115.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7125.0
+          },
+          "notes": "Main lamb sales window"
+        },
+        {
+          "year": 2025,
+          "month": 9,
+          "period": "2025-09",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 45,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 7.2,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 13608.0,
+            "wool": 0,
+            "other": 0,
+            "total": 13608.0
+          },
+          "costs": {
+            "feed": 3250.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7260.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 10,
+          "period": "2025-10",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 25,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 7.09,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 7444.0,
+            "wool": 0,
+            "other": 0,
+            "total": 7444.0
+          },
+          "costs": {
+            "feed": 3385.0,
+            "vet": 600,
+            "breeding": 200,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7545.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 11,
+          "period": "2025-11",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.8,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3484.0,
+            "vet": 600,
+            "breeding": 200,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7644.0
+          },
+          "notes": ""
+        },
+        {
+          "year": 2025,
+          "month": 12,
+          "period": "2025-12",
+          "operational": {
+            "ewes": 228,
+            "lambs_born": 0,
+            "lambs_sold": 0,
+            "rams": 6,
+            "mortality_notes": null
+          },
+          "pricing": {
+            "lamb_price_per_kg": 6.4,
+            "wool_income": 0
+          },
+          "revenue": {
+            "milk": 0,
+            "cattle_sales": 0,
+            "lamb_sales": 0,
+            "wool": 0,
+            "other": 0,
+            "total": 0
+          },
+          "costs": {
+            "feed": 3520.0,
+            "vet": 600,
+            "breeding": 50,
+            "labour": 1800,
+            "machinery": 320,
+            "fuel": 280,
+            "fertiliser": 250,
+            "insurance": 140,
+            "rent_land_lease": 0,
+            "contractor": 280,
+            "animal_purchases": 0,
+            "housing": 200,
+            "equipment": 90,
+            "total": 7530.0
+          },
+          "notes": ""
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "currency": "EUR",
+    "data_period": {
+      "start": "2024-01",
+      "end": "2025-12",
+      "months": 24
+    },
+    "seasonal_notes": [
+      {
+        "period": "2024-03",
+        "sector": "lamb",
+        "note": "Peak lambing \u2014 elevated vet and feed costs"
+      },
+      {
+        "period": "2024-07",
+        "sector": "lamb",
+        "note": "Main lamb sales window"
+      },
+      {
+        "period": "2024-11",
+        "sector": "beef",
+        "note": "Autumn store cattle sales"
+      },
+      {
+        "period": "2025-01",
+        "sector": "dairy",
+        "note": "Winter milk \u2014 higher concentrate feeding"
+      }
+    ]
+  }
+}

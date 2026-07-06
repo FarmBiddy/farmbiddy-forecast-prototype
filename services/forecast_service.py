@@ -31,6 +31,7 @@ from services.advisory_summary_service import generate_advisory_summary
 from services.chart_service import generate_selected_charts
 from services.comparison_service import COMPARISON_FIELDS, build_comparison_row
 from services.dashboard_service import generate_profitability_dashboard
+from services.multi_sector_farm import load_farm_for_analysis
 
 
 class FarmFileNotFoundError(FileNotFoundError):
@@ -247,6 +248,13 @@ def _build_full_forecast_result(farm: dict, outputs) -> dict:
             forecast_result, farm
         )
 
+    if farm.get("kpi_visibility"):
+        forecast_result["kpi_visibility"] = farm["kpi_visibility"]
+    if farm.get("_selected_sectors"):
+        forecast_result["selected_sectors"] = farm["_selected_sectors"]
+    if farm.get("_sector_metrics"):
+        forecast_result["_sector_metrics"] = farm["_sector_metrics"]
+
     return forecast_result
 
 
@@ -312,13 +320,26 @@ def _filter_response(full_result: dict, farm_file: str, outputs) -> dict:
         response["advisory_summary"] = full_result.get("advisory_summary")
 
     if outputs.kpis:
-        response["kpis"] = {
+        visibility = full_result.get("kpi_visibility") or {}
+        kpis = {
             "feed_cost_ratio": full_result["feed_cost_ratio"],
             "cost_ratio": full_result["cost_ratio"],
-            "revenue_per_cow": full_result["revenue_per_cow"],
-            "profit_per_cow": full_result["profit_per_cow"],
             "monthly_cashflow": full_result["monthly_cashflow"],
         }
+        if visibility.get("revenue_per_cow", True):
+            kpis["revenue_per_cow"] = full_result["revenue_per_cow"]
+        if visibility.get("profit_per_cow", True):
+            kpis["profit_per_cow"] = full_result["profit_per_cow"]
+        sector_metrics = full_result.get("_sector_metrics") or {}
+        if visibility.get("beef") and sector_metrics:
+            beef = sector_metrics.get("beef") or {}
+            kpis["beef_cattle_on_farm"] = beef.get("cattle_on_farm")
+            kpis["beef_avg_sale_price"] = beef.get("avg_sale_price_per_head")
+        if visibility.get("lamb") and sector_metrics:
+            lamb = sector_metrics.get("lamb") or {}
+            kpis["lamb_ewes"] = lamb.get("ewes")
+            kpis["lamb_avg_price_per_kg"] = lamb.get("avg_lamb_price_per_kg")
+        response["kpis"] = kpis
 
     if outputs.scenarios:
         response["scenarios"] = full_result.get("scenarios", [])
@@ -326,6 +347,11 @@ def _filter_response(full_result: dict, farm_file: str, outputs) -> dict:
     if getattr(outputs, "comparison_metrics", False):
         row = build_comparison_row(full_result)
         response["comparison_metrics"] = row
+
+    if full_result.get("kpi_visibility"):
+        response["kpi_visibility"] = full_result["kpi_visibility"]
+    if full_result.get("selected_sectors"):
+        response["selected_sectors"] = full_result["selected_sectors"]
 
     return response
 
@@ -336,6 +362,7 @@ def run_forecast(
     save_result: bool = True,
     generate_charts: bool = False,
     chart_types: Optional[List[str]] = None,
+    sectors: Optional[List[str]] = None,
 ) -> dict:
     """
     Execute a forecast for the given farm file and return selected outputs.
@@ -345,7 +372,7 @@ def run_forecast(
     if not outputs.any_selected() and not generate_charts:
         raise ValueError("At least one output section or chart must be requested.")
 
-    farm = load_farm(farm_file)
+    farm = load_farm_for_analysis(farm_file, sectors)
     full_result = _build_full_forecast_result(farm, outputs)
 
     saved_to = None
@@ -357,6 +384,8 @@ def run_forecast(
 
     response = _filter_response(full_result, farm_file, outputs)
     response["saved_to"] = saved_to
+    if full_result.get("selected_sectors"):
+        response["selected_sectors"] = full_result["selected_sectors"]
 
     if generate_charts:
         charts_to_generate = chart_types or [
@@ -419,12 +448,13 @@ def run_sandbox_forecast(
     farm_file: str,
     changes: dict,
     outputs,
+    sectors: Optional[List[str]] = None,
 ) -> dict:
     """Run a what-if forecast without modifying the original farm file."""
     if not outputs.any_selected():
         raise ValueError("At least one sandbox output section must be requested.")
 
-    farm = load_farm(farm_file)
+    farm = load_farm_for_analysis(farm_file, sectors)
     sandbox_farm, changes_applied = apply_sandbox_changes(farm, changes)
     full_result = _build_full_forecast_result(sandbox_farm, outputs)
 
@@ -433,9 +463,13 @@ def run_sandbox_forecast(
     return response
 
 
-def run_chart_generation(farm_file: str, chart_types: List[str]) -> dict:
+def run_chart_generation(
+    farm_file: str,
+    chart_types: List[str],
+    sectors: Optional[List[str]] = None,
+) -> dict:
     """Run a full forecast and generate only the requested chart types."""
-    farm = load_farm(farm_file)
+    farm = load_farm_for_analysis(farm_file, sectors)
     full_result = _build_full_forecast_for_save(farm)
     generated = generate_selected_charts(full_result, farm, chart_types)
 

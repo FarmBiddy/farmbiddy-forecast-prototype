@@ -276,6 +276,20 @@ class AnalyseResponse(BaseModel):
 # Farmer Edition
 # ---------------------------------------------------------------------------
 
+class SectorInfo(BaseModel):
+    id: str
+    label: str
+    selected: bool = True
+
+
+class SectorListResponse(BaseModel):
+    success: bool = True
+    farm_file: str
+    farm_name: str
+    available_sectors: List[SectorInfo] = Field(default_factory=list)
+    selected_sectors: List[str] = Field(default_factory=list)
+
+
 class FarmerProfileResponse(BaseModel):
     success: bool
     farm_file: str
@@ -288,6 +302,8 @@ class FarmerProfileResponse(BaseModel):
     location: Optional[str] = None
     owner_name: Optional[str] = None
     last_updated: Optional[str] = None
+    selected_sectors: List[str] = Field(default_factory=list)
+    farm_type: Optional[str] = None
 
 
 class FarmerDashboardResponse(BaseModel):
@@ -296,6 +312,8 @@ class FarmerDashboardResponse(BaseModel):
     kpis: List[Dict[str, Any]]
     has_analysis: bool = False
     farms: List[Dict[str, Any]] = Field(default_factory=list)
+    available_sectors: List[SectorInfo] = Field(default_factory=list)
+    selected_sectors: List[str] = Field(default_factory=list)
 
 
 class FarmerAdvancedForecastResponse(BaseModel):
@@ -322,6 +340,7 @@ class FarmerAdvancedForecastResponse(BaseModel):
 
 class FarmerMonteCarloRequest(BaseModel):
     farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
+    sectors: Optional[List[str]] = Field(default=None, description="Sectors to include: dairy, beef, lamb")
     iterations: int = Field(default=1000, ge=100, le=10000)
 
 
@@ -335,6 +354,7 @@ class FarmerMonteCarloResponse(BaseModel):
 
 class ScenarioSandboxRequest(BaseModel):
     farm_file: Optional[str] = None
+    sectors: Optional[List[str]] = None
     milk_price_cents_change: float = 0
     milk_price_pct_change: float = 0
     feed_pct_change: float = 0
@@ -365,6 +385,7 @@ class ScenarioSandboxResponse(BaseModel):
 
 class FarmerRunAnalysisRequest(BaseModel):
     farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
+    sectors: Optional[List[str]] = Field(default=None, description="Sectors to include: dairy, beef, lamb")
 
 
 class FinancialIntelligenceResponse(BaseModel):
@@ -387,6 +408,7 @@ class FinancialIntelligenceResponse(BaseModel):
 class AskAdvisorRequest(BaseModel):
     question: str = Field(..., min_length=1)
     farm_file: Optional[str] = None
+    sectors: Optional[List[str]] = None
 
 
 class AskAdvisorResponse(BaseModel):
@@ -398,6 +420,7 @@ class AskAdvisorResponse(BaseModel):
 
 class FarmerReportRequest(BaseModel):
     farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
+    sectors: Optional[List[str]] = Field(default=None, description="Sectors to include: dairy, beef, lamb")
     report_type: str = Field(default="full", description="executive | full | scenario | investment")
     report_date: Optional[str] = Field(default=None, description="Display date on cover page")
 
@@ -447,4 +470,6 @@ class FarmerAnalysisResponse(BaseModel):
     upcoming_payments: List[Dict[str, Any]] = Field(default_factory=list)
     forecast_summary: Optional[Dict[str, Any]] = None
     top_risk_drivers: List[Dict[str, Any]] = Field(default_factory=list)
+    selected_sectors: List[str] = Field(default_factory=list)
+    kpi_visibility: Dict[str, Any] = Field(default_factory=dict)
 

@@ -12,7 +12,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from config.paths import FARM_PROFILE_PATH
+from config.paths import DATASETS_DIR, FARM_PROFILE_PATH
 from forecast_engine.revenue import calculate_revenue
 from forecast_engine.costs import calculate_costs
 from forecast_engine.profit import calculate_profit
@@ -22,16 +22,23 @@ from forecast_engine.cashflow import calculate_monthly_cashflow
 from models.api_models import ForecastOutputs, SandboxOutputs
 from services.forecast_service import (
     apply_sandbox_changes,
-    load_farm,
     list_available_farms,
     run_forecast,
     run_sandbox_forecast,
+)
+from services.multi_sector_farm import (
+    MULTI_SECTOR_FILE,
+    is_multi_sector,
+    list_sectors_for_selector,
+    load_farm_for_analysis,
+    load_multi_sector_farm,
+    parse_sectors_param,
 )
 from forecast_engine.monte_carlo import run_monte_carlo
 from forecast_engine.scenarios import calculate_scenarios
 
 
-DEFAULT_FARM_FILE = "dairy_farm_1.json"
+DEFAULT_FARM_FILE = MULTI_SECTOR_FILE
 
 
 def _load_profile_config() -> dict:
@@ -40,7 +47,7 @@ def _load_profile_config() -> dict:
             return json.load(file)
     return {
         "active_farm_file": DEFAULT_FARM_FILE,
-        "farm_display_name": "Green Valley Dairy",
+        "farm_display_name": "Knockrow Mixed Farm",
         "milk_processor": "Lakeland Dairies",
     }
 
@@ -51,8 +58,36 @@ def get_active_farm_file() -> str:
 
 def resolve_farm_file(farm_id: str | None = None) -> str:
     if farm_id:
-        return farm_id if farm_id.endswith(".json") else f"{farm_id}.json"
+        filename = farm_id if farm_id.endswith(".json") else f"{farm_id}.json"
+        path = os.path.join(DATASETS_DIR, filename)
+        if os.path.exists(path):
+            return filename
+        return DEFAULT_FARM_FILE
     return get_active_farm_file()
+
+
+def resolve_sectors(
+    sectors: list[str] | str | None = None,
+    farm_id: str | None = None,
+) -> list[str]:
+    farm_file = resolve_farm_file(farm_id)
+    try:
+        raw = load_multi_sector_farm(farm_file)
+    except (FileNotFoundError, ValueError):
+        return parse_sectors_param(sectors, None)
+    return parse_sectors_param(sectors, raw)
+
+
+def get_sectors_list(farm_id: str | None = None, sectors: list[str] | str | None = None) -> dict:
+    farm_file = resolve_farm_file(farm_id)
+    raw = load_multi_sector_farm(farm_file)
+    selected = resolve_sectors(sectors, farm_id)
+    return {
+        "farm_file": farm_file,
+        "farm_name": raw.get("farm_name", "Farm"),
+        "available_sectors": list_sectors_for_selector(raw, selected),
+        "selected_sectors": selected,
+    }
 
 
 def list_farms_for_selector() -> list[dict]:
@@ -63,14 +98,28 @@ def list_farms_for_selector() -> list[dict]:
     return farms
 
 
-def get_farmer_profile(farm_id: str | None = None) -> dict:
+def get_farmer_profile(
+    farm_id: str | None = None,
+    sectors: list[str] | str | None = None,
+) -> dict:
     """Return profile for the selected or default farm."""
     config = _load_profile_config()
     farm_file = resolve_farm_file(farm_id)
-    farm = load_farm(farm_file)
+    selected = resolve_sectors(sectors, farm_id)
+    farm = load_farm_for_analysis(farm_file, selected)
     display_name = farm.get("farm_name", "My Farm")
     if farm_file == config.get("active_farm_file") and config.get("farm_display_name"):
         display_name = config["farm_display_name"]
+    processor = "—"
+    if farm_file == config.get("active_farm_file"):
+        processor = config.get("milk_processor", "Lakeland Dairies")
+    elif is_multi_sector(load_multi_sector_farm(farm_file)):
+        processor = (
+            load_multi_sector_farm(farm_file)
+            .get("sectors", {})
+            .get("dairy", {})
+            .get("processor", "—")
+        )
     return {
         "success": True,
         "farm_file": farm_file,
@@ -79,10 +128,12 @@ def get_farmer_profile(farm_id: str | None = None) -> dict:
         "litres_per_cow": farm.get("litres_per_cow"),
         "milk_price": farm.get("milk_price"),
         "opening_cash_balance": farm.get("opening_cash_balance"),
-        "milk_processor": config.get("milk_processor", "Lakeland Dairies") if farm_file == config.get("active_farm_file") else "—",
+        "milk_processor": processor,
         "location": config.get("location", ""),
         "owner_name": config.get("owner_name", "Farmer"),
         "last_updated": datetime.now().strftime("%Y-%m-%d"),
+        "selected_sectors": selected,
+        "farm_type": farm.get("farm_type", "Mixed"),
     }
 
 
@@ -114,6 +165,7 @@ def _health_breakdown(forecast: dict, farm: dict) -> dict:
 def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
     summary = forecast.get("forecast_summary") or {}
     kpis_block = forecast.get("kpis") or {}
+    visibility = forecast.get("kpi_visibility") or farm.get("kpi_visibility") or {}
     monthly = summary.get("annual_profit", 0) / 12 if summary else 0
     monthly_cf = kpis_block.get("monthly_cashflow", monthly)
     feed_pct = kpis_block.get("feed_cost_ratio", forecast.get("feed_cost_ratio", 31))
@@ -123,20 +175,13 @@ def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
     if monthly_forecast:
         cash = monthly_forecast[-1].get("running_balance", cash)
 
-    return [
+    cards = [
         {
             "id": "cash",
             "title": "Cash Available",
             "value": f"€{cash:,.0f}",
             "subtitle": f"+ €{max(monthly_cf, 0):,.0f} this month",
             "trend": "up" if monthly_cf >= 0 else "down",
-        },
-        {
-            "id": "milk_price",
-            "title": "Milk Price",
-            "value": f"€{farm.get('milk_price', 0.42):.2f} / L",
-            "subtitle": "No change",
-            "trend": "neutral",
         },
         {
             "id": "profit",
@@ -160,6 +205,34 @@ def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
             "trend": "neutral",
         },
     ]
+    if visibility.get("milk_price", False):
+        cards.insert(1, {
+            "id": "milk_price",
+            "title": "Milk Price",
+            "value": f"€{farm.get('milk_price', 0.42):.2f} / L",
+            "subtitle": "Dairy sector",
+            "trend": "neutral",
+        })
+    sector_metrics = farm.get("_sector_metrics") or {}
+    if visibility.get("beef") and sector_metrics.get("beef"):
+        beef = sector_metrics["beef"]
+        cards.append({
+            "id": "beef_price",
+            "title": "Beef Sale Price",
+            "value": f"€{beef.get('avg_sale_price_per_head', 0):,.0f} / head",
+            "subtitle": f"{beef.get('cattle_on_farm', 0)} cattle on farm",
+            "trend": "neutral",
+        })
+    if visibility.get("lamb") and sector_metrics.get("lamb"):
+        lamb = sector_metrics["lamb"]
+        cards.append({
+            "id": "lamb_price",
+            "title": "Lamb Price",
+            "value": f"€{lamb.get('avg_lamb_price_per_kg', 0):.2f} / kg",
+            "subtitle": f"{lamb.get('ewes', 0)} ewes",
+            "trend": "neutral",
+        })
+    return cards
 
 
 def _build_recommendations(forecast: dict) -> List[dict]:
@@ -214,23 +287,26 @@ def _scenario_snapshot(
 
 
 def _build_scenario_snapshots(farm_file: str, base_profit: float, farm: dict) -> List[dict]:
-    milk_change = {"milk_price": round(farm["milk_price"] * 0.9, 4)}
-    feed_change = {"feed": round(farm["feed"] * 1.15, 2)}
-    return [
-        _scenario_snapshot(farm_file, "Milk Price -10%", milk_change, base_profit),
-        _scenario_snapshot(farm_file, "Feed Cost +15%", feed_change, base_profit),
-        {
-            "label": "Base Case",
-            "annual_profit": base_profit,
-            "profit_impact": "positive",
-            "profit_difference": 0,
-            "risk_level": "Low",
-        },
-    ]
+    snapshots = []
+    selected = farm.get("_selected_sectors") or ["dairy", "beef", "lamb"]
+    if "dairy" in selected and farm.get("milk_price"):
+        milk_change = {"milk_price": round(farm["milk_price"] * 0.9, 4)}
+        snapshots.append(_scenario_snapshot(farm_file, "Milk Price -10%", milk_change, base_profit))
+    feed_change = {"feed": round(farm.get("feed", 0) * 1.15, 2)}
+    snapshots.append(_scenario_snapshot(farm_file, "Feed Cost +15%", feed_change, base_profit))
+    snapshots.append({
+        "label": "Base Case",
+        "annual_profit": base_profit,
+        "profit_impact": "positive",
+        "profit_difference": 0,
+        "risk_level": "Low",
+    })
+    return snapshots
 
 
 def _fallback_kpis(farm: dict) -> List[dict]:
     """Demo-style KPIs before the first analysis run."""
+    visibility = farm.get("kpi_visibility") or {}
     revenue = calculate_revenue(farm)
     costs = calculate_costs(farm)
     profit = calculate_profit(revenue, costs)
@@ -241,20 +317,27 @@ def _fallback_kpis(farm: dict) -> List[dict]:
     risk = calculate_risk_level(alerts, profit / revenue if revenue else 0)
     cash = farm.get("opening_cash_balance", 10000) + monthly
 
-    return [
+    cards = [
         {"id": "cash", "title": "Cash Available", "value": f"€{cash:,.0f}", "subtitle": f"+ €{max(monthly_cf, 0):,.0f} this month", "trend": "up"},
-        {"id": "milk_price", "title": "Milk Price", "value": f"€{farm.get('milk_price', 0.42):.2f} / L", "subtitle": "No change", "trend": "neutral"},
         {"id": "profit", "title": "Expected Monthly Profit", "value": f"€{monthly:,.0f}", "subtitle": f"Annual €{profit:,.0f}", "trend": "up"},
         {"id": "risk", "title": "Risk Level", "value": risk, "subtitle": "Stable" if risk == "Low" else "Monitor", "trend": "neutral"},
         {"id": "feed", "title": "Feed Cost %", "value": f"{feed_ratio:.0f}%", "subtitle": "Good" if feed_ratio < 35 else "High", "trend": "neutral"},
     ]
+    if visibility.get("milk_price", False):
+        cards.insert(1, {"id": "milk_price", "title": "Milk Price", "value": f"€{farm.get('milk_price', 0.42):.2f} / L", "subtitle": "Dairy sector", "trend": "neutral"})
+    return cards
 
 
-def run_farmer_analysis(farm_id: str | None = None, save_result: bool = True) -> dict:
+def run_farmer_analysis(
+    farm_id: str | None = None,
+    save_result: bool = True,
+    sectors: list[str] | str | None = None,
+) -> dict:
     """Run full forecast + charts + farmer dashboard payload for the selected farm."""
     farm_file = resolve_farm_file(farm_id)
-    farm = load_farm(farm_file)
-    profile = get_farmer_profile(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    farm = load_farm_for_analysis(farm_file, selected)
+    profile = get_farmer_profile(farm_id, selected)
 
     outputs = ForecastOutputs(
         forecast_summary=True,
@@ -274,6 +357,7 @@ def run_farmer_analysis(farm_id: str | None = None, save_result: bool = True) ->
         save_result=save_result,
         generate_charts=True,
         chart_types=["running_balance", "revenue_vs_costs", "cost_breakdown", "scenario_profit"],
+        sectors=selected,
     )
 
     summary = forecast.get("forecast_summary") or {}
@@ -322,28 +406,40 @@ def run_farmer_analysis(farm_id: str | None = None, save_result: bool = True) ->
         "upcoming_payments": upcoming,
         "forecast_summary": summary,
         "top_risk_drivers": forecast.get("top_risk_drivers") or [],
+        "selected_sectors": selected,
+        "kpi_visibility": forecast.get("kpi_visibility") or farm.get("kpi_visibility"),
     }
 
 
-def get_farmer_dashboard_preview(farm_id: str | None = None) -> dict:
+def get_farmer_dashboard_preview(
+    farm_id: str | None = None,
+    sectors: list[str] | str | None = None,
+) -> dict:
     """Dashboard shell with profile and fallback KPIs before Run Analysis."""
     farm_file = resolve_farm_file(farm_id)
-    farm = load_farm(farm_file)
-    profile = get_farmer_profile(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    farm = load_farm_for_analysis(farm_file, selected)
+    profile = get_farmer_profile(farm_id, selected)
+    sector_payload = get_sectors_list(farm_id, selected)
     return {
         "success": True,
         "profile": profile,
         "kpis": _fallback_kpis(farm),
         "has_analysis": False,
-        "farms": list_farms_for_selector(),
+        "available_sectors": sector_payload["available_sectors"],
+        "selected_sectors": selected,
     }
 
 
-def run_advanced_forecast(farm_id: str | None = None) -> dict:
+def run_advanced_forecast(
+    farm_id: str | None = None,
+    sectors: list[str] | str | None = None,
+) -> dict:
     """Advanced forecast with scenarios, Monte Carlo, and farmer interpretation."""
     farm_file = resolve_farm_file(farm_id)
-    farm = load_farm(farm_file)
-    profile = get_farmer_profile(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    farm = load_farm_for_analysis(farm_file, selected)
+    profile = get_farmer_profile(farm_id, selected)
 
     outputs = ForecastOutputs(
         forecast_summary=True,
@@ -363,6 +459,7 @@ def run_advanced_forecast(farm_id: str | None = None) -> dict:
         save_result=True,
         generate_charts=True,
         chart_types=["running_balance", "revenue_vs_costs", "cost_breakdown", "scenario_profit"],
+        sectors=selected,
     )
 
     summary = forecast.get("forecast_summary") or {}
@@ -401,14 +498,21 @@ def run_advanced_forecast(farm_id: str | None = None) -> dict:
             {"month": m.get("month"), "profit": m.get("cashflow"), "revenue": m.get("revenue"), "costs": m.get("costs")}
             for m in monthly
         ],
+        "selected_sectors": selected,
+        "kpi_visibility": forecast.get("kpi_visibility") or farm.get("kpi_visibility"),
     }
 
 
-def run_monte_carlo_for_farm(farm_id: str | None = None, iterations: int = 1000) -> dict:
+def run_monte_carlo_for_farm(
+    farm_id: str | None = None,
+    iterations: int = 1000,
+    sectors: list[str] | str | None = None,
+) -> dict:
     """Run Monte Carlo simulation for the selected farm."""
     farm_file = resolve_farm_file(farm_id)
-    farm = load_farm(farm_file)
-    profile = get_farmer_profile(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    farm = load_farm_for_analysis(farm_file, selected)
+    profile = get_farmer_profile(farm_id, selected)
     monte = run_monte_carlo(farm, iterations=iterations)
     return {
         "success": True,
@@ -416,4 +520,5 @@ def run_monte_carlo_for_farm(farm_id: str | None = None, iterations: int = 1000)
         "profile": profile,
         "monte_carlo": monte,
         "scenarios": calculate_scenarios(farm),
+        "selected_sectors": selected,
     }

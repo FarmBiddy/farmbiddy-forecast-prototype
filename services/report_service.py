@@ -42,9 +42,10 @@ from forecast_engine.revenue import calculate_revenue
 from forecast_engine.risk_level import calculate_risk_level
 from forecast_engine.scenarios import calculate_scenarios
 from models.api_models import ForecastOutputs, SandboxOutputs
-from services.farmer_dashboard_service import get_farmer_profile, resolve_farm_file
+from services.farmer_dashboard_service import get_farmer_profile, resolve_farm_file, resolve_sectors
 from services.financial_intelligence_service import get_financial_intelligence
-from services.forecast_service import load_farm, run_forecast, run_sandbox_forecast
+from services.forecast_service import run_forecast, run_sandbox_forecast
+from services.multi_sector_farm import load_farm_for_analysis
 
 SOFTWARE_VERSION = "1.0.0"
 
@@ -382,12 +383,14 @@ def collect_report_data(
     farm_id: str | None = None,
     report_type: str = "full",
     report_date: str | None = None,
+    sectors: list[str] | None = None,
 ) -> dict[str, Any]:
     """Gather all modules needed for PDF generation."""
     farm_file = resolve_farm_file(farm_id)
-    farm = load_farm(farm_file)
-    profile = get_farmer_profile(farm_id)
-    intel = get_financial_intelligence(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    farm = load_farm_for_analysis(farm_file, selected)
+    profile = get_farmer_profile(farm_id, selected)
+    intel = get_financial_intelligence(farm_id, sectors=selected)
 
     outputs = ForecastOutputs(
         forecast_summary=True,
@@ -405,6 +408,7 @@ def collect_report_data(
             outputs=outputs,
             save_result=False,
             generate_charts=False,
+            sectors=selected,
         )
     except Exception:
         revenue = calculate_revenue(farm)
@@ -1087,9 +1091,10 @@ def get_report_preview(
     farm_id: str | None = None,
     report_type: str = "full",
     report_date: str | None = None,
+    sectors: list[str] | None = None,
 ) -> dict:
     """JSON preview for the Reports UI before download."""
-    data = collect_report_data(farm_id, report_type, report_date)
+    data = collect_report_data(farm_id, report_type, report_date, sectors=sectors)
     return {
         "success": True,
         "farm_file": data["farm_file"],
@@ -1114,12 +1119,13 @@ def generate_farmer_report(
     farm_id: str | None = None,
     report_type: str = "full",
     report_date: str | None = None,
+    sectors: list[str] | None = None,
 ) -> dict:
     """Generate PDF report and return download metadata."""
     if report_type not in REPORT_TYPES:
         raise ValueError(f"Invalid report_type. Choose from: {', '.join(REPORT_TYPES)}")
 
-    data = collect_report_data(farm_id, report_type, report_date)
+    data = collect_report_data(farm_id, report_type, report_date, sectors=sectors)
     charts = _generate_report_charts(data)
     pages = PAGE_SETS.get(report_type, PAGE_SETS["full"])
 

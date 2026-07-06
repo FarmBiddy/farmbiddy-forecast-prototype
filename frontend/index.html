@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=6" />
+  <link rel="stylesheet" href="/assets/styles.css?v=7" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -58,14 +58,27 @@
 
       <div id="status-bar" class="status-bar hidden"></div>
 
-      <!-- Select Farm card -->
-      <div class="card farm-select-card">
-        <div class="farm-select-header">
+      <!-- Sector selection -->
+      <div class="card sector-select-card">
+        <div class="sector-select-header">
           <div>
-            <h3>Select Farm</h3>
-            <p class="muted">Choose which farm you want to view</p>
+            <h3>Select Sectors for Analysis</h3>
+            <p class="muted">Knockrow Mixed Farm — choose one or more enterprises</p>
           </div>
-          <select id="farm-select" class="farm-select"></select>
+          <div id="sector-select" class="sector-select" role="group" aria-label="Farm sectors">
+            <label class="sector-chip">
+              <input type="checkbox" data-sector="dairy" checked />
+              <span>Dairy</span>
+            </label>
+            <label class="sector-chip">
+              <input type="checkbox" data-sector="beef" checked />
+              <span>Beef</span>
+            </label>
+            <label class="sector-chip">
+              <input type="checkbox" data-sector="lamb" checked />
+              <span>Lamb</span>
+            </label>
+          </div>
         </div>
       </div>
 

@@ -1,14 +1,16 @@
 /**
- * FarmBiddy Farmer Edition — dashboard with farm selection, advanced forecast, sandbox
+ * FarmBiddy Farmer Edition — multi-sector dashboard (Dairy, Beef, Lamb)
  */
 
 const API = "/api";
+const ACTIVE_FARM_FILE = "multi_sector_farm.json";
 
 let state = {
   profile: null,
   analysis: null,
-  farms: [],
-  selectedFarm: null,
+  activeFarmFile: ACTIVE_FARM_FILE,
+  selectedSectors: ["dairy", "beef", "lamb"],
+  availableSectors: [],
   view: "dashboard",
 };
 
@@ -22,12 +24,27 @@ function showStatus(msg, type = "info") {
   bar.classList.remove("hidden");
 }
 
-function farmQuery() {
-  return state.selectedFarm ? `?farm_file=${encodeURIComponent(state.selectedFarm)}` : "";
+function getSelectedSectorsFromUI() {
+  const checked = [...document.querySelectorAll("#sector-select input[data-sector]:checked")]
+    .map((el) => el.dataset.sector);
+  return checked.length ? checked : ["dairy", "beef", "lamb"];
 }
 
-function farmBody(extra = {}) {
-  return JSON.stringify({ farm_file: state.selectedFarm, ...extra });
+function sectorsQuery() {
+  const params = new URLSearchParams();
+  params.set("farm_file", state.activeFarmFile);
+  if (state.selectedSectors.length) {
+    params.set("sectors", state.selectedSectors.join(","));
+  }
+  return `?${params.toString()}`;
+}
+
+function sectorsBody(extra = {}) {
+  return JSON.stringify({
+    farm_file: state.activeFarmFile,
+    sectors: state.selectedSectors,
+    ...extra,
+  });
 }
 
 async function api(path, options = {}) {
@@ -49,23 +66,42 @@ function setGreeting() {
   }
 }
 
-function renderFarmSelect(farms) {
-  const sel = $("farm-select");
-  if (!sel) return;
-  sel.innerHTML = farms.map((f) =>
-    `<option value="${f.farm_file}" ${f.is_default ? "selected" : ""}>${f.farm_name} (${f.milking_cows || "?"} cows)</option>`
-  ).join("");
-  const selected = sel.value;
-  state.selectedFarm = selected;
-  state.farms = farms;
+function renderSectorSelect(sectors) {
+  const box = $("sector-select");
+  if (!box || !sectors?.length) return;
+  state.availableSectors = sectors;
+  box.querySelectorAll("input[data-sector]").forEach((input) => {
+    const info = sectors.find((s) => s.id === input.dataset.sector);
+    if (info) {
+      input.checked = info.selected;
+      input.parentElement.querySelector("span").textContent = info.label;
+    }
+  });
+  state.selectedSectors = getSelectedSectorsFromUI();
+}
+
+function sectorSummaryLabel() {
+  const labels = {
+    dairy: "Dairy",
+    beef: "Beef",
+    lamb: "Lamb",
+  };
+  return state.selectedSectors.map((id) => labels[id] || id).join(", ");
 }
 
 function renderSidebar(profile) {
   if (!profile) return;
   $("sf-farm-name").textContent = profile.farm_name || "My Farm";
-  $("sf-herd").textContent = `${profile.milking_cows || "—"} Milking Cows`;
-  $("sf-milk").textContent = `Milk Price: €${Number(profile.milk_price || 0).toFixed(2)}/L`;
-  $("sf-processor").textContent = `Processor: ${profile.milk_processor || "—"}`;
+  const sectors = sectorSummaryLabel();
+  if (state.selectedSectors.includes("dairy") && profile.milking_cows) {
+    $("sf-herd").textContent = `${profile.milking_cows} Milking Cows`;
+    $("sf-milk").textContent = `Milk Price: €${Number(profile.milk_price || 0).toFixed(2)}/L`;
+    $("sf-processor").textContent = `Processor: ${profile.milk_processor || "—"}`;
+  } else {
+    $("sf-herd").textContent = `Sectors: ${sectors}`;
+    $("sf-milk").textContent = profile.farm_type ? `Type: ${profile.farm_type}` : "Mixed enterprise";
+    $("sf-processor").textContent = `${state.selectedSectors.length} sector(s) selected`;
+  }
   $("sf-updated").textContent = `Last Updated: ${profile.last_updated || "Today"}`;
   if ($("settings-farm")) $("settings-farm").textContent = profile.farm_name;
 }
@@ -73,13 +109,16 @@ function renderSidebar(profile) {
 function renderProfileDetail(profile) {
   const box = $("farm-profile-detail");
   if (!box || !profile) return;
+  const dairyRows = state.selectedSectors.includes("dairy") ? `
+    <div class="profile-item"><span>Herd</span><strong>${profile.milking_cows || "—"} cows</strong></div>
+    <div class="profile-item"><span>Milk price</span><strong>€${profile.milk_price || "—"}/L</strong></div>
+    <div class="profile-item"><span>Processor</span><strong>${profile.milk_processor || "—"}</strong></div>` : "";
   box.innerHTML = `
-    <div class="profile-item"><span>Farm file</span><strong>${profile.farm_file}</strong></div>
     <div class="profile-item"><span>Farm</span><strong>${profile.farm_name}</strong></div>
-    <div class="profile-item"><span>Herd</span><strong>${profile.milking_cows} cows</strong></div>
-    <div class="profile-item"><span>Milk price</span><strong>€${profile.milk_price}/L</strong></div>
-    <div class="profile-item"><span>Cash opening</span><strong>€${Number(profile.opening_cash_balance || 0).toLocaleString()}</strong></div>
-    <div class="profile-item"><span>Processor</span><strong>${profile.milk_processor}</strong></div>`;
+    <div class="profile-item"><span>Sectors</span><strong>${sectorSummaryLabel()}</strong></div>
+    <div class="profile-item"><span>Farm type</span><strong>${profile.farm_type || "Mixed"}</strong></div>
+    ${dairyRows}
+    <div class="profile-item"><span>Cash opening</span><strong>€${Number(profile.opening_cash_balance || 0).toLocaleString()}</strong></div>`;
 }
 
 function renderKpis(kpis, containerId = "kpi-row") {
@@ -177,7 +216,7 @@ function renderQuickActions() {
   const box = $("quick-actions");
   if (!box) return;
   const actions = [
-    { icon: "🐄", label: "Select Farm", action: "focus-farm" },
+    { icon: "◎", label: "Select Sectors", action: "focus-sectors" },
     { icon: "↗", label: "Run Advanced Forecast", view: "forecasts", trigger: "advanced" },
     { icon: "◆", label: "Open Scenario Sandbox", view: "scenarios" },
     { icon: "💡", label: "Ask AI Advisor", view: "intelligence" },
@@ -190,7 +229,7 @@ function renderQuickActions() {
   ).join("");
   box.querySelectorAll(".qa-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (btn.dataset.action === "focus-farm") $("farm-select")?.focus();
+      if (btn.dataset.action === "focus-sectors") $("sector-select")?.scrollIntoView({ behavior: "smooth", block: "center" });
       else if (btn.dataset.view) {
         navigate(btn.dataset.view);
         if (btn.dataset.trigger === "advanced") runAdvancedForecast();
@@ -355,7 +394,8 @@ function getReportParams() {
   const reportType = $("report-type")?.value || "full";
   const dateVal = $("report-date")?.value;
   const params = new URLSearchParams();
-  if (state.selectedFarm) params.set("farm_file", state.selectedFarm);
+  params.set("farm_file", state.activeFarmFile);
+  params.set("sectors", state.selectedSectors.join(","));
   params.set("report_type", reportType);
   if (dateVal) params.set("report_date", formatReportDate(dateVal));
   return {
@@ -420,7 +460,8 @@ async function generateReport() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        farm_file: state.selectedFarm,
+        farm_file: state.activeFarmFile,
+        sectors: state.selectedSectors,
         report_type: reportType,
         report_date: reportDate,
       }),
@@ -501,7 +542,7 @@ async function loadFinancialIntelligence() {
   $("intelligence-loading")?.classList.remove("hidden");
   $("intelligence-content")?.classList.add("hidden");
   try {
-    const data = await api(`/farmer/financial-intelligence${farmQuery()}`);
+    const data = await api(`/farmer/financial-intelligence${sectorsQuery()}`);
     state.intelligence = data;
     renderFinancialIntelligence(data);
   } catch (err) {
@@ -522,7 +563,11 @@ async function askAdvisor() {
     const data = await api("/farmer/ask-advisor", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, farm_file: state.selectedFarm }),
+      body: JSON.stringify({
+        question,
+        farm_file: state.activeFarmFile,
+        sectors: state.selectedSectors,
+      }),
     });
     const box = $("advisor-answer");
     if (box) {
@@ -541,8 +586,10 @@ async function askAdvisor() {
 }
 
 async function refreshFarmData() {
-  const data = await api(`/farmer/dashboard${farmQuery()}`);
+  const data = await api(`/farmer/dashboard${sectorsQuery()}`);
   state.profile = data.profile;
+  state.selectedSectors = data.selected_sectors || state.selectedSectors;
+  renderSectorSelect(data.available_sectors);
   setGreeting();
   renderSidebar(data.profile);
   renderProfileDetail(data.profile);
@@ -550,27 +597,29 @@ async function refreshFarmData() {
   if (state.analysis) await runAnalysis(false);
 }
 
-async function onFarmChange() {
-  state.selectedFarm = $("farm-select")?.value;
-  showStatus("Loading farm data…", "info");
+async function onSectorChange(changedInput) {
+  const selected = getSelectedSectorsFromUI();
+  if (!selected.length) {
+    changedInput.checked = true;
+    showStatus("At least one sector must be selected.", "error");
+    return;
+  }
+  state.selectedSectors = selected;
+  showStatus("Updating analysis for selected sectors…", "info");
   try {
     await refreshFarmData();
     if (state.view === "intelligence") await loadFinancialIntelligence();
     if (state.view === "reports") $("report-preview")?.classList.add("hidden");
-    showStatus(`Now viewing ${state.profile.farm_name}`, "success");
+    showStatus(`Analyzing: ${sectorSummaryLabel()}`, "success");
   } catch (err) {
     showStatus(err.message, "error");
   }
 }
 
 async function loadInitial() {
-  const data = await api(`/farmer/dashboard${farmQuery()}`);
-  state.farms = data.farms || [];
-  if (!state.farms.length) {
-    const farmsRes = await api("/farms");
-    state.farms = farmsRes.farms.map((f) => ({ ...f, is_default: f.farm_file === "dairy_farm_1.json" }));
-  }
-  renderFarmSelect(state.farms);
+  const data = await api(`/farmer/dashboard${sectorsQuery()}`);
+  state.selectedSectors = data.selected_sectors || state.selectedSectors;
+  renderSectorSelect(data.available_sectors);
   state.profile = data.profile;
   setGreeting();
   renderSidebar(data.profile);
@@ -584,9 +633,10 @@ async function runAnalysis(showMsg = true) {
   if (btn) btn.disabled = true;
   if (showMsg) showStatus("Running analysis…", "info");
   try {
-    const data = await api("/farmer/run-analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: farmBody() });
+    const data = await api("/farmer/run-analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: sectorsBody() });
     state.analysis = data;
     state.profile = data.profile;
+    state.selectedSectors = data.selected_sectors || state.selectedSectors;
     renderSidebar(data.profile);
     renderDashboardResults(data);
     if (showMsg) showStatus("Analysis complete.", "success");
@@ -602,7 +652,7 @@ async function runAdvancedForecast() {
   if (btn) btn.disabled = true;
   showStatus("Running advanced forecast…", "info");
   try {
-    const data = await api("/farmer/run-advanced-forecast", { method: "POST", headers: { "Content-Type": "application/json" }, body: farmBody() });
+    const data = await api("/farmer/run-advanced-forecast", { method: "POST", headers: { "Content-Type": "application/json" }, body: sectorsBody() });
     renderForecastResults(data);
     showStatus("Advanced forecast complete.", "success");
   } catch (err) {
@@ -615,7 +665,7 @@ async function runAdvancedForecast() {
 async function runMonteCarlo() {
   showStatus("Running Monte Carlo simulation…", "info");
   try {
-    const data = await api("/farmer/run-monte-carlo", { method: "POST", headers: { "Content-Type": "application/json" }, body: farmBody({ iterations: 1000 }) });
+    const data = await api("/farmer/run-monte-carlo", { method: "POST", headers: { "Content-Type": "application/json" }, body: sectorsBody({ iterations: 1000 }) });
     renderMonteCarlo(data.monte_carlo);
     $("forecast-results")?.classList.remove("hidden");
     showStatus("Monte Carlo complete.", "success");
@@ -632,7 +682,7 @@ async function runSandbox() {
     const data = await api("/farmer/scenario-sandbox", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: farmBody(getSandboxInputs()),
+      body: sectorsBody(getSandboxInputs()),
     });
     renderSandboxResults(data);
     showStatus("Scenario complete.", "success");
@@ -651,7 +701,9 @@ function setupNav() {
   $("run-advanced-forecast-btn")?.addEventListener("click", runAdvancedForecast);
   $("run-monte-carlo-btn")?.addEventListener("click", runMonteCarlo);
   $("run-sandbox-btn")?.addEventListener("click", runSandbox);
-  $("farm-select")?.addEventListener("change", onFarmChange);
+  $("sector-select")?.querySelectorAll("input[data-sector]").forEach((input) => {
+    input.addEventListener("change", () => onSectorChange(input));
+  });
   $("refresh-intelligence-btn")?.addEventListener("click", loadFinancialIntelligence);
   $("ask-advisor-btn")?.addEventListener("click", askAdvisor);
   $("advisor-question")?.addEventListener("keydown", (e) => {

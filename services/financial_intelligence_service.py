@@ -18,8 +18,9 @@ from forecast_engine.risk_drivers import calculate_risk_drivers
 from forecast_engine.risk_level import calculate_risk_level
 from models.api_models import ForecastOutputs
 from services.advisory_summary_service import generate_advisory_summary
-from services.farmer_dashboard_service import get_farmer_profile, resolve_farm_file
-from services.forecast_service import load_farm, run_forecast
+from services.farmer_dashboard_service import get_farmer_profile, resolve_farm_file, resolve_sectors
+from services.forecast_service import run_forecast
+from services.multi_sector_farm import load_farm_for_analysis
 
 
 def _build_forecast_from_farm(farm: dict) -> dict:
@@ -53,9 +54,13 @@ def _build_forecast_from_farm(farm: dict) -> dict:
     }
 
 
-def _load_forecast_context(farm_file: str) -> tuple[dict, dict, dict]:
+def _load_forecast_context(
+    farm_file: str,
+    sectors: list[str] | None = None,
+) -> tuple[dict, dict, dict]:
     """Return farm dict, full forecast result, and advisory summary."""
-    farm = load_farm(farm_file)
+    selected = resolve_sectors(sectors, farm_file)
+    farm = load_farm_for_analysis(farm_file, selected)
     try:
         outputs = ForecastOutputs(
             forecast_summary=True,
@@ -71,6 +76,7 @@ def _load_forecast_context(farm_file: str) -> tuple[dict, dict, dict]:
             outputs=outputs,
             save_result=False,
             generate_charts=False,
+            sectors=selected,
         )
         summary = api_result.get("forecast_summary") or {}
         full = _build_forecast_from_farm(farm)
@@ -249,11 +255,15 @@ def _plain_summary(forecast: dict, health: dict, farm: dict) -> str:
     return " ".join(parts)
 
 
-def get_financial_intelligence(farm_id: str | None = None) -> dict:
+def get_financial_intelligence(
+    farm_id: str | None = None,
+    sectors: list[str] | None = None,
+) -> dict:
     """Build the full Financial Intelligence payload for the selected farm."""
     farm_file = resolve_farm_file(farm_id)
-    profile = get_farmer_profile(farm_id)
-    farm, forecast, extras = _load_forecast_context(farm_file)
+    selected = resolve_sectors(sectors, farm_id)
+    profile = get_farmer_profile(farm_id, selected)
+    farm, forecast, extras = _load_forecast_context(farm_file, selected)
     advisory = extras["advisory"]
     risk_drivers = extras["risk_drivers"]
     health = _health_score(forecast, farm)
@@ -298,9 +308,13 @@ def _normalize_question(question: str) -> str:
     return question.strip().lower()
 
 
-def ask_farm_advisor(question: str, farm_id: str | None = None) -> dict:
+def ask_farm_advisor(
+    question: str,
+    farm_id: str | None = None,
+    sectors: list[str] | None = None,
+) -> dict:
     """Rule-based answers to common farmer questions."""
-    intel = get_financial_intelligence(farm_id)
+    intel = get_financial_intelligence(farm_id, sectors=sectors)
     forecast = intel["forecast_summary"]
     health = intel["health_score"]
     q = _normalize_question(question)

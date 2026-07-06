@@ -9,6 +9,9 @@ def generate_monthly_forecast(farm, revenue, costs, opening_cash_balance):
     """
     Generates a 12-month cashflow forecast and returns it as a list of dictionaries.
     """
+    precomputed = farm.get("monthly_forecast")
+    if isinstance(precomputed, list) and len(precomputed) == 12:
+        return precomputed
 
     milk_revenue = farm["milking_cows"] * farm["litres_per_cow"] * farm["milk_price"]
 

@@ -316,6 +316,44 @@ body {
   background: var(--white);
 }
 
+.sector-select-card { margin-bottom: 1.25rem; }
+.sector-select-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.sector-select-header h3 { margin: 0; }
+.sector-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.sector-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--white);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sector-chip:has(input:checked) {
+  border-color: var(--green);
+  background: #e8f7ee;
+}
+.sector-chip input {
+  accent-color: var(--green);
+  width: 1rem;
+  height: 1rem;
+}
+
 .sandbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
