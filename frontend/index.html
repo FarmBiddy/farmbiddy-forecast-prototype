@@ -52,7 +52,6 @@
         <div class="dash-header-right">
           <span id="today-date" class="date-badge"></span>
           <button type="button" class="icon-btn" title="Help">?</button>
-          <button type="button" id="run-analysis-btn" class="btn-run">Run Analysis</button>
         </div>
       </header>
 
@@ -151,17 +150,12 @@
         <div class="card"><h3>My Farm Profile</h3><div id="farm-profile-detail" class="profile-grid"></div></div>
       </section>
       <section class="view hidden" id="view-daily">
-        <div class="card"><h3>Daily Updates</h3><p class="muted">Record today's milk income, feed, vet, fuel, and other costs. Full daily entry coming in a future update — use Run Analysis to refresh forecasts.</p></div>
+        <div class="card"><h3>Daily Updates</h3><p class="muted">Record today's milk income, feed, vet, fuel, and other costs. Full daily entry coming in a future update — forecasts refresh automatically when you change sectors.</p></div>
       </section>
       <section class="view hidden" id="view-forecasts">
         <div class="card">
-          <div class="panel-header">
-            <div>
-              <h3>Advanced Forecast</h3>
-              <p class="muted">12-month cashflow, profit, scenarios, Monte Carlo, and risk range</p>
-            </div>
-            <button type="button" id="run-advanced-forecast-btn" class="btn-run">Run Advanced Forecast</button>
-          </div>
+          <h3>Advanced Forecast</h3>
+          <p class="muted">12-month cashflow, profit, scenarios, Monte Carlo, and risk range</p>
         </div>
         <div id="forecast-results" class="hidden">
           <div class="interpretation-box" id="forecast-interpretation"></div>
@@ -213,7 +207,6 @@
         <div class="card">
           <h3>Financial Intelligence</h3>
           <p class="muted">Practical insights and recommendations for your selected farm.</p>
-          <button type="button" id="refresh-intelligence-btn" class="btn-secondary">Refresh Analysis</button>
         </div>
         <div id="intelligence-loading" class="muted">Loading financial intelligence…</div>
         <div id="intelligence-content" class="hidden">
@@ -307,6 +300,6 @@
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=6"></script>
+  <script src="/assets/app.js?v=7"></script>
 </body>
 </html>

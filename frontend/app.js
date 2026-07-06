@@ -218,7 +218,7 @@ function renderQuickActions() {
   if (!box) return;
   const actions = [
     { icon: "◎", label: "Select Sectors", action: "focus-sectors" },
-    { icon: "↗", label: "Run Advanced Forecast", view: "forecasts", trigger: "advanced" },
+    { icon: "↗", label: "View Advanced Forecast", view: "forecasts", trigger: "advanced" },
     { icon: "◆", label: "Open Scenario Sandbox", view: "scenarios" },
     { icon: "💡", label: "Ask AI Advisor", view: "intelligence" },
     { icon: "↑", label: "Upload Financial File", view: "settings" },
@@ -229,12 +229,15 @@ function renderQuickActions() {
     `<button type="button" class="qa-btn" data-view="${a.view || ""}" data-action="${a.action || ""}" data-trigger="${a.trigger || ""}"><span>${a.icon}</span>${a.label}</button>`
   ).join("");
   box.querySelectorAll(".qa-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       if (btn.dataset.action === "focus-sectors") $("sector-select")?.scrollIntoView({ behavior: "smooth", block: "center" });
       else if (btn.dataset.view) {
-        navigate(btn.dataset.view);
-        if (btn.dataset.trigger === "advanced") runAdvancedForecast();
-        if (btn.dataset.trigger === "monte") showMonteCarloFromAnalysis();
+        try {
+          await navigate(btn.dataset.view);
+          if (btn.dataset.trigger === "monte") showMonteCarloFromAnalysis();
+        } catch (err) {
+          showStatus(err.message, "error");
+        }
       }
     });
   });
@@ -286,12 +289,13 @@ function renderForecastResults(data) {
 }
 
 function showMonteCarloFromAnalysis() {
-  if (!state.analysis?.monte_carlo) {
-    showStatus("Run analysis first to load Monte Carlo results.", "error");
+  const monte = state.advancedForecast?.monte_carlo || state.analysis?.monte_carlo;
+  if (!monte) {
+    showStatus("Forecast data is still loading.", "error");
     return;
   }
   $("forecast-results")?.classList.remove("hidden");
-  renderMonteCarlo(state.analysis.monte_carlo);
+  renderMonteCarlo(monte);
 }
 
 function renderMonteCarlo(monte) {
@@ -497,16 +501,32 @@ function setReportStatus(msg, type = "info") {
   el.classList.remove("hidden");
 }
 
-function navigate(view) {
+function sectorCacheKey() {
+  return (state.selectedSectors || []).slice().sort().join(",");
+}
+
+function invalidateAdvancedForecast() {
+  state.advancedForecast = null;
+  state.advancedForecastKey = null;
+}
+
+async function ensureAdvancedForecast(showMsg = false) {
+  const key = sectorCacheKey();
+  if (state.advancedForecast && state.advancedForecastKey === key) {
+    renderForecastResults(state.advancedForecast);
+    return;
+  }
+  await runAdvancedForecast(showMsg);
+}
+
+async function navigate(view) {
   state.view = view;
   document.querySelectorAll(".nav-link").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
   document.querySelectorAll(".view").forEach((v) => { v.classList.remove("active"); v.classList.add("hidden"); });
   const section = $(`view-${view}`);
   if (section) { section.classList.add("active"); section.classList.remove("hidden"); }
-  if (view === "forecasts" && state.analysis?.monte_carlo) {
-    renderMonteCarlo(state.analysis.monte_carlo);
-  }
-  if (view === "intelligence") loadFinancialIntelligence();
+  if (view === "forecasts") await ensureAdvancedForecast();
+  if (view === "intelligence") await loadFinancialIntelligence();
   if (view === "reports") {
     initReportDate();
     updateReportSections();
@@ -619,10 +639,12 @@ async function onSectorChange(changedInput) {
     return;
   }
   state.selectedSectors = selected;
+  invalidateAdvancedForecast();
   showStatus("Updating analysis for selected sectors…", "info");
   try {
     await refreshFarmData();
     if (state.view === "intelligence") await loadFinancialIntelligence();
+    if (state.view === "forecasts") await ensureAdvancedForecast();
     if (state.view === "reports") $("report-preview")?.classList.add("hidden");
     showStatus(`Analyzing: ${sectorSummaryLabel()}`, "success");
   } catch (err) {
@@ -644,12 +666,11 @@ async function loadInitial() {
 }
 
 async function runAnalysis(showMsg = true) {
-  const btn = $("run-analysis-btn");
-  if (btn) btn.disabled = true;
   if (showMsg) showStatus("Running analysis…", "info");
   try {
     const data = await api("/farmer/run-analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: sectorsBody() });
     state.analysis = data;
+    invalidateAdvancedForecast();
     state.profile = data.profile;
     state.selectedSectors = data.selected_sectors || state.selectedSectors;
     renderSidebar(data.profile);
@@ -657,23 +678,19 @@ async function runAnalysis(showMsg = true) {
     if (showMsg) showStatus("Analysis complete.", "success");
   } catch (err) {
     showStatus(err.message, "error");
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
-async function runAdvancedForecast() {
-  const btn = $("run-advanced-forecast-btn");
-  if (btn) btn.disabled = true;
-  showStatus("Running advanced forecast…", "info");
+async function runAdvancedForecast(showMsg = true) {
+  if (showMsg) showStatus("Running advanced forecast…", "info");
   try {
     const data = await api("/farmer/run-advanced-forecast", { method: "POST", headers: { "Content-Type": "application/json" }, body: sectorsBody() });
+    state.advancedForecast = data;
+    state.advancedForecastKey = sectorCacheKey();
     renderForecastResults(data);
-    showStatus("Advanced forecast complete.", "success");
+    if (showMsg) showStatus("Advanced forecast complete.", "success");
   } catch (err) {
     showStatus(err.message, "error");
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
@@ -698,15 +715,14 @@ async function runSandbox() {
 
 function setupNav() {
   document.querySelectorAll(".nav-link").forEach((btn) => {
-    btn.addEventListener("click", () => navigate(btn.dataset.view));
+    btn.addEventListener("click", () => {
+      navigate(btn.dataset.view).catch((err) => showStatus(err.message, "error"));
+    });
   });
-  $("run-analysis-btn")?.addEventListener("click", () => runAnalysis());
-  $("run-advanced-forecast-btn")?.addEventListener("click", runAdvancedForecast);
   $("run-sandbox-btn")?.addEventListener("click", runSandbox);
   $("sector-select")?.querySelectorAll("input[data-sector]").forEach((input) => {
     input.addEventListener("change", () => onSectorChange(input));
   });
-  $("refresh-intelligence-btn")?.addEventListener("click", loadFinancialIntelligence);
   $("ask-advisor-btn")?.addEventListener("click", askAdvisor);
   $("advisor-question")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") askAdvisor();
