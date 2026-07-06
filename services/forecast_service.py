@@ -31,7 +31,7 @@ from services.advisory_summary_service import generate_advisory_summary
 from services.chart_service import generate_selected_charts
 from services.comparison_service import COMPARISON_FIELDS, build_comparison_row
 from services.dashboard_service import generate_profitability_dashboard
-from services.multi_sector_farm import load_farm_for_analysis
+from services.multi_sector_farm import get_available_sectors, is_multi_sector, load_farm_for_analysis
 
 
 class FarmFileNotFoundError(FileNotFoundError):
@@ -108,12 +108,16 @@ def list_available_farms() -> List[dict]:
         except (FarmFileNotFoundError, InvalidFarmDataError):
             continue
 
-        farms.append({
+        entry = {
             "farm_file": filename,
             "farm_name": farm.get("farm_name", filename),
             "milking_cows": farm.get("milking_cows"),
             "milk_price": farm.get("milk_price"),
-        })
+        }
+        if is_multi_sector(farm):
+            entry["sectors"] = get_available_sectors(farm)
+            entry["farm_type"] = "Mixed"
+        farms.append(entry)
 
     return farms
 

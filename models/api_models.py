@@ -75,7 +75,7 @@ class FarmListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ForecastRequest(BaseModel):
-    farm_file: str = Field(..., description="JSON filename from datasets/, e.g. dairy_farm_1.json")
+    farm_file: str = Field(..., description="JSON filename from datasets/, e.g. multi_sector_farm.json")
     outputs: ForecastOutputs = Field(default_factory=ForecastOutputs)
     save_result: bool = True
     generate_charts: bool = False
