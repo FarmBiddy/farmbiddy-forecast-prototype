@@ -310,6 +310,8 @@ class FarmerDashboardResponse(BaseModel):
     success: bool
     profile: Dict[str, Any]
     kpis: List[Dict[str, Any]]
+    executive_kpis: List[Dict[str, Any]] = Field(default_factory=list)
+    overview_header: Dict[str, Any] = Field(default_factory=dict)
     has_analysis: bool = False
     farms: List[Dict[str, Any]] = Field(default_factory=list)
     available_sectors: List[SectorInfo] = Field(default_factory=list)
@@ -457,20 +459,22 @@ class FarmerAnalysisResponse(BaseModel):
     success: bool
     generated_at: Optional[str] = None
     profile: Dict[str, Any]
-    kpis: List[Dict[str, Any]]
-    alerts: List[str] = Field(default_factory=list)
-    recommendations: List[Dict[str, Any]] = Field(default_factory=list)
-    health: Dict[str, Any] = Field(default_factory=dict)
-    scenario_snapshots: List[Dict[str, Any]] = Field(default_factory=list)
-    charts: Dict[str, str] = Field(default_factory=dict)
-    monthly_forecast: List[Dict[str, Any]] = Field(default_factory=list)
-    profit_chart_data: List[Dict[str, Any]] = Field(default_factory=list)
-    cashflow_chart_data: List[Dict[str, Any]] = Field(default_factory=list)
-    recent_updates: List[Dict[str, Any]] = Field(default_factory=list)
-    upcoming_payments: List[Dict[str, Any]] = Field(default_factory=list)
+    overview_header: Dict[str, Any] = Field(default_factory=dict)
+    executive_kpis: List[Dict[str, Any]] = Field(default_factory=list)
+    health_snapshot: List[Dict[str, Any]] = Field(default_factory=list)
+    sector_performance: List[Dict[str, Any]] = Field(default_factory=list)
+    alerts: List[Dict[str, Any]] = Field(default_factory=list)
+    overview_chart: List[Dict[str, Any]] = Field(default_factory=list)
     forecast_summary: Optional[Dict[str, Any]] = None
-    top_risk_drivers: List[Dict[str, Any]] = Field(default_factory=list)
-    monte_carlo: Dict[str, Any] = Field(default_factory=dict)
     selected_sectors: List[str] = Field(default_factory=list)
-    kpi_visibility: Dict[str, Any] = Field(default_factory=dict)
+    # Legacy alias used by KPI row during initial load
+    kpis: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class FarmerHistoricalDataResponse(BaseModel):
+    success: bool
+    farm_name: str
+    selected_sectors: List[str] = Field(default_factory=list)
+    combined_monthly: List[Dict[str, Any]] = Field(default_factory=list)
+    sectors: List[Dict[str, Any]] = Field(default_factory=list)
 

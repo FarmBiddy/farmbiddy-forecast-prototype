@@ -37,6 +37,12 @@ from services.multi_sector_farm import (
 )
 from forecast_engine.monte_carlo import run_monte_carlo
 from forecast_engine.scenarios import calculate_scenarios
+from services.dashboard_summary import (
+    build_executive_dashboard,
+    calculate_preview_kpis,
+    get_historical_data,
+    get_selected_sector_data,
+)
 
 
 DEFAULT_FARM_FILE = MULTI_SECTOR_FILE
@@ -350,9 +356,10 @@ def run_farmer_analysis(
     save_result: bool = True,
     sectors: list[str] | str | None = None,
 ) -> dict:
-    """Run full forecast + charts + farmer dashboard payload for the selected farm."""
+    """Run forecast and return executive dashboard payload for selected sectors."""
     farm_file = resolve_farm_file(farm_id)
     selected = resolve_sectors(sectors, farm_id)
+    filtered_raw = get_selected_sector_data(farm_file, selected)
     farm = load_farm_for_analysis(farm_file, selected)
     profile = get_farmer_profile(farm_id, selected)
 
@@ -361,72 +368,29 @@ def run_farmer_analysis(
         monthly_forecast=True,
         alerts=True,
         risk_level=True,
-        top_risk_drivers=True,
-        profitability_dashboard=True,
-        advisory_summary=True,
         kpis=True,
-        scenarios=True,
     )
 
     forecast = run_forecast(
         farm_file=farm_file,
         outputs=outputs,
         save_result=save_result,
-        generate_charts=True,
-        chart_types=["running_balance", "revenue_vs_costs", "cost_breakdown", "scenario_profit"],
+        generate_charts=False,
         sectors=selected,
     )
 
-    summary = forecast.get("forecast_summary") or {}
-    base_profit = summary.get("annual_profit", 0)
-    monthly_forecast = forecast.get("monthly_forecast") or []
-    monte = run_monte_carlo(farm, iterations=1000)
-
-    upcoming = [{
-        "label": "Loan repayment",
-        "amount": round(farm.get("loan_repayments", 36000) / 12, 0),
-        "frequency": "Monthly",
-        "due": "This month",
-    }]
+    executive = build_executive_dashboard(
+        farm_file, selected, profile, forecast, farm, filtered_raw,
+    )
 
     return {
         "success": True,
         "generated_at": forecast.get("generated_at"),
         "profile": profile,
-        "kpis": _build_kpis(forecast, farm),
-        "alerts": forecast.get("alerts") or [],
-        "recommendations": _build_recommendations(forecast),
-        "health": _health_breakdown(
-            {
-                "profit_margin": summary.get("profit_margin", 0),
-                "risk_level": forecast.get("risk_level"),
-                "monthly_cashflow": (forecast.get("kpis") or {}).get("monthly_cashflow", 0),
-                "feed_cost_ratio": (forecast.get("kpis") or {}).get("feed_cost_ratio", 31),
-            },
-            farm,
-        ),
-        "scenario_snapshots": _build_scenario_snapshots(farm_file, base_profit, farm),
-        "charts": forecast.get("charts") or {},
-        "monthly_forecast": monthly_forecast,
-        "profit_chart_data": [
-            {"month": m.get("month"), "profit": m.get("cashflow"), "revenue": m.get("revenue"), "costs": m.get("costs")}
-            for m in monthly_forecast
-        ],
-        "cashflow_chart_data": [
-            {"month": m.get("month"), "cash_in": m.get("revenue"), "cash_out": m.get("costs"), "net": m.get("cashflow"), "balance": m.get("running_balance")}
-            for m in monthly_forecast
-        ],
-        "recent_updates": [{
-            "label": "Forecast run",
-            "detail": f"Annual profit €{base_profit:,.0f}",
-            "when": forecast.get("generated_at", "")[:10],
-        }],
-        "upcoming_payments": upcoming,
-        "forecast_summary": summary,
-        "top_risk_drivers": forecast.get("top_risk_drivers") or [],
-        "monte_carlo": monte,
         "selected_sectors": selected,
-        "kpi_visibility": forecast.get("kpi_visibility") or farm.get("kpi_visibility"),
+        **executive,
+        # Legacy alias for preview KPI row during load
+        "kpis": executive["executive_kpis"],
     }
 
 
@@ -434,20 +398,42 @@ def get_farmer_dashboard_preview(
     farm_id: str | None = None,
     sectors: list[str] | str | None = None,
 ) -> dict:
-    """Dashboard shell with profile and fallback KPIs before Run Analysis."""
+    """Dashboard shell with profile and executive KPI placeholders."""
+    from models.multi_sector_farm import SECTOR_LABELS
+
     farm_file = resolve_farm_file(farm_id)
     selected = resolve_sectors(sectors, farm_id)
+    filtered_raw = get_selected_sector_data(farm_file, selected)
     farm = load_farm_for_analysis(farm_file, selected)
     profile = get_farmer_profile(farm_id, selected)
     sector_payload = get_sectors_list(farm_id, selected)
+    executive_kpis = calculate_preview_kpis(farm, filtered_raw)
     return {
         "success": True,
         "profile": profile,
-        "kpis": _fallback_kpis(farm),
+        "kpis": executive_kpis,
+        "executive_kpis": executive_kpis,
+        "overview_header": {
+            "farm_name": profile.get("farm_name"),
+            "selected_sectors": selected,
+            "sector_labels": [SECTOR_LABELS.get(s, s.title()) for s in selected],
+            "status_label": "Loading…",
+            "last_updated": profile.get("last_updated"),
+        },
         "has_analysis": False,
         "available_sectors": sector_payload["available_sectors"],
         "selected_sectors": selected,
     }
+
+
+def get_farmer_historical_data(
+    farm_id: str | None = None,
+    sectors: list[str] | str | None = None,
+) -> dict:
+    """Historical monthly data for the Historical Data page."""
+    farm_file = resolve_farm_file(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    return get_historical_data(farm_file, selected)
 
 
 def run_advanced_forecast(

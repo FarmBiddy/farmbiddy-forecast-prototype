@@ -174,24 +174,106 @@ function renderEngineCharts(charts, containerId = "engine-charts") {
   }).join("");
 }
 
-function renderAlerts(alerts, listId = "alerts-list") {
-  const list = $(listId);
-  if (!list) return;
-  list.innerHTML = (alerts?.length ? alerts : ["No critical alerts right now."]).map((a) => `<li>${a}</li>`).join("");
+function renderOverviewHeader(header) {
+  const box = $("exec-overview-header");
+  if (!box || !header) return;
+  const badges = (header.sector_labels || []).map((l) =>
+    `<span class="exec-sector-badge">${l}</span>`).join("");
+  box.innerHTML = `
+    <div>
+      <h3>${header.farm_name || "My Farm"}</h3>
+      <span class="exec-status-badge">${header.status_label || "Overview"}</span>
+      <div class="exec-sector-badges">${badges}</div>
+    </div>
+    <div class="exec-meta">
+      <div>Last updated: ${header.last_updated || "—"}</div>
+      ${header.location ? `<div>${header.location}</div>` : ""}
+    </div>`;
 }
 
-function renderHealth(health) {
-  const box = $("health-score");
-  if (!box || !health) return;
+function renderHealthSnapshot(indicators) {
+  const box = $("health-snapshot");
+  if (!box) return;
+  if (!indicators?.length) {
+    box.innerHTML = `<p class="muted">Health indicators appear after analysis.</p>`;
+    return;
+  }
+  box.innerHTML = indicators.map((ind) => `
+    <div class="health-pill ${ind.colour || "amber"}">
+      <div class="health-pill-label">${ind.label}</div>
+      <div class="health-pill-status">${ind.status}</div>
+    </div>`).join("");
+}
+
+function renderSectorTable(rows) {
+  const box = $("sector-performance-table");
+  if (!box) return;
+  if (!rows?.length) {
+    box.innerHTML = `<p class="muted">No sector data for current selection.</p>`;
+    return;
+  }
+  const statusClass = (s) => `status-${(s || "").toLowerCase()}`;
   box.innerHTML = `
-    <div class="health-score">${health.score} / 100</div>
-    <div class="health-label">${health.label || "Good"}</div>
-    <div class="health-rows">
-      <div class="health-row"><span>Profitability</span><strong>${health.profitability}</strong></div>
-      <div class="health-row"><span>Liquidity</span><strong>${health.liquidity}</strong></div>
-      <div class="health-row"><span>Solvency</span><strong>${health.solvency}</strong></div>
-      <div class="health-row"><span>Efficiency</span><strong>${health.efficiency}</strong></div>
+    <table class="sector-table">
+      <thead>
+        <tr><th>Sector</th><th>Revenue</th><th>Profit</th><th>Margin</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <td><strong>${r.label}</strong></td>
+            <td>€${Number(r.revenue || 0).toLocaleString()}</td>
+            <td>€${Number(r.profit || 0).toLocaleString()}</td>
+            <td>${r.margin_pct}%</td>
+            <td class="${statusClass(r.status)}">${r.status}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function renderOverviewChart(data) {
+  const el = $("overview-chart");
+  if (!el || !data?.length) {
+    if (el) el.innerHTML = `<p class="muted">No chart data yet.</p>`;
+    return;
+  }
+  const max = Math.max(...data.flatMap((d) => [Math.abs(d.revenue || 0), Math.abs(d.costs || 0)]), 1);
+  const barMaxPx = 150;
+  el.innerHTML = `<div class="chart-bars">${data.map((d) => {
+    const revH = Math.max(3, (Math.abs(d.revenue || 0) / max) * barMaxPx);
+    const costH = Math.max(3, (Math.abs(d.costs || 0) / max) * barMaxPx);
+    const label = d.period ? d.period.slice(2) : `${d.month}`;
+    return `<div class="bar-group">
+      <div class="bar-stack">
+        <div class="bar bar-in" style="height:${revH}px" title="Revenue: €${d.revenue}"></div>
+        <div class="bar bar-out" style="height:${costH}px" title="Costs: €${d.costs}"></div>
+      </div>
+      <span class="bar-label">${label}</span>
     </div>`;
+  }).join("")}</div>`;
+}
+
+function renderExecutiveAlerts(alerts, listId = "alerts-list") {
+  const list = $(listId);
+  if (!list) return;
+  const items = alerts?.length ? alerts : [{ message: "No critical alerts right now.", severity: "info" }];
+  list.innerHTML = items.map((a) => {
+    const msg = typeof a === "string" ? a : a.message;
+    const sev = typeof a === "string" ? "medium" : (a.severity || "medium");
+    return `<li class="alert-${sev}">${msg}</li>`;
+  }).join("");
+}
+
+function renderExecutiveDashboard(data) {
+  $("dashboard-empty")?.classList.add("hidden");
+  $("dashboard-results")?.classList.remove("hidden");
+  renderOverviewHeader(data.overview_header);
+  renderKpis(data.executive_kpis || data.kpis);
+  renderHealthSnapshot(data.health_snapshot);
+  renderSectorTable(data.sector_performance);
+  renderExecutiveAlerts(data.alerts);
+  renderExecutiveAlerts(data.alerts, "alerts-full");
+  renderOverviewChart(data.overview_chart);
 }
 
 function renderRecommendations(recs, listId = "recommendations") {
@@ -214,56 +296,7 @@ function renderScenarios(snapshots) {
 }
 
 function renderQuickActions() {
-  const box = $("quick-actions");
-  if (!box) return;
-  const actions = [
-    { icon: "◎", label: "Select Sectors", action: "focus-sectors" },
-    { icon: "↗", label: "View Advanced Forecast", view: "forecasts", trigger: "advanced" },
-    { icon: "◆", label: "Open Scenario Sandbox", view: "scenarios" },
-    { icon: "💡", label: "Ask AI Advisor", view: "intelligence" },
-    { icon: "↑", label: "Upload Financial File", view: "settings" },
-    { icon: "◎", label: "View Monte Carlo Results", view: "forecasts", trigger: "monte" },
-    { icon: "📄", label: "Generate Farmer Report", view: "reports" },
-  ];
-  box.innerHTML = actions.map((a) =>
-    `<button type="button" class="qa-btn" data-view="${a.view || ""}" data-action="${a.action || ""}" data-trigger="${a.trigger || ""}"><span>${a.icon}</span>${a.label}</button>`
-  ).join("");
-  box.querySelectorAll(".qa-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      if (btn.dataset.action === "focus-sectors") $("sector-select")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      else if (btn.dataset.view) {
-        try {
-          await navigate(btn.dataset.view);
-          if (btn.dataset.trigger === "monte") showMonteCarloFromAnalysis();
-        } catch (err) {
-          showStatus(err.message, "error");
-        }
-      }
-    });
-  });
-}
-
-function renderDashboardResults(data) {
-  $("dashboard-empty")?.classList.add("hidden");
-  $("dashboard-results")?.classList.remove("hidden");
-  renderKpis(data.kpis);
-  renderAlerts(data.alerts);
-  renderAlerts(data.alerts, "alerts-full");
-  renderHealth(data.health);
-  renderRecommendations(data.recommendations);
-  renderScenarios(data.scenario_snapshots);
-  renderBarChart("chart-cashflow", data.cashflow_chart_data, ["cash_in", "cash_out"]);
-  renderBarChart("chart-profit", data.profit_chart_data, ["profit"]);
-  renderEngineCharts(data.charts);
-  renderMonteCarlo(data.monte_carlo);
-  if ($("recent-updates")) {
-    $("recent-updates").innerHTML = (data.recent_updates || []).map((u) =>
-      `<li><strong>${u.label}</strong><br><span class="muted">${u.detail} · ${u.when}</span></li>`).join("");
-  }
-  if ($("upcoming-payments")) {
-    $("upcoming-payments").innerHTML = (data.upcoming_payments || []).map((p) =>
-      `<li><strong>${p.label}</strong> — €${Number(p.amount || 0).toLocaleString()} (${p.due})</li>`).join("");
-  }
+  // Quick actions removed from executive dashboard — navigation via sidebar only.
 }
 
 function renderForecastResults(data) {
@@ -286,16 +319,6 @@ function renderForecastResults(data) {
       `<div class="scenario-item"><strong>${s.name}</strong> — Profit €${Number(s.profit).toLocaleString()} @ €${s.milk_price}/L</div>`
     ).join("");
   }
-}
-
-function showMonteCarloFromAnalysis() {
-  const monte = state.advancedForecast?.monte_carlo || state.analysis?.monte_carlo;
-  if (!monte) {
-    showStatus("Forecast data is still loading.", "error");
-    return;
-  }
-  $("forecast-results")?.classList.remove("hidden");
-  renderMonteCarlo(monte);
 }
 
 function renderMonteCarlo(monte) {
@@ -527,6 +550,7 @@ async function navigate(view) {
   if (section) { section.classList.add("active"); section.classList.remove("hidden"); }
   if (view === "forecasts") await ensureAdvancedForecast();
   if (view === "intelligence") await loadFinancialIntelligence();
+  if (view === "historical") await loadHistoricalData();
   if (view === "reports") {
     initReportDate();
     updateReportSections();
@@ -570,6 +594,53 @@ function renderFinancialIntelligence(data) {
   }
 
   renderRecommendations(data.recommended_actions, "intel-actions");
+}
+
+function renderHistoricalData(data) {
+  $("historical-loading")?.classList.add("hidden");
+  $("historical-content")?.classList.remove("hidden");
+  const box = $("historical-content");
+  if (!box) return;
+
+  const renderTable = (rows, title) => {
+    if (!rows?.length) return "";
+    return `
+      <div class="historical-sector-block">
+        <h4>${title}</h4>
+        <div class="table-wrap">
+          <table class="sector-table">
+            <thead><tr><th>Period</th><th>Revenue</th><th>Costs</th><th>Profit</th></tr></thead>
+            <tbody>
+              ${rows.map((r) => `
+                <tr>
+                  <td>${r.period}</td>
+                  <td>€${Number(r.revenue || 0).toLocaleString()}</td>
+                  <td>€${Number(r.costs || 0).toLocaleString()}</td>
+                  <td>€${Number((r.revenue || 0) - (r.costs || 0)).toLocaleString()}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  };
+
+  let html = renderTable(data.combined_monthly, "Combined (selected sectors)");
+  (data.sectors || []).forEach((s) => {
+    html += renderTable(s.monthly, `${s.label} — totals: €${Number(s.totals?.revenue || 0).toLocaleString()} revenue`);
+  });
+  box.innerHTML = html || `<p class="muted">No historical data available.</p>`;
+}
+
+async function loadHistoricalData() {
+  $("historical-loading")?.classList.remove("hidden");
+  $("historical-content")?.classList.add("hidden");
+  try {
+    const data = await api(`/farmer/historical-data${sectorsQuery()}`);
+    renderHistoricalData(data);
+  } catch (err) {
+    if ($("historical-loading")) $("historical-loading").textContent = `Could not load: ${err.message}`;
+    showStatus(err.message, "error");
+  }
 }
 
 async function loadFinancialIntelligence() {
@@ -627,7 +698,8 @@ async function refreshFarmData() {
   setGreeting();
   renderSidebar(data.profile);
   renderProfileDetail(data.profile);
-  renderKpis(data.kpis);
+  renderKpis(data.executive_kpis || data.kpis);
+  if (data.overview_header) renderOverviewHeader(data.overview_header);
   if (state.analysis) await runAnalysis(false);
 }
 
@@ -645,6 +717,7 @@ async function onSectorChange(changedInput) {
     await refreshFarmData();
     if (state.view === "intelligence") await loadFinancialIntelligence();
     if (state.view === "forecasts") await ensureAdvancedForecast();
+    if (state.view === "historical") await loadHistoricalData();
     if (state.view === "reports") $("report-preview")?.classList.add("hidden");
     showStatus(`Analyzing: ${sectorSummaryLabel()}`, "success");
   } catch (err) {
@@ -660,8 +733,8 @@ async function loadInitial() {
   setGreeting();
   renderSidebar(data.profile);
   renderProfileDetail(data.profile);
-  renderKpis(data.kpis);
-  renderQuickActions();
+  renderKpis(data.executive_kpis || data.kpis);
+  if (data.overview_header) renderOverviewHeader(data.overview_header);
   await runAnalysis(false);
 }
 
@@ -674,7 +747,7 @@ async function runAnalysis(showMsg = true) {
     state.profile = data.profile;
     state.selectedSectors = data.selected_sectors || state.selectedSectors;
     renderSidebar(data.profile);
-    renderDashboardResults(data);
+    renderExecutiveDashboard(data);
     if (showMsg) showStatus("Analysis complete.", "success");
   } catch (err) {
     showStatus(err.message, "error");

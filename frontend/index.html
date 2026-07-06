@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=7" />
+  <link rel="stylesheet" href="/assets/styles.css?v=8" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -28,6 +28,7 @@
         <button type="button" class="nav-link" data-view="scenarios">Scenario Planner</button>
         <button type="button" class="nav-link" data-view="intelligence">Financial Intelligence</button>
         <button type="button" class="nav-link" data-view="reports">Reports</button>
+        <button type="button" class="nav-link" data-view="historical">Historical Data</button>
         <button type="button" class="nav-link" data-view="alerts">Alerts</button>
         <button type="button" class="nav-link" data-view="settings">Settings</button>
       </nav>
@@ -83,64 +84,34 @@
 
       <!-- Dashboard view -->
       <section class="view active" id="view-dashboard">
-        <div class="kpi-row" id="kpi-row"></div>
+        <div id="exec-overview-header" class="card exec-overview-card"></div>
+
+        <div class="kpi-row exec-kpi-row" id="kpi-row"></div>
 
         <div id="dashboard-empty" class="empty-state">
-          <p>Loading your cash flow forecast, charts, alerts, and recommendations…</p>
+          <p>Loading farm performance overview…</p>
         </div>
 
         <div id="dashboard-results" class="hidden">
-          <div class="grid-row grid-2-1">
-            <div class="card chart-card">
-              <h3>12 Month Cash Flow Forecast</h3>
-              <div id="chart-cashflow" class="chart-area"></div>
-              <div id="iframe-cashflow" class="chart-iframes"></div>
-            </div>
-            <div class="card">
-              <h3>Latest Alerts</h3>
-              <ul id="alerts-list" class="alert-list"></ul>
-            </div>
+          <div class="card">
+            <h3>Financial Health Snapshot</h3>
+            <div id="health-snapshot" class="health-snapshot"></div>
           </div>
 
           <div class="grid-row grid-2-1">
-            <div class="card chart-card">
-              <h3>Monthly Profit Forecast</h3>
-              <div id="chart-profit" class="chart-area"></div>
+            <div class="card">
+              <h3>Sector Performance</h3>
+              <div id="sector-performance-table" class="table-wrap"></div>
             </div>
             <div class="card">
-              <h3>Farm Health Score</h3>
-              <div id="health-score" class="health-block"></div>
+              <h3>Key Alerts</h3>
+              <ul id="alerts-list" class="alert-list exec-alerts"></ul>
             </div>
           </div>
 
-          <div class="grid-row grid-3">
-            <div class="card">
-              <h3>Quick Actions</h3>
-              <div id="quick-actions" class="quick-actions"></div>
-            </div>
-            <div class="card">
-              <h3>Top 5 Recommended Actions</h3>
-              <ol id="recommendations" class="rec-list"></ol>
-            </div>
-            <div class="card">
-              <h3>Scenario Snapshots</h3>
-              <div id="scenario-snapshots"></div>
-            </div>
-          </div>
-
-          <div class="grid-row grid-3">
-            <div class="card">
-              <h3>Recent Updates</h3>
-              <ul id="recent-updates" class="simple-list"></ul>
-            </div>
-            <div class="card">
-              <h3>Engine Charts</h3>
-              <div id="engine-charts" class="chart-iframes"></div>
-            </div>
-            <div class="card">
-              <h3>Upcoming Payments</h3>
-              <ul id="upcoming-payments" class="simple-list"></ul>
-            </div>
+          <div class="card chart-card">
+            <h3>Revenue vs Costs — Last 24 Months</h3>
+            <div id="overview-chart" class="chart-area overview-chart-area"></div>
           </div>
         </div>
       </section>
@@ -292,14 +263,22 @@
           <a id="report-download-link" class="btn-run report-download hidden" href="#" target="_blank" rel="noopener">Download PDF</a>
         </div>
       </section>
+      <section class="view hidden" id="view-historical">
+        <div class="card">
+          <h3>Historical Data</h3>
+          <p class="muted">24-month revenue and cost history for selected sectors.</p>
+        </div>
+        <div id="historical-loading" class="muted">Loading historical data…</div>
+        <div id="historical-content" class="hidden"></div>
+      </section>
       <section class="view hidden" id="view-alerts">
         <div class="card"><h3>All Alerts</h3><ul id="alerts-full" class="alert-list"></ul></div>
       </section>
       <section class="view hidden" id="view-settings">
-        <div class="card"><h3>Settings</h3><p class="muted">Active farm: <strong id="settings-farm">Green Valley Dairy</strong> (dairy_farm_1.json). No farm selection required.</p></div>
+        <div class="card"><h3>Settings</h3><p class="muted">Active farm: <strong id="settings-farm">Knockrow Mixed Farm</strong> (multi_sector_farm.json). Sector selection controls all analysis.</p></div>
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=7"></script>
+  <script src="/assets/app.js?v=8"></script>
 </body>
 </html>
