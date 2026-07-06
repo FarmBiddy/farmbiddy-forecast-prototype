@@ -23,6 +23,7 @@ from models.api_models import ForecastOutputs, SandboxOutputs
 from services.forecast_service import (
     apply_sandbox_changes,
     list_available_farms,
+    load_farm,
     run_forecast,
     run_sandbox_forecast,
 )
@@ -98,6 +99,22 @@ def list_farms_for_selector() -> list[dict]:
     return farms
 
 
+def _resolve_owner_name(farm_file: str, config: dict) -> str:
+    """Prefer farmer name from dataset JSON, then config, then generic fallback."""
+    try:
+        raw = load_farm(farm_file)
+        farmer = (raw.get("identity") or {}).get("farmer") or {}
+        if farmer.get("name"):
+            return str(farmer["name"])
+        if raw.get("owner_name"):
+            return str(raw["owner_name"])
+    except (FileNotFoundError, ValueError, OSError):
+        pass
+    if farm_file == config.get("active_farm_file") and config.get("owner_name"):
+        return str(config["owner_name"])
+    return "Farmer"
+
+
 def get_farmer_profile(
     farm_id: str | None = None,
     sectors: list[str] | str | None = None,
@@ -130,7 +147,7 @@ def get_farmer_profile(
         "opening_cash_balance": farm.get("opening_cash_balance"),
         "milk_processor": processor,
         "location": config.get("location", ""),
-        "owner_name": config.get("owner_name", "Farmer"),
+        "owner_name": _resolve_owner_name(farm_file, config),
         "last_updated": datetime.now().strftime("%Y-%m-%d"),
         "selected_sectors": selected,
         "farm_type": farm.get("farm_type", "Mixed"),
