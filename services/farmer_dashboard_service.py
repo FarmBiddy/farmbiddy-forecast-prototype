@@ -380,6 +380,7 @@ def run_farmer_analysis(
     summary = forecast.get("forecast_summary") or {}
     base_profit = summary.get("annual_profit", 0)
     monthly_forecast = forecast.get("monthly_forecast") or []
+    monte = run_monte_carlo(farm, iterations=1000)
 
     upcoming = [{
         "label": "Loan repayment",
@@ -423,6 +424,7 @@ def run_farmer_analysis(
         "upcoming_payments": upcoming,
         "forecast_summary": summary,
         "top_risk_drivers": forecast.get("top_risk_drivers") or [],
+        "monte_carlo": monte,
         "selected_sectors": selected,
         "kpi_visibility": forecast.get("kpi_visibility") or farm.get("kpi_visibility"),
     }

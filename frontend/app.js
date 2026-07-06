@@ -222,7 +222,7 @@ function renderQuickActions() {
     { icon: "◆", label: "Open Scenario Sandbox", view: "scenarios" },
     { icon: "💡", label: "Ask AI Advisor", view: "intelligence" },
     { icon: "↑", label: "Upload Financial File", view: "settings" },
-    { icon: "◎", label: "Run Monte Carlo Simulation", view: "forecasts", trigger: "monte" },
+    { icon: "◎", label: "View Monte Carlo Results", view: "forecasts", trigger: "monte" },
     { icon: "📄", label: "Generate Farmer Report", view: "reports" },
   ];
   box.innerHTML = actions.map((a) =>
@@ -234,7 +234,7 @@ function renderQuickActions() {
       else if (btn.dataset.view) {
         navigate(btn.dataset.view);
         if (btn.dataset.trigger === "advanced") runAdvancedForecast();
-        if (btn.dataset.trigger === "monte") runMonteCarlo();
+        if (btn.dataset.trigger === "monte") showMonteCarloFromAnalysis();
       }
     });
   });
@@ -252,6 +252,7 @@ function renderDashboardResults(data) {
   renderBarChart("chart-cashflow", data.cashflow_chart_data, ["cash_in", "cash_out"]);
   renderBarChart("chart-profit", data.profit_chart_data, ["profit"]);
   renderEngineCharts(data.charts);
+  renderMonteCarlo(data.monte_carlo);
   if ($("recent-updates")) {
     $("recent-updates").innerHTML = (data.recent_updates || []).map((u) =>
       `<li><strong>${u.label}</strong><br><span class="muted">${u.detail} · ${u.when}</span></li>`).join("");
@@ -282,6 +283,15 @@ function renderForecastResults(data) {
       `<div class="scenario-item"><strong>${s.name}</strong> — Profit €${Number(s.profit).toLocaleString()} @ €${s.milk_price}/L</div>`
     ).join("");
   }
+}
+
+function showMonteCarloFromAnalysis() {
+  if (!state.analysis?.monte_carlo) {
+    showStatus("Run analysis first to load Monte Carlo results.", "error");
+    return;
+  }
+  $("forecast-results")?.classList.remove("hidden");
+  renderMonteCarlo(state.analysis.monte_carlo);
 }
 
 function renderMonteCarlo(monte) {
@@ -493,6 +503,9 @@ function navigate(view) {
   document.querySelectorAll(".view").forEach((v) => { v.classList.remove("active"); v.classList.add("hidden"); });
   const section = $(`view-${view}`);
   if (section) { section.classList.add("active"); section.classList.remove("hidden"); }
+  if (view === "forecasts" && state.analysis?.monte_carlo) {
+    renderMonteCarlo(state.analysis.monte_carlo);
+  }
   if (view === "intelligence") loadFinancialIntelligence();
   if (view === "reports") {
     initReportDate();
@@ -663,18 +676,6 @@ async function runAdvancedForecast() {
   }
 }
 
-async function runMonteCarlo() {
-  showStatus("Running Monte Carlo simulation…", "info");
-  try {
-    const data = await api("/farmer/run-monte-carlo", { method: "POST", headers: { "Content-Type": "application/json" }, body: sectorsBody({ iterations: 1000 }) });
-    renderMonteCarlo(data.monte_carlo);
-    $("forecast-results")?.classList.remove("hidden");
-    showStatus("Monte Carlo complete.", "success");
-  } catch (err) {
-    showStatus(err.message, "error");
-  }
-}
-
 async function runSandbox() {
   const btn = $("run-sandbox-btn");
   if (btn) btn.disabled = true;
@@ -700,7 +701,6 @@ function setupNav() {
   });
   $("run-analysis-btn")?.addEventListener("click", () => runAnalysis());
   $("run-advanced-forecast-btn")?.addEventListener("click", runAdvancedForecast);
-  $("run-monte-carlo-btn")?.addEventListener("click", runMonteCarlo);
   $("run-sandbox-btn")?.addEventListener("click", runSandbox);
   $("sector-select")?.querySelectorAll("input[data-sector]").forEach((input) => {
     input.addEventListener("change", () => onSectorChange(input));

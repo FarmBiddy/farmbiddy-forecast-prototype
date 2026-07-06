@@ -470,6 +470,7 @@ class FarmerAnalysisResponse(BaseModel):
     upcoming_payments: List[Dict[str, Any]] = Field(default_factory=list)
     forecast_summary: Optional[Dict[str, Any]] = None
     top_risk_drivers: List[Dict[str, Any]] = Field(default_factory=list)
+    monte_carlo: Dict[str, Any] = Field(default_factory=dict)
     selected_sectors: List[str] = Field(default_factory=list)
     kpi_visibility: Dict[str, Any] = Field(default_factory=dict)
 
