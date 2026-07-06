@@ -197,7 +197,7 @@ function renderRecommendations(recs, listId = "recommendations") {
   const list = $(listId);
   if (!list) return;
   list.innerHTML = (recs || []).map((r) =>
-    `<li><strong>${r.rank ? r.rank + ". " : ""}${r.title}</strong>${r.reason || r.description ? `<br><span class="muted">${r.reason || r.description}</span>` : ""}</li>`
+    `<li><strong>${r.title}</strong>${r.reason || r.description ? `<br><span class="muted">${r.reason || r.description}</span>` : ""}</li>`
   ).join("") || "<li>Run analysis to see recommendations.</li>";
 }
 
