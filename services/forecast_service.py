@@ -72,13 +72,6 @@ def load_farm(farm_file: str) -> dict:
     return farm
 
 
-def save_farm(farm_file: str, farm: dict) -> None:
-    """Persist a farm dict to datasets/."""
-    path = _farm_path(farm_file)
-    with open(path, "w", encoding="utf-8") as file:
-        json.dump(farm, file, indent=4)
-
-
 def load_forecast_file(forecast_file: str) -> dict:
     """Load a saved forecast JSON file from outputs/history/."""
     path = _history_path(forecast_file)

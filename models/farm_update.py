@@ -41,7 +41,6 @@ class ApplyFarmUpdateRequest(BaseModel):
     upload_id: str
     filename: str
     farm_name: str | None = None
-    farm_file: str | None = None
     selected_categories: list[str]
     detected_fields: dict[str, UploadedFinancialField]
     farmer_categories: dict[str, FarmerCategoryPreview]
@@ -74,7 +73,6 @@ class DailyUpdateEntry(BaseModel):
 class DailyUpdateRequest(BaseModel):
     entries: list[DailyUpdateEntry]
     note: str = ""
-    farm_file: str | None = None
 
 
 class DailyUpdateResponse(BaseModel):

@@ -49,7 +49,7 @@ DETECTED_FIELD_TO_CATEGORY: dict[str, str] = {
 }
 
 CATEGORY_TO_PROFILE_FIELD: dict[str, str] = {
-    "milk_income": "milk_price",
+    "milk_income": "annual_milk_income",
     "feed_costs": "feed",
     "vet_costs": "vet",
     "labour": "labour",

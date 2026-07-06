@@ -10,8 +10,6 @@ let state = {
   farms: [],
   selectedFarm: null,
   view: "dashboard",
-  uploadPreview: null,
-  dailyCategories: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -183,7 +181,7 @@ function renderQuickActions() {
     { icon: "↗", label: "Run Advanced Forecast", view: "forecasts", trigger: "advanced" },
     { icon: "◆", label: "Open Scenario Sandbox", view: "scenarios" },
     { icon: "💡", label: "Ask AI Advisor", view: "intelligence" },
-    { icon: "↑", label: "Upload Financial File", view: "upload" },
+    { icon: "↑", label: "Upload Financial File", view: "settings" },
     { icon: "◎", label: "Run Monte Carlo Simulation", view: "forecasts", trigger: "monte" },
     { icon: "📄", label: "Generate Farmer Report", view: "reports" },
   ];
@@ -458,143 +456,6 @@ function navigate(view) {
     initReportDate();
     updateReportSections();
   }
-  if (view === "daily") loadDailyCategories();
-  if (view === "upload") setupUploadZone();
-}
-
-async function loadDailyCategories() {
-  try {
-    const data = await api("/daily-updates/categories");
-    state.dailyCategories = data.categories || [];
-    renderDailyForm();
-  } catch (err) {
-    showStatus(err.message, "error");
-  }
-}
-
-function renderDailyForm() {
-  const form = $("daily-form");
-  if (!form) return;
-  form.innerHTML = (state.dailyCategories || []).map((c) =>
-    `<label class="daily-row"><span>${c.label}</span><input type="number" step="0.01" class="input-field daily-amount" data-cat="${c.id}" placeholder="€0" /></label>`
-  ).join("") || "<p class='muted'>Loading categories…</p>";
-}
-
-async function saveDailyUpdates() {
-  const entries = [];
-  document.querySelectorAll(".daily-amount").forEach((input) => {
-    const amount = parseFloat(input.value);
-    if (!Number.isNaN(amount) && amount !== 0) {
-      entries.push({ category_id: input.dataset.cat, amount });
-    }
-  });
-  if (!entries.length) {
-    showStatus("Enter at least one amount.", "error");
-    return;
-  }
-  try {
-    const data = await api("/daily-updates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entries, farm_file: state.selectedFarm }),
-    });
-    showStatus(data.message, data.success ? "success" : "error");
-    if (data.success) {
-      document.querySelectorAll(".daily-amount").forEach((i) => { i.value = ""; });
-      await refreshFarmData();
-    }
-  } catch (err) {
-    showStatus(err.message, "error");
-  }
-}
-
-function setupUploadZone() {
-  const zone = $("upload-zone");
-  const input = $("file-input");
-  if (!zone || zone.dataset.bound) return;
-  zone.dataset.bound = "1";
-  $("browse-btn")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    input?.click();
-  });
-  input?.addEventListener("change", () => {
-    if (input.files?.[0]) previewUpload(input.files[0]);
-  });
-  zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("dragover"); });
-  zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
-  zone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    zone.classList.remove("dragover");
-    if (e.dataTransfer.files?.[0]) previewUpload(e.dataTransfer.files[0]);
-  });
-}
-
-async function previewUpload(file) {
-  const form = new FormData();
-  form.append("file", file);
-  if (state.selectedFarm) form.append("farm_file", state.selectedFarm);
-  showStatus("Analysing your file…", "info");
-  try {
-    const response = await fetch(`${API}/upload/preview`, { method: "POST", body: form });
-    const data = await response.json();
-    if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Upload failed");
-    state.uploadPreview = data;
-    if ($("upload-status")) $("upload-status").textContent = `${data.filename} — review changes below`;
-    renderUploadPreview(data);
-    $("confirm-upload-btn")?.classList.remove("hidden");
-    showStatus("Review detected values before confirming.", "success");
-  } catch (err) {
-    showStatus(err.message, "error");
-  }
-}
-
-function renderUploadPreview(data) {
-  const box = $("upload-preview");
-  if (!box) return;
-  box.classList.remove("hidden");
-  const cats = Object.values(data.farmer_categories || {});
-  box.innerHTML = `
-    <h4>Detected values — select what to update</h4>
-    ${cats.map((c) => {
-      const diff = c.current_profile_value != null ? c.proposed_profile_value - c.current_profile_value : null;
-      return `<label class="preview-row">
-        <input type="checkbox" class="preview-check" data-cat="${c.category_id}" ${c.selected_by_default ? "checked" : ""} />
-        <span><strong>${c.label}</strong></span>
-        <span>Current: €${Number(c.current_profile_value || 0).toLocaleString()}</span>
-        <span>Detected: €${Number(c.proposed_profile_value || 0).toLocaleString()}</span>
-        ${diff != null ? `<span class="${diff > 0 ? "up" : "down"}">${diff >= 0 ? "+" : ""}€${diff.toLocaleString()}</span>` : ""}
-      </label>`;
-    }).join("")}`;
-}
-
-async function confirmUpload() {
-  const preview = state.uploadPreview;
-  if (!preview) return;
-  const selected = [...document.querySelectorAll(".preview-check:checked")].map((c) => c.dataset.cat);
-  showStatus("Updating your farm…", "info");
-  try {
-    const data = await api("/upload/confirm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        upload_id: preview.upload_id,
-        filename: preview.filename,
-        selected_categories: selected,
-        detected_fields: preview.detected_fields,
-        farmer_categories: preview.farmer_categories,
-        farm_file: state.selectedFarm,
-      }),
-    });
-    showStatus(data.message, data.success ? "success" : "error");
-    if (data.success) {
-      $("confirm-upload-btn")?.classList.add("hidden");
-      state.uploadPreview = null;
-      $("upload-preview")?.classList.add("hidden");
-      await refreshFarmData();
-    }
-  } catch (err) {
-    showStatus(err.message, "error");
-  }
 }
 
 function renderFinancialIntelligence(data) {
@@ -799,9 +660,6 @@ function setupNav() {
   $("preview-report-btn")?.addEventListener("click", previewReport);
   $("generate-report-btn")?.addEventListener("click", generateReport);
   $("report-type")?.addEventListener("change", updateReportSections);
-  $("save-daily-btn")?.addEventListener("click", saveDailyUpdates);
-  $("confirm-upload-btn")?.addEventListener("click", confirmUpload);
-  $("goto-upload-btn")?.addEventListener("click", () => navigate("upload"));
   initReportDate();
   updateReportSections();
 }

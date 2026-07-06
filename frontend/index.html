@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=7" />
+  <link rel="stylesheet" href="/assets/styles.css?v=6" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -138,16 +138,7 @@
         <div class="card"><h3>My Farm Profile</h3><div id="farm-profile-detail" class="profile-grid"></div></div>
       </section>
       <section class="view hidden" id="view-daily">
-        <div class="card">
-          <h3>Daily Updates</h3>
-          <p class="muted">Record today's income and costs. Forecasts update automatically when you save.</p>
-          <div id="daily-form" class="daily-form"></div>
-          <button type="button" id="save-daily-btn" class="btn-run">Save Today's Updates</button>
-        </div>
-        <div class="card">
-          <h3>Recent Entries</h3>
-          <div id="daily-history" class="muted">No entries yet.</div>
-        </div>
+        <div class="card"><h3>Daily Updates</h3><p class="muted">Record today's milk income, feed, vet, fuel, and other costs. Full daily entry coming in a future update — use Run Analysis to refresh forecasts.</p></div>
       </section>
       <section class="view hidden" id="view-forecasts">
         <div class="card">
@@ -296,32 +287,14 @@
           <a id="report-download-link" class="btn-run report-download hidden" href="#" target="_blank" rel="noopener">Download PDF</a>
         </div>
       </section>
-      <section class="view hidden" id="view-upload">
-        <div class="card">
-          <h3>Upload Financial File</h3>
-          <p class="muted">We detect your numbers and show what would change before saving anything.</p>
-          <div class="upload-zone" id="upload-zone">
-            <input type="file" id="file-input" accept=".csv,.xlsx,.json" hidden />
-            <div class="upload-icon">↑</div>
-            <p>Drop your file here, or <button type="button" id="browse-btn" class="link-btn">browse</button></p>
-          </div>
-          <p id="upload-status" class="muted">No file selected</p>
-          <div id="upload-preview" class="upload-preview hidden"></div>
-          <button type="button" id="confirm-upload-btn" class="btn-run hidden">Confirm &amp; Update My Farm</button>
-        </div>
-      </section>
       <section class="view hidden" id="view-alerts">
         <div class="card"><h3>All Alerts</h3><ul id="alerts-full" class="alert-list"></ul></div>
       </section>
       <section class="view hidden" id="view-settings">
-        <div class="card">
-          <h3>Settings</h3>
-          <p class="muted">Active farm: <strong id="settings-farm">Green Valley Dairy</strong></p>
-          <button type="button" id="goto-upload-btn" class="btn-secondary">Open Upload Financial File</button>
-        </div>
+        <div class="card"><h3>Settings</h3><p class="muted">Active farm: <strong id="settings-farm">Green Valley Dairy</strong> (dairy_farm_1.json). No farm selection required.</p></div>
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=7"></script>
+  <script src="/assets/app.js?v=6"></script>
 </body>
 </html>

@@ -33,7 +33,7 @@ def build_farmer_category_previews(
     for category_id, label in FARMER_CATEGORIES.items():
         profile_field = CATEGORY_TO_PROFILE_FIELD[category_id]
         current_value = current_profile.get(profile_field)
-        if category_id == "milk_income":
+        if current_value is None and profile_field == "annual_milk_income":
             cows = float(current_profile.get("milking_cows", 0))
             litres = float(current_profile.get("litres_per_cow", 0))
             price = float(current_profile.get("milk_price", 0))

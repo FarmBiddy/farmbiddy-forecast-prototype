@@ -3,10 +3,8 @@ FarmBiddy API routes — shared by /api/... and legacy root paths.
 """
 
 from typing import Optional
-import uuid
-from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Query
 
 from models.api_models import (
     AnalyseRequest,
@@ -57,14 +55,7 @@ from services.farmer_dashboard_service import (
     resolve_farm_file,
 )
 from services.scenario_sandbox_service import run_scenario_sandbox
-from config.paths import RAW_UPLOADS_DIR, ensure_output_dirs
-from models.farm_update import ApplyFarmUpdateRequest, ApplyFarmUpdateResponse, DailyUpdateRequest, DailyUpdateResponse, FarmUpdatePreviewResponse
-from models.uploaded_financials import UploadResponse
-from services.daily_updates_service import apply_daily_updates, list_daily_update_categories
-from services.farm_update_service import apply_farm_update, build_upload_preview
-from services.file_ingestion_service import ALLOWED_EXTENSIONS, FileIngestionService
 from services.forecast_service import (
-    InvalidFarmDataError,
     list_available_farms,
     run_chart_generation,
     run_forecast,
@@ -73,7 +64,6 @@ from services.forecast_service import (
 )
 
 router = APIRouter()
-ingestion_service = FileIngestionService()
 
 
 # ---------------------------------------------------------------------------
@@ -256,112 +246,6 @@ def farmer_generate_report(request: FarmerReportRequest):
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-
-
-@router.post(
-    "/upload",
-    response_model=UploadResponse,
-    tags=["Upload"],
-    summary="Upload and parse a financial file",
-)
-async def upload_financial_file(file: UploadFile = File(...)):
-    ensure_output_dirs()
-    original_name = file.filename or "uploaded_file"
-    suffix = Path(original_name).suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '{suffix}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-        )
-    safe_name = f"{uuid.uuid4().hex}{suffix}"
-    saved_path = Path(RAW_UPLOADS_DIR) / safe_name
-    saved_path.parent.mkdir(parents=True, exist_ok=True)
-    content = await file.read()
-    saved_path.write_bytes(content)
-    try:
-        parsed = ingestion_service.ingest_file(saved_path, filename=original_name)
-    except ValueError as error:
-        saved_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    except Exception as error:
-        saved_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=f"Could not parse file: {error}") from error
-    return UploadResponse(
-        success=True,
-        filename=parsed.filename,
-        detected_fields=parsed.detected_fields,
-        warnings=parsed.warnings,
-        ready_for_forecast=parsed.ready_for_forecast,
-    )
-
-
-@router.post(
-    "/upload/preview",
-    response_model=FarmUpdatePreviewResponse,
-    tags=["Upload"],
-    summary="Upload a file and preview profile changes",
-)
-async def upload_preview(
-    file: UploadFile = File(...),
-    farm_file: Optional[str] = Form(default=None),
-):
-    ensure_output_dirs()
-    original_name = file.filename or "uploaded_file"
-    suffix = Path(original_name).suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '{suffix}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-        )
-    upload_id = uuid.uuid4().hex
-    saved_path = Path(RAW_UPLOADS_DIR) / f"{upload_id}{suffix}"
-    saved_path.parent.mkdir(parents=True, exist_ok=True)
-    content = await file.read()
-    saved_path.write_bytes(content)
-    try:
-        parsed = ingestion_service.ingest_file(saved_path, filename=original_name)
-        return build_upload_preview(upload_id, parsed, farm_file=farm_file)
-    except ValueError as error:
-        saved_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    except Exception as error:
-        saved_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=f"Could not parse file: {error}") from error
-
-
-@router.post(
-    "/upload/confirm",
-    response_model=ApplyFarmUpdateResponse,
-    tags=["Upload"],
-    summary="Apply selected upload categories to the active farm",
-)
-def upload_confirm(request: ApplyFarmUpdateRequest):
-    try:
-        return apply_farm_update(request)
-    except InvalidFarmDataError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-
-
-@router.get(
-    "/daily-updates/categories",
-    tags=["Daily Updates"],
-    summary="List daily update categories",
-)
-def daily_update_categories():
-    return {"success": True, "categories": list_daily_update_categories()}
-
-
-@router.post(
-    "/daily-updates",
-    response_model=DailyUpdateResponse,
-    tags=["Daily Updates"],
-    summary="Save daily farm updates",
-)
-def save_daily_updates(request: DailyUpdateRequest):
-    try:
-        return apply_daily_updates(request)
-    except InvalidFarmDataError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 # ---------------------------------------------------------------------------
