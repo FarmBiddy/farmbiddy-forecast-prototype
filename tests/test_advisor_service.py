@@ -84,7 +84,43 @@ def test_milk_price_sector_routing():
     assert result["affected_sectors"] == ["dairy"]
     assert result["unaffected_sectors"] == ["beef", "lamb"]
     assert "dairy" in result["sector_impact"]
-    assert result["sector_impact"]["dairy"]["profit_change"] is None
+    assert result["sector_impact"]["dairy"]["profit_change"] is not None
+    assert result["overall_impact"]["total_profit_change"] is not None
+
+
+def test_feed_scenario_affects_selected_sectors():
+    result = ask_farm_intelligence(
+        "What happens if feed costs increase by 10%?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef"],
+    )
+    assert result["intent"] == "scenario_feed_cost"
+    assert set(result["affected_sectors"]) == {"dairy", "beef"}
+    assert result["overall_impact"]["total_profit_change"] is not None
+    assert result["overall_impact"]["total_profit_change"] < 0
+
+
+def test_herd_scenario_without_dairy_selected():
+    result = ask_farm_intelligence(
+        "What if I add 50 cows?",
+        farm_file="multi_sector_farm.json",
+        sectors=["beef", "lamb"],
+    )
+    assert result["intent"] == "scenario_herd_size"
+    assert result["affected_sectors"] == []
+    assert "dairy sector" in result["summary"].lower() or "dairy" in result["summary"].lower()
+
+
+def test_parse_milk_price_profit_increases():
+    result = ask_farm_intelligence(
+        "What happens if milk price increases by 5c/L?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    dairy_profit = result["sector_impact"]["dairy"]["profit_change"]
+    overall_profit = result["overall_impact"]["total_profit_change"]
+    assert dairy_profit > 0
+    assert overall_profit == dairy_profit
 
 
 def test_milk_price_without_dairy_selected():

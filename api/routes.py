@@ -225,7 +225,9 @@ def farmer_monte_carlo(request: FarmerMonteCarloRequest):
 def farmer_scenario_sandbox(request: ScenarioSandboxRequest):
     try:
         farm_file = resolve_farm_file(request.farm_file)
-        payload = run_scenario_sandbox(farm_file, request.model_dump())
+        body = request.model_dump()
+        sectors = body.pop("sectors", None)
+        payload = run_scenario_sandbox(farm_file, body, sectors=sectors)
         return ScenarioSandboxResponse(**payload)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

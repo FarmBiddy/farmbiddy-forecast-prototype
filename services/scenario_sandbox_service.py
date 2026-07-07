@@ -13,7 +13,9 @@ from forecast_engine.profit import calculate_profit
 from forecast_engine.risk_level import calculate_risk_level
 from forecast_engine.alerts import generate_alerts
 from models.api_models import ForecastOutputs, SandboxOutputs
+from services.farmer_dashboard_service import resolve_sectors
 from services.forecast_service import load_farm, run_forecast, run_sandbox_forecast
+from services.multi_sector_farm import load_farm_for_analysis
 
 
 def resolve_farm_file(farm_id: str | None) -> str:
@@ -124,10 +126,24 @@ def build_scenario_recommendations(
     return [{"rank": i + 1, **r} for i, r in enumerate(recs[:5])]
 
 
-def run_scenario_sandbox(farm_file: str, inputs: dict) -> dict:
+def run_scenario_sandbox(
+    farm_file: str,
+    inputs: dict,
+    sectors: list[str] | None = None,
+) -> dict:
     """Run base vs scenario comparison with recommendations."""
-    farm = load_farm(farm_file)
-    absolute = build_absolute_changes(farm, inputs)
+    payload = dict(inputs)
+    if sectors is None:
+        sectors = payload.pop("sectors", None)
+    else:
+        payload.pop("sectors", None)
+
+    resolved_sectors = resolve_sectors(sectors, farm_file) if sectors else None
+    if resolved_sectors:
+        farm = load_farm_for_analysis(farm_file, resolved_sectors)
+    else:
+        farm = load_farm(farm_file)
+    absolute = build_absolute_changes(farm, payload)
 
     outputs = SandboxOutputs(
         forecast_summary=True,
@@ -138,8 +154,12 @@ def run_scenario_sandbox(farm_file: str, inputs: dict) -> dict:
         advisory_summary=True,
     )
 
-    base_result = run_sandbox_forecast(farm_file, {}, outputs)
-    scenario_result = run_sandbox_forecast(farm_file, absolute, outputs) if absolute else base_result
+    base_result = run_sandbox_forecast(farm_file, {}, outputs, sectors=resolved_sectors)
+    scenario_result = (
+        run_sandbox_forecast(farm_file, absolute, outputs, sectors=resolved_sectors)
+        if absolute
+        else base_result
+    )
 
     base_summary = base_result.get("forecast_summary") or {}
     scenario_summary = scenario_result.get("forecast_summary") or {}

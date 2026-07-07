@@ -1,8 +1,9 @@
 """
 Farm Intelligence advisor — rule-based question routing.
 
-Phase 3: intent detection and structured responses. Scenario numbers and full
-sector-aware sandbox integration are completed in Phases 5–6.
+Routes farmer questions to existing forecast, intelligence, and sandbox services.
+Scenario questions parse natural language into sandbox inputs and return sector-aware
+impact breakdowns (direct sector vs overall farm vs unaffected sectors).
 """
 
 from __future__ import annotations
@@ -12,7 +13,9 @@ from typing import Any, Callable
 
 from services.dashboard_summary import calculate_sector_performance, get_selected_sector_data
 from services.farmer_dashboard_service import resolve_farm_file, resolve_sectors
-from services.financial_intelligence_service import get_financial_intelligence
+from services.financial_intelligence_service import _health_score, get_financial_intelligence
+from services.multi_sector_farm import load_farm_for_analysis
+from services.scenario_sandbox_service import run_scenario_sandbox
 
 Handler = Callable[..., dict[str, Any]]
 
@@ -27,10 +30,15 @@ def detect_intent(question: str) -> str:
     if not q:
         return "general_recommendation"
 
+    if ("cow" in q or "cows" in q or "herd" in q) and any(
+        w in q for w in ("add", "increase", "more", "what if", "what happens", "expand")
+    ):
+        return "scenario_herd_size"
+
     milk_scenario = (
         "milk price" in q
         or "c/l" in q
-        or re.search(r"\d+\s*c(?:ent)?s?", q)
+        or re.search(r"(\d+(?:\.\d+)?)\s*(?:c/l|cents?|cent(?!\w))", q)
         or ("milk" in q and any(w in q for w in ("increase", "decrease", "rise", "fall", "drop", "what if", "what happens")))
     )
     if milk_scenario and "feed" not in q:
@@ -40,6 +48,11 @@ def detect_intent(question: str) -> str:
         w in q for w in ("%", "percent", "increase", "decrease", "rise", "fall", "what if", "what happens", "cost")
     ):
         return "scenario_feed_cost"
+
+    if ("labour" in q or "labor" in q) and any(
+        w in q for w in ("%", "percent", "increase", "decrease", "rise", "fall", "what if", "what happens", "cost")
+    ):
+        return "scenario_labour_cost"
 
     if any(w in q for w in ("health score", "how healthy", "explain my health")):
         return "health_score"
@@ -81,6 +94,13 @@ def resolve_affected_sectors(intent: str, selected: list[str]) -> tuple[list[str
 
     if intent == "scenario_feed_cost":
         return selected_set, []
+
+    if intent in ("scenario_labour_cost",):
+        return selected_set, []
+
+    if intent == "scenario_herd_size":
+        affected = [s for s in selected_set if s == "dairy"]
+        return affected, [s for s in selected_set if s not in affected]
 
     if intent in {
         "health_score",
@@ -169,6 +189,298 @@ def _load_intel(farm_file: str, selected: list[str]) -> dict[str, Any]:
     return get_financial_intelligence(farm_file, sectors=selected)
 
 
+def _parse_direction(question: str, default: float = 1.0) -> float:
+    q = _normalize_question(question)
+    if any(w in q for w in ("decrease", "fall", "drop", "lower", "reduce", "cut")):
+        return -1.0
+    if any(w in q for w in ("increase", "rise", "higher", "up", "grow", "add")):
+        return 1.0
+    return default
+
+
+def _parse_percentage(question: str) -> float | None:
+    q = _normalize_question(question)
+    match = re.search(r"(\d+(?:\.\d+)?)\s*(?:%|percent)", q)
+    if match:
+        return float(match.group(1))
+    return None
+
+
+def _parse_milk_cents(question: str) -> float | None:
+    q = _normalize_question(question)
+    match = re.search(r"(\d+(?:\.\d+)?)\s*(?:c/l|cents?|cent(?!\w))", q)
+    if match:
+        return float(match.group(1)) * _parse_direction(question)
+    return None
+
+
+def _parse_cow_delta(question: str) -> int | None:
+    q = _normalize_question(question)
+    direction = _parse_direction(question)
+    match = re.search(r"(?:add|increase|by)\s*(\d+)\s*(?:more\s*)?cow", q)
+    if match:
+        return int(match.group(1)) * int(direction)
+    match = re.search(r"(\d+)\s*(?:more\s*)?cow", q)
+    if match:
+        return int(match.group(1)) * int(direction)
+    return None
+
+
+def parse_scenario_inputs(
+    question: str,
+    intent: str,
+    farm_file: str,
+    selected: list[str],
+) -> dict[str, Any] | None:
+    """Map natural-language scenario questions to sandbox input fields."""
+    direction = _parse_direction(question)
+
+    if intent == "scenario_milk_price":
+        cents = _parse_milk_cents(question)
+        if cents is not None:
+            return {"milk_price_cents_change": cents}
+        pct = _parse_percentage(question)
+        if pct is not None:
+            return {"milk_price_pct_change": pct * direction}
+        return {"milk_price_cents_change": 5 * direction}
+
+    if intent == "scenario_feed_cost":
+        pct = _parse_percentage(question) or 10
+        return {"feed_pct_change": pct * direction}
+
+    if intent == "scenario_labour_cost":
+        pct = _parse_percentage(question) or 8
+        return {"labour_pct_change": pct * direction}
+
+    if intent == "scenario_herd_size":
+        delta = _parse_cow_delta(question)
+        if delta is None:
+            return None
+        dairy_farm = load_farm_for_analysis(farm_file, ["dairy"])
+        current = int(dairy_farm.get("milking_cows") or 0)
+        return {"milking_cows": max(0, current + delta)}
+
+    return None
+
+
+def _deltas_from_sandbox_result(result: dict) -> dict[str, Any]:
+    comparison = result.get("comparison") or {}
+    base_summary = (result.get("base") or {}).get("forecast_summary") or {}
+    scenario_summary = (result.get("scenario") or {}).get("forecast_summary") or {}
+    base_kpis = (result.get("base") or {}).get("kpis") or {}
+    scenario_kpis = (result.get("scenario") or {}).get("kpis") or {}
+    return {
+        "revenue_change": comparison.get("revenue_difference"),
+        "profit_change": comparison.get("profit_difference"),
+        "cashflow_change": round(
+            float(scenario_kpis.get("monthly_cashflow") or 0)
+            - float(base_kpis.get("monthly_cashflow") or 0),
+            0,
+        ),
+        "margin_change": round(
+            float(scenario_summary.get("profit_margin") or 0)
+            - float(base_summary.get("profit_margin") or 0),
+            1,
+        ),
+    }
+
+
+def _estimate_health_after(result: dict, farm_file: str, sectors: list[str]) -> int | None:
+    scenario_summary = (result.get("scenario") or {}).get("forecast_summary") or {}
+    scenario_kpis = (result.get("scenario") or {}).get("kpis") or {}
+    if not scenario_summary:
+        return None
+    farm = load_farm_for_analysis(farm_file, sectors)
+    forecast = {
+        **scenario_summary,
+        **scenario_kpis,
+        "risk_level": (result.get("scenario") or {}).get("risk_level"),
+        "feed_cost_ratio": scenario_kpis.get("feed_cost_ratio", 35),
+        "monthly_cashflow": scenario_kpis.get("monthly_cashflow", 0),
+    }
+    return _health_score(forecast, farm).get("score")
+
+
+def _format_euro(value: float | int | None) -> str:
+    if value is None:
+        return "—"
+    if value > 0:
+        return f"+€{value:,.0f}"
+    if value < 0:
+        return f"-€{abs(value):,.0f}"
+    return "€0"
+
+
+def _handle_scenario(
+    question: str,
+    farm_file: str,
+    selected: list[str],
+    affected: list[str],
+    unaffected: list[str],
+    intent: str,
+) -> dict[str, Any]:
+    dairy_only = intent in ("scenario_milk_price", "scenario_herd_size")
+    if dairy_only and "dairy" not in selected:
+        return _base_response(
+            question,
+            intent,
+            [],
+            selected,
+            summary=(
+                "This scenario only applies to the dairy sector, and dairy is not "
+                "in your current sector selection."
+            ),
+            key_points=[
+                "Select Dairy in the sector filter to model this change.",
+                "Beef and lamb are not affected by dairy-only scenarios.",
+            ],
+            recommendation="Add Dairy to your selected sectors to explore this scenario.",
+        )
+
+    sandbox_inputs = parse_scenario_inputs(question, intent, farm_file, selected)
+    if sandbox_inputs is None:
+        return _base_response(
+            question,
+            intent,
+            affected,
+            unaffected,
+            summary="I could not read the scenario details from your question.",
+            key_points=[
+                "Try including a number, for example: 'add 50 cows' or 'feed costs increase by 10%'.",
+            ],
+            recommendation="Rephrase your question with a clear percentage or amount.",
+        )
+
+    intel = _load_intel(farm_file, selected)
+    overall_result = run_scenario_sandbox(farm_file, sandbox_inputs, sectors=selected)
+    overall_deltas = _deltas_from_sandbox_result(overall_result)
+    comparison = overall_result.get("comparison") or {}
+
+    sector_impact: dict[str, Any] = {}
+    for sector in affected:
+        sector_result = run_scenario_sandbox(farm_file, sandbox_inputs, sectors=[sector])
+        sector_impact[sector] = _deltas_from_sandbox_result(sector_result)
+
+    overall_impact = _empty_overall_impact()
+    overall_impact["total_revenue_change"] = overall_deltas["revenue_change"]
+    overall_impact["total_profit_change"] = overall_deltas["profit_change"]
+    overall_impact["health_score_before"] = intel["health_score"].get("score")
+    overall_impact["health_score_after"] = _estimate_health_after(overall_result, farm_file, selected)
+    overall_impact["risk_level_before"] = comparison.get("risk_base")
+    overall_impact["risk_level_after"] = comparison.get("risk_scenario")
+
+    profit_diff = overall_deltas["profit_change"] or 0
+    cf_diff = overall_deltas["cashflow_change"] or 0
+    note = _unaffected_note(affected, unaffected)
+
+    if intent == "scenario_milk_price":
+        cents = sandbox_inputs.get("milk_price_cents_change")
+        pct = sandbox_inputs.get("milk_price_pct_change")
+        change_label = f"{cents:+.0f}c/L" if cents else f"{pct:+.1f}%"
+        dairy_profit = (sector_impact.get("dairy") or {}).get("profit_change", profit_diff) or 0
+        summary = (
+            f"If milk price changes by {change_label}, dairy profit would change by "
+            f"about {_format_euro(dairy_profit)}. "
+            f"Whole-farm profit would change by about {_format_euro(profit_diff)}."
+        )
+        if note:
+            summary = f"{summary} {note}"
+        key_points = [
+            f"Dairy profit change: {_format_euro(dairy_profit)}.",
+            f"Whole-farm profit change: {_format_euro(profit_diff)}.",
+            f"Monthly cashflow change: {_format_euro(cf_diff)}.",
+        ]
+        if overall_impact["health_score_before"] is not None and overall_impact["health_score_after"] is not None:
+            key_points.append(
+                f"Health score: {overall_impact['health_score_before']} → {overall_impact['health_score_after']}."
+            )
+        if overall_impact["risk_level_before"] and overall_impact["risk_level_after"]:
+            key_points.append(
+                f"Risk level: {overall_impact['risk_level_before']} → {overall_impact['risk_level_after']}."
+            )
+        recommendation = (
+            overall_result.get("recommendations") or [{}]
+        )[0].get("title", "Review dairy cashflow before committing to new costs.")
+
+    elif intent == "scenario_feed_cost":
+        labels = ", ".join(_sector_label(s) for s in affected)
+        summary = (
+            f"If feed costs change as modelled, whole-farm profit would change by "
+            f"about {_format_euro(profit_diff)} across {labels}."
+        )
+        key_points = [
+            f"Whole-farm profit change: {_format_euro(profit_diff)}.",
+            f"Monthly cashflow change: {_format_euro(cf_diff)}.",
+        ]
+        for sector, impact in sector_impact.items():
+            key_points.append(
+                f"{_sector_label(sector)} profit change: {_format_euro(impact.get('profit_change'))}."
+            )
+        recommendation = (
+            overall_result.get("recommendations") or [{}]
+        )[0].get("title", "Compare feed quotes and ration efficiency before accepting higher bills.")
+
+    elif intent == "scenario_labour_cost":
+        labels = ", ".join(_sector_label(s) for s in affected)
+        summary = (
+            f"If labour costs change as modelled, whole-farm profit would change by "
+            f"about {_format_euro(profit_diff)} across {labels}."
+        )
+        key_points = [
+            f"Whole-farm profit change: {_format_euro(profit_diff)}.",
+            f"Monthly cashflow change: {_format_euro(cf_diff)}.",
+        ]
+        for sector, impact in sector_impact.items():
+            key_points.append(
+                f"{_sector_label(sector)} profit change: {_format_euro(impact.get('profit_change'))}."
+            )
+        recommendation = (
+            overall_result.get("recommendations") or [{}]
+        )[0].get("title", "Review staffing plans before labour costs rise further.")
+
+    elif intent == "scenario_herd_size":
+        dairy_profit = (sector_impact.get("dairy") or {}).get("profit_change", profit_diff) or 0
+        cows = sandbox_inputs.get("milking_cows")
+        summary = (
+            f"Changing the dairy herd to {cows} cows would change dairy profit by "
+            f"about {_format_euro(dairy_profit)} and whole-farm profit by about {_format_euro(profit_diff)}."
+        )
+        if note:
+            summary = f"{summary} {note}"
+        key_points = [
+            f"Target herd size: {cows} cows.",
+            f"Dairy profit change: {_format_euro(dairy_profit)}.",
+            f"Whole-farm profit change: {_format_euro(profit_diff)}.",
+            f"Monthly cashflow change: {_format_euro(cf_diff)}.",
+        ]
+        recommendation = (
+            overall_result.get("recommendations") or [{}]
+        )[0].get("title", "Confirm feed, labour, and housing capacity before expanding the herd.")
+
+    else:
+        summary = overall_result.get("summary") or "Scenario analysis complete."
+        key_points = [summary]
+        recommendation = "Review the impact on cashflow before making changes."
+
+    return _base_response(
+        question,
+        intent,
+        affected,
+        unaffected,
+        summary=summary,
+        key_points=key_points[:5],
+        recommendation=recommendation,
+        sector_impact=sector_impact,
+        overall_impact=overall_impact,
+        metrics={
+            "profit_change": profit_diff,
+            "cashflow_change": cf_diff,
+            "health_score": overall_impact["health_score_after"] or overall_impact["health_score_before"],
+            "risk_level": overall_impact["risk_level_after"] or overall_impact["risk_level_before"],
+        },
+    )
+
+
 def _handle_scenario_milk_price(
     question: str,
     farm_file: str,
@@ -177,45 +489,7 @@ def _handle_scenario_milk_price(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    if "dairy" not in selected:
-        return _base_response(
-            question,
-            intent,
-            [],
-            selected,
-            summary=(
-                "Milk price changes only affect the dairy sector, and dairy is not "
-                "in your current sector selection."
-            ),
-            key_points=[
-                "Select Dairy in the sector filter to model milk price changes.",
-                "Beef and lamb prices are separate from dairy milk price.",
-            ],
-            recommendation="Add Dairy to your selected sectors if you want to explore milk price scenarios.",
-        )
-
-    note = _unaffected_note(affected, unaffected)
-    summary = (
-        "This is a dairy-only scenario. A milk price change would directly affect "
-        "dairy revenue and profit."
-    )
-    if note:
-        summary = f"{summary} {note}"
-
-    return _base_response(
-        question,
-        intent,
-        affected,
-        unaffected,
-        summary=summary,
-        key_points=[
-            "Direct impact: Dairy sector only.",
-            "Overall farm totals will move by the dairy change amount.",
-            "Detailed euro estimates will be calculated in the next implementation phase.",
-        ],
-        recommendation="Review dairy cashflow after any milk price change before committing to new costs.",
-        sector_impact=_sector_impact_for(affected),
-    )
+    return _handle_scenario(question, farm_file, selected, affected, unaffected, intent)
 
 
 def _handle_scenario_feed_cost(
@@ -226,24 +500,29 @@ def _handle_scenario_feed_cost(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    labels = ", ".join(_sector_label(s) for s in affected) or "your selected sectors"
-    return _base_response(
-        question,
-        intent,
-        affected,
-        unaffected,
-        summary=(
-            f"A feed cost change would affect {labels} because feed is shared "
-            "across the sectors you have selected."
-        ),
-        key_points=[
-            f"Direct impact: {labels}.",
-            "Overall farm profit and cashflow would reflect the combined feed change.",
-            "Detailed percentage and euro estimates will be calculated in the next phase.",
-        ],
-        recommendation="Compare feed quotes and ration efficiency before accepting higher feed bills.",
-        sector_impact=_sector_impact_for(affected),
-    )
+    return _handle_scenario(question, farm_file, selected, affected, unaffected, intent)
+
+
+def _handle_scenario_labour_cost(
+    question: str,
+    farm_file: str,
+    selected: list[str],
+    affected: list[str],
+    unaffected: list[str],
+    intent: str,
+) -> dict[str, Any]:
+    return _handle_scenario(question, farm_file, selected, affected, unaffected, intent)
+
+
+def _handle_scenario_herd_size(
+    question: str,
+    farm_file: str,
+    selected: list[str],
+    affected: list[str],
+    unaffected: list[str],
+    intent: str,
+) -> dict[str, Any]:
+    return _handle_scenario(question, farm_file, selected, affected, unaffected, intent)
 
 
 def _handle_health_score(
@@ -560,6 +839,8 @@ def _handle_general_recommendation(
 _HANDLERS: dict[str, Handler] = {
     "scenario_milk_price": _handle_scenario_milk_price,
     "scenario_feed_cost": _handle_scenario_feed_cost,
+    "scenario_labour_cost": _handle_scenario_labour_cost,
+    "scenario_herd_size": _handle_scenario_herd_size,
     "health_score": _handle_health_score,
     "strengths": _handle_strengths,
     "risks": _handle_risks,
