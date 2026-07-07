@@ -681,6 +681,210 @@ const FARM_INTELLIGENCE_QUESTIONS = [
   "What will my cashflow look like over the next 12 months?",
 ];
 
+let fiBusy = false;
+
+const FI_SECTOR_LABELS = { dairy: "Dairy", beef: "Beef", lamb: "Lamb" };
+
+function fiSectorLabel(sectorId) {
+  return FI_SECTOR_LABELS[sectorId] || sectorId.charAt(0).toUpperCase() + sectorId.slice(1);
+}
+
+function formatFiSectorCallout(data) {
+  const intent = data.intent || "";
+  const affected = data.affected_sectors || [];
+  const unaffected = data.unaffected_sectors || [];
+
+  if (intent === "funding_need") {
+    return "This applies to your whole farm.";
+  }
+  if (!intent.startsWith("scenario_")) {
+    return "";
+  }
+  if (intent === "scenario_milk_price" && !affected.length) {
+    return "Dairy is not in your selected sectors — milk price changes would not apply.";
+  }
+  const parts = [];
+  if (affected.length) {
+    parts.push(`Direct impact: ${affected.map(fiSectorLabel).join(", ")} only.`);
+  }
+  if (unaffected.length) {
+    parts.push(`${unaffected.map(fiSectorLabel).join(" and ")} not directly affected.`);
+  }
+  return parts.join(" ");
+}
+
+function formatFiMetrics(metrics) {
+  if (!metrics) return [];
+  const items = [];
+  if (metrics.health_score != null) {
+    items.push({ label: "Health score", value: `${metrics.health_score}/100` });
+  }
+  if (metrics.profit_change != null) {
+    items.push({ label: "Profit change", value: `€${Number(metrics.profit_change).toLocaleString("en-IE")}` });
+  }
+  if (metrics.cashflow_change != null) {
+    items.push({
+      label: "Cashflow",
+      value: `€${Number(metrics.cashflow_change).toLocaleString("en-IE")}/mo`,
+    });
+  }
+  if (metrics.risk_level) {
+    items.push({ label: "Risk", value: metrics.risk_level });
+  }
+  return items;
+}
+
+function scrollFiChat() {
+  const chat = $("fi-chat");
+  if (chat) chat.scrollTop = chat.scrollHeight;
+}
+
+function appendFiUserMessage(question) {
+  $("fi-empty")?.classList.add("hidden");
+  const messages = $("fi-messages");
+  if (!messages) return;
+  messages.classList.remove("hidden");
+
+  const wrap = document.createElement("div");
+  wrap.className = "fi-message fi-message-user";
+  wrap.innerHTML = '<div class="fi-message-label">You</div>';
+  const body = document.createElement("div");
+  body.className = "fi-message-body";
+  body.textContent = question;
+  wrap.appendChild(body);
+  messages.appendChild(wrap);
+  scrollFiChat();
+}
+
+function appendFiLoadingMessage() {
+  const messages = $("fi-messages");
+  if (!messages) return;
+  const wrap = document.createElement("div");
+  wrap.className = "fi-message fi-message-advisor";
+  wrap.id = "fi-loading-msg";
+  wrap.innerHTML = '<div class="fi-message-label">Farm Intelligence</div>';
+  const body = document.createElement("div");
+  body.className = "fi-message-body fi-loading-text";
+  body.textContent = "Analysing your question…";
+  wrap.appendChild(body);
+  messages.appendChild(wrap);
+  scrollFiChat();
+}
+
+function removeFiLoadingMessage() {
+  $("fi-loading-msg")?.remove();
+}
+
+function renderFiAdvisorAnswer(data) {
+  const messages = $("fi-messages");
+  if (!messages) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "fi-message fi-message-advisor";
+  wrap.innerHTML = '<div class="fi-message-label">Farm Intelligence</div>';
+
+  const body = document.createElement("div");
+  body.className = "fi-message-body fi-answer-card";
+
+  const callout = formatFiSectorCallout(data);
+  if (callout) {
+    const sectorEl = document.createElement("div");
+    sectorEl.className = "fi-sector-callout";
+    sectorEl.textContent = callout;
+    body.appendChild(sectorEl);
+  }
+
+  const summary = document.createElement("p");
+  summary.className = "fi-summary";
+  summary.textContent = data.summary || "No summary available.";
+  body.appendChild(summary);
+
+  if (data.key_points?.length) {
+    const list = document.createElement("ul");
+    list.className = "fi-key-points";
+    data.key_points.slice(0, 5).forEach((point) => {
+      const item = document.createElement("li");
+      item.textContent = point;
+      list.appendChild(item);
+    });
+    body.appendChild(list);
+  }
+
+  const metricItems = formatFiMetrics(data.metrics);
+  if (metricItems.length) {
+    const row = document.createElement("div");
+    row.className = "fi-metrics-row";
+    metricItems.forEach(({ label, value }) => {
+      const chip = document.createElement("div");
+      chip.className = "fi-metric-chip";
+      chip.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+      row.appendChild(chip);
+    });
+    body.appendChild(row);
+  }
+
+  if (data.recommendation) {
+    const rec = document.createElement("div");
+    rec.className = "fi-recommendation";
+    rec.textContent = `Recommendation: ${data.recommendation}`;
+    body.appendChild(rec);
+  }
+
+  wrap.appendChild(body);
+  messages.appendChild(wrap);
+  scrollFiChat();
+}
+
+function renderFiAdvisorError(message) {
+  const messages = $("fi-messages");
+  if (!messages) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "fi-message fi-message-advisor";
+  wrap.innerHTML = '<div class="fi-message-label">Farm Intelligence</div>';
+  const body = document.createElement("div");
+  body.className = "fi-message-body fi-error";
+  body.textContent = message || "Something went wrong. Please try again.";
+  wrap.appendChild(body);
+  messages.appendChild(wrap);
+  scrollFiChat();
+}
+
+function setFiBusy(busy) {
+  fiBusy = busy;
+  const askBtn = $("fi-ask-btn");
+  if (askBtn) askBtn.disabled = busy;
+  document.querySelectorAll(".fi-suggestion-btn").forEach((btn) => {
+    btn.disabled = busy;
+  });
+}
+
+async function askFarmIntelligence(question) {
+  const q = (question || $("fi-question")?.value || "").trim();
+  if (!q || fiBusy) return;
+
+  setFiBusy(true);
+  if ($("fi-question")) $("fi-question").value = q;
+  appendFiUserMessage(q);
+  appendFiLoadingMessage();
+
+  try {
+    const data = await api("/farmer/advisor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: sectorsBody({ question: q }),
+    });
+    removeFiLoadingMessage();
+    renderFiAdvisorAnswer(data);
+  } catch (err) {
+    removeFiLoadingMessage();
+    renderFiAdvisorError(err.message);
+    showStatus(err.message, "error");
+  } finally {
+    setFiBusy(false);
+  }
+}
+
 function initFarmIntelligencePage() {
   const box = $("fi-suggestions");
   if (!box || box.dataset.initialized) return;
@@ -692,36 +896,9 @@ function initFarmIntelligencePage() {
     btn.addEventListener("click", () => {
       const question = btn.dataset.question || btn.textContent;
       if ($("fi-question")) $("fi-question").value = question;
-      askFarmIntelligenceStub(question);
+      askFarmIntelligence(question);
     });
   });
-}
-
-function askFarmIntelligenceStub(question) {
-  const q = (question || $("fi-question")?.value || "").trim();
-  if (!q) return;
-  if ($("fi-question")) $("fi-question").value = q;
-  $("fi-empty")?.classList.add("hidden");
-  const messages = $("fi-messages");
-  if (!messages) return;
-  messages.classList.remove("hidden");
-  messages.innerHTML = "";
-  const userMsg = document.createElement("div");
-  userMsg.className = "fi-message fi-message-user";
-  userMsg.innerHTML = '<div class="fi-message-label">You</div>';
-  const userBody = document.createElement("div");
-  userBody.className = "fi-message-body";
-  userBody.textContent = q;
-  userMsg.appendChild(userBody);
-  messages.appendChild(userMsg);
-  const advisorMsg = document.createElement("div");
-  advisorMsg.className = "fi-message fi-message-advisor";
-  advisorMsg.innerHTML = '<div class="fi-message-label">Farm Intelligence</div>';
-  const advisorBody = document.createElement("div");
-  advisorBody.className = "fi-message-body muted";
-  advisorBody.textContent = "Backend analysis connects in Phase 4. For now this is a UI preview only.";
-  advisorMsg.appendChild(advisorBody);
-  messages.appendChild(advisorMsg);
 }
 
 async function navigate(view) {
@@ -983,9 +1160,9 @@ function setupNav() {
   $("advisor-question")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") askAdvisor();
   });
-  $("fi-ask-btn")?.addEventListener("click", () => askFarmIntelligenceStub());
+  $("fi-ask-btn")?.addEventListener("click", () => askFarmIntelligence());
   $("fi-question")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") askFarmIntelligenceStub();
+    if (e.key === "Enter") askFarmIntelligence();
   });
   $("preview-report-btn")?.addEventListener("click", previewReport);
   $("generate-report-btn")?.addEventListener("click", generateReport);
