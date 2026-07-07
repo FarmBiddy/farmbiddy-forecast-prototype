@@ -27,6 +27,11 @@
   },
   "farm_summary": {
     "total_hectares": 185,
+    "land_by_sector": {
+      "dairy": 72,
+      "beef": 68,
+      "lamb": 45
+    },
     "opening_cash_balance": 28500,
     "debtors": 14200,
     "creditors": 19600,
@@ -84,6 +89,10 @@
         "dry_cows": 12,
         "calves": 8,
         "replacement_heifers": 24
+      },
+      "pricing": {
+        "milk_solids_bonus_per_litre": 0.018,
+        "notes": "Quality / protein bonus on base milk price"
       },
       "monthly": [
         {

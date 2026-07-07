@@ -133,16 +133,74 @@ def get_farmer_profile(
     display_name = farm.get("farm_name", "My Farm")
     if farm_file == config.get("active_farm_file") and config.get("farm_display_name"):
         display_name = config["farm_display_name"]
+
+    raw: dict | None = None
+    try:
+        if is_multi_sector(_read_farm_json_for_profile(farm_file)):
+            raw = load_multi_sector_farm(farm_file)
+    except (FileNotFoundError, ValueError):
+        raw = None
+
     processor = "—"
     if farm_file == config.get("active_farm_file"):
         processor = config.get("milk_processor", "Lakeland Dairies")
-    elif is_multi_sector(load_multi_sector_farm(farm_file)):
-        processor = (
-            load_multi_sector_farm(farm_file)
-            .get("sectors", {})
-            .get("dairy", {})
-            .get("processor", "—")
-        )
+    elif raw:
+        processor = raw.get("sectors", {}).get("dairy", {}).get("processor", "—")
+
+    identity = (raw or {}).get("identity") or {}
+    location_block = identity.get("location") or {}
+    farmer_block = identity.get("farmer") or {}
+    summary = (raw or {}).get("farm_summary") or {}
+    county = location_block.get("county") or config.get("location", "")
+    owner_name = _resolve_owner_name(farm_file, config)
+    if farmer_block.get("name") and not (
+        farm_file == config.get("active_farm_file") and config.get("owner_name")
+    ):
+        owner_name = farmer_block.get("name")
+
+    sector_metrics = farm.get("_sector_metrics") or {}
+    dairy_metrics = sector_metrics.get("dairy") or {}
+    beef_metrics = sector_metrics.get("beef") or {}
+    lamb_metrics = sector_metrics.get("lamb") or {}
+    dairy_sector = (raw or {}).get("sectors", {}).get("dairy", {}) if raw else {}
+    beef_sector = (raw or {}).get("sectors", {}).get("beef", {}) if raw else {}
+    lamb_sector = (raw or {}).get("sectors", {}).get("lamb", {}) if raw else {}
+    dairy_herd = dairy_sector.get("herd") or {}
+    beef_herd = beef_sector.get("herd") or {}
+    lamb_flock = lamb_sector.get("flock") or {}
+    dairy_pricing = dairy_sector.get("pricing") or {}
+
+    sector_profile: dict[str, dict] = {}
+    if "dairy" in selected:
+        sector_profile["dairy"] = {
+            "milking_cows": dairy_metrics.get("milking_cows") or farm.get("milking_cows"),
+            "litres_per_cow": dairy_metrics.get("litres_per_cow") or farm.get("litres_per_cow"),
+            "annual_milk_litres": dairy_metrics.get("annual_milk_litres"),
+            "milk_price": dairy_metrics.get("milk_price") or farm.get("milk_price"),
+            "processor": processor,
+            "dry_cows": dairy_herd.get("dry_cows"),
+            "replacement_heifers": dairy_herd.get("replacement_heifers"),
+            "calves": dairy_herd.get("calves"),
+            "milk_solids_bonus_per_litre": float(
+                dairy_pricing.get("milk_solids_bonus_per_litre") or 0
+            ),
+        }
+    if "beef" in selected:
+        sector_profile["beef"] = {
+            "cattle_on_farm": beef_metrics.get("cattle_on_farm"),
+            "finishing_units": beef_herd.get("finishing_units"),
+            "avg_sale_price_per_head": beef_metrics.get("avg_sale_price_per_head"),
+        }
+    if "lamb" in selected:
+        sector_profile["lamb"] = {
+            "ewes": lamb_metrics.get("ewes"),
+            "lambs_on_farm": lamb_flock.get("lambs"),
+            "avg_lamb_price_per_kg": lamb_metrics.get("avg_lamb_price_per_kg"),
+            "lambs_sold_trailing_12": lamb_metrics.get("lambs_sold_trailing_12"),
+        }
+
+    land_by_sector = summary.get("land_by_sector") or {}
+
     return {
         "success": True,
         "farm_file": farm_file,
@@ -152,12 +210,23 @@ def get_farmer_profile(
         "milk_price": farm.get("milk_price"),
         "opening_cash_balance": farm.get("opening_cash_balance"),
         "milk_processor": processor,
-        "location": config.get("location", ""),
-        "owner_name": _resolve_owner_name(farm_file, config),
+        "location": county,
+        "county": county,
+        "herd_number": location_block.get("herd_number"),
+        "total_hectares": summary.get("total_hectares"),
+        "land_by_sector": land_by_sector,
+        "owner_name": owner_name,
         "last_updated": datetime.now().strftime("%Y-%m-%d"),
         "selected_sectors": selected,
         "farm_type": farm.get("farm_type", "Mixed"),
+        "sector_profile": sector_profile,
     }
+
+
+def _read_farm_json_for_profile(farm_file: str) -> dict:
+    path = os.path.join(DATASETS_DIR, farm_file)
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
 
 
 def _risk_to_score(risk_level: str) -> int:

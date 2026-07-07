@@ -106,19 +106,89 @@ function renderSidebar(profile) {
   if ($("settings-farm")) $("settings-farm").textContent = profile.farm_name;
 }
 
+function profileItem(label, value) {
+  return `<div class="profile-item"><span>${label}</span><strong>${value ?? "—"}</strong></div>`;
+}
+
+function profileSection(title, itemsHtml) {
+  if (!itemsHtml) return "";
+  return `<div class="profile-section"><h4 class="profile-section-title">${title}</h4><div class="profile-section-grid">${itemsHtml}</div></div>`;
+}
+
+function formatNum(n) {
+  if (n == null || n === "") return "—";
+  return Number(n).toLocaleString();
+}
+
 function renderProfileDetail(profile) {
   const box = $("farm-profile-detail");
   if (!box || !profile) return;
-  const dairyRows = state.selectedSectors.includes("dairy") ? `
-    <div class="profile-item"><span>Herd</span><strong>${profile.milking_cows || "—"} cows</strong></div>
-    <div class="profile-item"><span>Milk price</span><strong>€${profile.milk_price || "—"}/L</strong></div>
-    <div class="profile-item"><span>Processor</span><strong>${profile.milk_processor || "—"}</strong></div>` : "";
-  box.innerHTML = `
-    <div class="profile-item"><span>Farm</span><strong>${profile.farm_name}</strong></div>
-    <div class="profile-item"><span>Sectors</span><strong>${sectorSummaryLabel()}</strong></div>
-    <div class="profile-item"><span>Farm type</span><strong>${profile.farm_type || "Mixed"}</strong></div>
-    ${dairyRows}
-    <div class="profile-item"><span>Cash opening</span><strong>€${Number(profile.opening_cash_balance || 0).toLocaleString()}</strong></div>`;
+  const sectors = profile.sector_profile || {};
+  const land = profile.land_by_sector || {};
+  const selected = profile.selected_sectors || state.selectedSectors || [];
+
+  const general = [
+    profileItem("Farm", profile.farm_name),
+    profileItem("Owner", profile.owner_name),
+    profileItem("Location", profile.county || profile.location),
+    profileItem("Herd no.", profile.herd_number),
+    profileItem("Farm size", profile.total_hectares != null ? `${profile.total_hectares} ha` : "—"),
+    profileItem("Sectors", sectorSummaryLabel()),
+    profileItem("Farm type", profile.farm_type || "Mixed"),
+    profileItem("Cash opening", `€${formatNum(profile.opening_cash_balance)}`),
+  ].join("");
+
+  let dairy = "";
+  if (selected.includes("dairy") && sectors.dairy) {
+    const d = sectors.dairy;
+    dairy = [
+      profileItem("Milking cows", d.milking_cows != null ? `${d.milking_cows} cows` : "—"),
+      profileItem("Litres per cow", d.litres_per_cow != null ? `${formatNum(d.litres_per_cow)} L/yr` : "—"),
+      profileItem("Annual milk litres", d.annual_milk_litres != null ? `${formatNum(d.annual_milk_litres)} L` : "—"),
+      profileItem("Milk price", d.milk_price != null ? `€${Number(d.milk_price).toFixed(3)}/L` : "—"),
+      profileItem("Processor", d.processor),
+      profileItem("Dry cows", d.dry_cows),
+      profileItem("Replacement heifers", d.replacement_heifers),
+      profileItem("Calves", d.calves),
+      profileItem("Milk solids bonus", d.milk_solids_bonus_per_litre != null ? `€${Number(d.milk_solids_bonus_per_litre).toFixed(3)}/L` : "—"),
+    ].join("");
+  }
+
+  let beef = "";
+  if (selected.includes("beef") && sectors.beef) {
+    const b = sectors.beef;
+    beef = [
+      profileItem("Cattle on farm", b.cattle_on_farm),
+      profileItem("Finishing units", b.finishing_units),
+      profileItem("Beef sale price", b.avg_sale_price_per_head != null ? `€${formatNum(b.avg_sale_price_per_head)}/head` : "—"),
+    ].join("");
+  }
+
+  let lamb = "";
+  if (selected.includes("lamb") && sectors.lamb) {
+    const l = sectors.lamb;
+    lamb = [
+      profileItem("Ewes", l.ewes),
+      profileItem("Lambs on farm", l.lambs_on_farm),
+      profileItem("Lamb price", l.avg_lamb_price_per_kg != null ? `€${Number(l.avg_lamb_price_per_kg).toFixed(2)}/kg` : "—"),
+      profileItem("Lambs sold (12 mo)", l.lambs_sold_trailing_12),
+    ].join("");
+  }
+
+  const landRows = [
+    selected.includes("dairy") && land.dairy != null ? profileItem("Dairy land", `${land.dairy} ha`) : "",
+    selected.includes("beef") && land.beef != null ? profileItem("Beef land", `${land.beef} ha`) : "",
+    selected.includes("lamb") && land.lamb != null ? profileItem("Lamb land", `${land.lamb} ha`) : "",
+  ].filter(Boolean).join("");
+  const landSection = landRows ? profileSection("Land use", landRows) : "";
+
+  box.innerHTML = [
+    profileSection("General", general),
+    profileSection("Dairy", dairy),
+    profileSection("Beef", beef),
+    profileSection("Lamb / Sheep", lamb),
+    landSection,
+  ].filter(Boolean).join("");
 }
 
 function renderKpis(kpis, containerId = "kpi-row") {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=16" />
+  <link rel="stylesheet" href="/assets/styles.css?v=17" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -27,7 +27,6 @@
         <button type="button" class="nav-link" data-view="reports">Reports</button>
         <button type="button" class="nav-link" data-view="historical">Historical Data</button>
         <button type="button" class="nav-link nav-link-secondary" data-view="my-farm">My Farm</button>
-        <button type="button" class="nav-link nav-link-secondary" data-view="daily">Daily Updates</button>
         <button type="button" id="nav-alerts" class="nav-link nav-link-secondary" data-view="alerts">Alerts</button>
         <button type="button" class="nav-link nav-link-secondary" data-view="settings">Settings</button>
       </nav>
@@ -119,9 +118,7 @@
       <section class="view hidden" id="view-my-farm">
         <div class="card"><h3>My Farm Profile</h3><div id="farm-profile-detail" class="profile-grid"></div></div>
       </section>
-      <section class="view hidden" id="view-daily">
-        <div class="card"><h3>Daily Updates</h3><p class="muted">Record today's milk income, feed, vet, fuel, and other costs. Full daily entry coming in a future update — forecasts refresh automatically when you change sectors.</p></div>
-      </section>
+      <section class="view hidden" id="view-daily"></section>
       <section class="view hidden" id="view-forecasts">
         <div class="card">
           <h3>Advanced Forecast</h3>

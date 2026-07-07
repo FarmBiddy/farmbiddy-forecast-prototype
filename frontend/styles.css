@@ -568,6 +568,21 @@ body {
 .scenario-item strong { display: block; margin-bottom: 0.2rem; }
 
 .profile-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.profile-section-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--green-dark);
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+.profile-section-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
