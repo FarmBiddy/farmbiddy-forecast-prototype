@@ -13,11 +13,21 @@ from typing import Any, Callable
 
 from services.dashboard_summary import calculate_sector_performance, get_selected_sector_data
 from services.farmer_dashboard_service import resolve_farm_file, resolve_sectors
-from services.financial_intelligence_service import _health_score, get_financial_intelligence
+from services.financial_intelligence_service import (
+    _health_score,
+    _load_forecast_context,
+    _plain_summary,
+    get_financial_intelligence,
+)
 from services.multi_sector_farm import load_farm_for_analysis
 from services.scenario_sandbox_service import run_scenario_sandbox
 
 Handler = Callable[..., dict[str, Any]]
+
+MONTH_LABELS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
 
 
 def _normalize_question(question: str) -> str:
@@ -187,6 +197,360 @@ def _base_response(
 
 def _load_intel(farm_file: str, selected: list[str]) -> dict[str, Any]:
     return get_financial_intelligence(farm_file, sectors=selected)
+
+
+def _month_label(month_num: int | float) -> str:
+    idx = int(month_num) - 1
+    if 0 <= idx < len(MONTH_LABELS):
+        return MONTH_LABELS[idx]
+    return str(month_num)
+
+
+def _analyze_monthly_cashflow(monthly: list[dict]) -> dict[str, Any]:
+    if not monthly:
+        return {}
+    points: list[dict[str, Any]] = []
+    for index, entry in enumerate(monthly[:12]):
+        month = entry.get("month", index + 1)
+        points.append({
+            "label": _month_label(month) if isinstance(month, (int, float)) else str(month),
+            "running_balance": float(entry.get("running_balance") or 0),
+            "cashflow": float(entry.get("cashflow") or 0),
+        })
+    if not points:
+        return {}
+    min_point = min(points, key=lambda item: item["running_balance"])
+    negative = [item["label"] for item in points if item["running_balance"] < 0]
+    return {
+        "min_month": min_point["label"],
+        "min_balance": min_point["running_balance"],
+        "negative_months": negative,
+        "end_balance": points[-1]["running_balance"],
+    }
+
+
+def _load_advisor_context(farm_file: str, selected: list[str]) -> dict[str, Any]:
+    intel = _load_intel(farm_file, selected)
+    _, forecast, extras = _load_forecast_context(farm_file, selected)
+    monthly = forecast.get("monthly_forecast") or []
+    return {
+        "intel": intel,
+        "forecast": forecast,
+        "advisory": extras.get("advisory") or {},
+        "monthly_forecast": monthly,
+        "cashflow_insights": _analyze_monthly_cashflow(monthly),
+    }
+
+
+def _first_recommendation(intel: dict[str, Any]) -> str:
+    actions = intel.get("recommended_actions") or []
+    return actions[0]["title"] if actions else "Keep monitoring cash and costs each month."
+
+
+def _sector_scope_label(selected: list[str]) -> str:
+    if len(selected) == 3:
+        return "your whole farm"
+    if len(selected) == 1:
+        return f"{_sector_label(selected[0])} only"
+    return " and ".join(_sector_label(s) for s in selected)
+
+
+def _format_health_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
+    intel = ctx["intel"]
+    health = intel["health_score"]
+    farm_name = intel.get("farm_name") or "Your farm"
+    score = health.get("score", 0)
+    label = health.get("label", "—")
+
+    if score >= 85:
+        tone = f"{farm_name} is in strong financial shape"
+    elif score >= 70:
+        tone = f"{farm_name} looks financially stable overall"
+    elif score >= 50:
+        tone = f"{farm_name} is under some financial pressure"
+    else:
+        tone = f"{farm_name} needs urgent financial attention"
+
+    summary = f"{tone}, with a health score of {score}/100 ({label})."
+    watch: list[str] = []
+    if health.get("feed_pressure") == "High":
+        watch.append("feed costs are squeezing margins")
+    elif health.get("feed_pressure") == "Moderate":
+        watch.append("feed costs need watching")
+    if health.get("cashflow") == "Negative":
+        watch.append("monthly cashflow is negative")
+    elif health.get("cashflow") == "Tight":
+        watch.append("cashflow is tight")
+    if health.get("debt_pressure") == "High":
+        watch.append("debt repayments are heavy")
+
+    if watch:
+        summary += " Watch out because " + ", ".join(watch) + "."
+
+    risk = intel["forecast_summary"].get("risk_level")
+    if risk == "High":
+        summary += " Overall risk is elevated — act on costs and cash this month."
+    elif risk == "Low":
+        summary += " Overall risk is low if you stay disciplined on costs."
+
+    key_points = [
+        f"Health score: {score}/100 ({label}).",
+        f"Profitability: {health.get('profitability', '—')}.",
+        f"Cashflow: {health.get('cashflow', '—')}.",
+        f"Feed pressure: {health.get('feed_pressure', '—')}.",
+        f"Debt pressure: {health.get('debt_pressure', '—')}.",
+    ]
+    return summary, key_points[:5], _first_recommendation(intel)
+
+
+def _format_strengths_answer(ctx: dict[str, Any], selected: list[str]) -> tuple[str, list[str], str]:
+    intel = ctx["intel"]
+    strengths = intel.get("key_strengths") or []
+    opportunities = intel.get("opportunities") or []
+    if not strengths:
+        strengths = ["No major strengths flagged yet — keep building reserves and tracking costs."]
+
+    if len(strengths) == 1:
+        summary = f"Your main financial strength right now is {strengths[0]}"
+    else:
+        summary = f"Your strongest areas are {strengths[0]} and {strengths[1]}"
+
+    summary += f" on {_sector_scope_label(selected)}."
+
+    key_points = strengths[:5]
+    if opportunities and len(key_points) < 5:
+        key_points.append(f"Opportunity: {opportunities[0]}")
+    return summary, key_points[:5], "Build on these strengths while keeping costs under control."
+
+
+def _format_risks_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
+    intel = ctx["intel"]
+    risks = intel.get("biggest_risks") or []
+    risk_level = intel["forecast_summary"].get("risk_level", "Medium")
+    health = intel["health_score"]
+
+    if risks:
+        lead = risks[0]
+        summary = (
+            f"Your biggest financial risk right now is {lead.get('driver', 'cash pressure')} "
+            f"({lead.get('severity', 'Medium')})."
+        )
+        if len(risks) > 1:
+            summary += (
+                f" You should also watch {risks[1].get('driver', 'other pressures')} "
+                f"({risks[1].get('severity', 'Medium')})."
+            )
+        if health.get("feed_pressure") == "High":
+            summary += " Feed costs are adding to the pressure on margins."
+        key_points = [
+            f"{item.get('driver', 'Risk')} — {item.get('severity', 'Medium')}"
+            + (f": {item.get('commentary')}" if item.get("commentary") else "")
+            for item in risks[:5]
+        ]
+    else:
+        summary = f"No critical risks flagged. Overall risk level is {risk_level}."
+        key_points = [summary]
+
+    for alert in (intel.get("alerts") or [])[:2]:
+        if len(key_points) >= 5:
+            break
+        if not any(alert.lower() in point.lower() for point in key_points):
+            key_points.append(f"Alert: {alert}")
+
+    return summary, key_points[:5], _first_recommendation(intel) or "Address the highest-severity risk first and keep a cash buffer."
+
+
+def _format_profitability_answer(
+    ctx: dict[str, Any],
+    question: str,
+    farm_file: str,
+    selected: list[str],
+) -> tuple[str, list[str], str]:
+    intel = ctx["intel"]
+    forecast = intel["forecast_summary"]
+    profit = forecast.get("annual_profit", 0) or 0
+    margin = forecast.get("profit_margin", 0) or 0
+    monthly_cf = forecast.get("monthly_cashflow", 0) or 0
+    question_norm = _normalize_question(question)
+    weaknesses = intel.get("key_weaknesses") or []
+    opportunities = intel.get("opportunities") or []
+
+    worst = None
+    if "losing" in question_norm or "lose money" in question_norm:
+        rows = calculate_sector_performance(get_selected_sector_data(farm_file, selected))
+        if rows:
+            worst = min(rows, key=lambda row: row.get("profit", 0))
+
+    if worst and worst.get("profit", 0) < 0:
+        summary = (
+            f"The weakest area is {worst['label']}, losing about €{abs(worst['profit']):,.0f} "
+            f"over the last 12 months with a {worst['margin_pct']:.1f}% margin."
+        )
+        recommendation = f"Focus first on improving costs or income in {worst['label']}."
+    elif profit < 0:
+        summary = (
+            f"On current figures {_sector_scope_label(selected)} may lose about "
+            f"€{abs(profit):,.0f} per year — review costs and income urgently."
+        )
+        recommendation = "Focus on the largest cost lines and cashflow before new spending."
+    elif "improve" in question_norm:
+        summary = (
+            f"The farm is profitable at about €{profit:,.0f} per year, but there is still room to improve margins "
+            f"({margin:.1f}% today)."
+        )
+        if weaknesses:
+            summary += f" The main pressure area is {weaknesses[0]}."
+        recommendation = _first_recommendation(intel)
+    else:
+        summary = (
+            f"The farm is forecast to make about €{profit:,.0f} profit per year "
+            f"with a {margin:.1f}% margin on {_sector_scope_label(selected)}."
+        )
+        recommendation = "Protect margin by monitoring feed and keeping reserves for seasonal dips."
+
+    key_points = [
+        f"Annual profit: €{profit:,.0f}.",
+        f"Profit margin: {margin:.1f}%.",
+        f"Monthly cashflow: €{monthly_cf:,.0f}.",
+    ]
+    if worst:
+        key_points.append(
+            f"{worst['label']}: €{worst['profit']:,.0f} profit, {worst['margin_pct']:.1f}% margin."
+        )
+    elif weaknesses:
+        key_points.append(f"Pressure area: {weaknesses[0]}.")
+    if opportunities and len(key_points) < 5:
+        key_points.append(f"Opportunity: {opportunities[0]}.")
+
+    return summary, key_points[:5], recommendation
+
+
+def _format_sector_comparison_answer(
+    rows: list[dict],
+) -> tuple[str, list[str], str]:
+    best = max(rows, key=lambda row: row.get("profit", 0))
+    worst = min(rows, key=lambda row: row.get("profit", 0))
+    summary = (
+        f"{best['label']} is performing best with about €{best['profit']:,.0f} profit "
+        f"and a {best['margin_pct']:.1f}% margin over the last 12 months."
+    )
+    if len(rows) > 1 and worst["sector"] != best["sector"]:
+        summary += (
+            f" {worst['label']} is the weakest at €{worst['profit']:,.0f} profit "
+            f"({worst['margin_pct']:.1f}% margin)."
+        )
+
+    key_points = [
+        f"{row['label']}: €{row['profit']:,.0f} profit, {row['margin_pct']:.1f}% margin ({row['status']})"
+        for row in rows
+    ]
+    recommendation = (
+        f"Learn from what is working in {best['label']} while giving attention to {worst['label']}."
+        if len(rows) > 1 and worst["sector"] != best["sector"]
+        else f"Keep building on the strengths in {best['label']}."
+    )
+    return summary, key_points, recommendation
+
+
+def _format_cashflow_answer(ctx: dict[str, Any], selected: list[str]) -> tuple[str, list[str], str]:
+    intel = ctx["intel"]
+    forecast = intel["forecast_summary"]
+    insights = ctx["cashflow_insights"]
+    monthly_cf = forecast.get("monthly_cashflow", 0) or 0
+    opening = intel["profile"].get("opening_cash_balance", 0) or 0
+
+    summary = (
+        f"Average monthly cashflow is about €{monthly_cf:,.0f} on {_sector_scope_label(selected)}."
+    )
+    if insights.get("negative_months"):
+        summary += (
+            f" Cash could dip below zero in {', '.join(insights['negative_months'][:3])}"
+            f"{' and other months' if len(insights['negative_months']) > 3 else ''} — plan ahead."
+        )
+    elif insights.get("min_month"):
+        summary += (
+            f" The tightest month looks like {insights['min_month']} "
+            f"(about €{insights['min_balance']:,.0f} running balance)."
+        )
+
+    key_points = [
+        f"Opening cash: €{opening:,.0f}.",
+        f"Average monthly cashflow: €{monthly_cf:,.0f}.",
+        f"Cashflow status: {intel['health_score'].get('cashflow', '—')}.",
+    ]
+    if insights.get("min_month"):
+        key_points.append(f"Lowest balance: {insights['min_month']} (€{insights['min_balance']:,.0f}).")
+    if insights.get("end_balance") is not None:
+        key_points.append(f"Year-end running balance: €{insights['end_balance']:,.0f}.")
+    if insights.get("negative_months"):
+        key_points.append(f"Months below zero: {', '.join(insights['negative_months'])}.")
+
+    alerts = intel.get("alerts") or []
+    if alerts and len(key_points) < 5:
+        key_points.append(f"Alert: {alerts[0]}.")
+
+    return summary, key_points[:5], _first_recommendation(intel) or "Plan ahead for low-cash months before taking on new commitments."
+
+
+def _format_funding_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
+    intel = ctx["intel"]
+    health = intel["health_score"]
+    forecast = intel["forecast_summary"]
+    insights = ctx["cashflow_insights"]
+    monthly_cf = forecast.get("monthly_cashflow", 0) or 0
+    opening = intel["profile"].get("opening_cash_balance", 0) or 0
+    debt_pressure = health.get("debt_pressure", "Moderate")
+    min_balance = insights.get("min_balance")
+
+    if monthly_cf < 0 or opening < abs(monthly_cf) or (min_balance is not None and min_balance < 0):
+        summary = (
+            "Cash reserves look tight — you may need extra funding or stronger cash "
+            "management before major purchases."
+        )
+        if insights.get("min_month") and min_balance is not None and min_balance < 0:
+            summary += f" The lowest point looks like {insights['min_month']} (about €{min_balance:,.0f})."
+        recommendation = "Speak to your bank or adviser about short-term cash support before new debt."
+    elif debt_pressure == "High":
+        summary = (
+            "Debt repayments are already putting pressure on the farm — "
+            "additional borrowing should be approached carefully."
+        )
+        recommendation = "Improve cash reserves or reduce costs before taking on new loans."
+    else:
+        summary = (
+            "You may have some room for funding if needed, but keep a buffer for "
+            "feed bills and seasonal dips."
+        )
+        recommendation = "Only borrow for investments that clearly improve income or reduce costs."
+
+    key_points = [
+        f"Debt pressure: {debt_pressure}.",
+        f"Monthly cashflow: €{monthly_cf:,.0f}.",
+        f"Cash reserves: €{opening:,.0f}.",
+        "Funding need applies to the whole farm.",
+    ]
+    if insights.get("min_month"):
+        key_points.append(f"Tightest month: {insights['min_month']} (€{insights['min_balance']:,.0f}).")
+
+    return summary, key_points[:5], recommendation
+
+
+def _format_general_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
+    intel = ctx["intel"]
+    actions = intel.get("recommended_actions") or []
+    weaknesses = intel.get("key_weaknesses") or []
+    summary = intel.get("plain_summary") or _plain_summary(
+        ctx["forecast"],
+        intel["health_score"],
+        {"farm_name": intel.get("farm_name"), "opening_cash_balance": intel["profile"].get("opening_cash_balance", 0), "loan_repayments": intel["profile"].get("loan_repayments", 0)},
+    )
+    if weaknesses and weaknesses[0].lower() not in summary.lower():
+        summary += f" The main pressure area is {weaknesses[0]}."
+
+    key_points = [action["title"] for action in actions[:5]]
+    if not key_points:
+        key_points = [summary]
+    return summary, key_points, _first_recommendation(intel)
 
 
 def _parse_direction(question: str, default: float = 1.0) -> float:
@@ -533,37 +897,25 @@ def _handle_health_score(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    intel = _load_intel(farm_file, selected)
-    health = intel["health_score"]
-    forecast = intel["forecast_summary"]
+    ctx = _load_advisor_context(farm_file, selected)
+    intel = ctx["intel"]
+    summary, key_points, recommendation = _format_health_answer(ctx)
     overall = _empty_overall_impact()
-    overall["health_score_before"] = health.get("score")
-    overall["risk_level_before"] = forecast.get("risk_level")
+    overall["health_score_before"] = intel["health_score"].get("score")
+    overall["risk_level_before"] = intel["forecast_summary"].get("risk_level")
 
     return _base_response(
         question,
         intent,
         affected,
         unaffected,
-        summary=(
-            f"Your farm health score is {health.get('score', '—')}/100 ({health.get('label', '—')}). "
-            f"Profitability is {health.get('profitability', '—').lower()}, cashflow is "
-            f"{health.get('cashflow', '—').lower()}, and overall risk is {forecast.get('risk_level', '—')}."
-        ),
-        key_points=[
-            f"Profitability: {health.get('profitability', '—')}.",
-            f"Cashflow: {health.get('cashflow', '—')}.",
-            f"Feed pressure: {health.get('feed_pressure', '—')}.",
-            f"Debt pressure: {health.get('debt_pressure', '—')}.",
-        ],
-        recommendation=intel.get("recommended_actions", [{}])[0].get(
-            "title",
-            "Keep monitoring cash and costs each month.",
-        ),
+        summary=summary,
+        key_points=key_points,
+        recommendation=recommendation,
         overall_impact=overall,
         metrics={
-            "health_score": health.get("score"),
-            "risk_level": forecast.get("risk_level"),
+            "health_score": intel["health_score"].get("score"),
+            "risk_level": intel["forecast_summary"].get("risk_level"),
             "profit_change": None,
             "cashflow_change": None,
         },
@@ -578,18 +930,17 @@ def _handle_strengths(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    intel = _load_intel(farm_file, selected)
-    strengths = intel.get("key_strengths") or ["No major strengths flagged yet — keep building reserves."]
-    summary = "Your main financial strengths right now: " + "; ".join(strengths[:3]) + "."
+    ctx = _load_advisor_context(farm_file, selected)
+    summary, key_points, recommendation = _format_strengths_answer(ctx, selected)
     return _base_response(
         question,
         intent,
         affected,
         unaffected,
         summary=summary,
-        key_points=strengths[:5],
-        recommendation="Build on these strengths while keeping costs under control.",
-        metrics={"health_score": intel["health_score"].get("score")},
+        key_points=key_points,
+        recommendation=recommendation,
+        metrics={"health_score": ctx["intel"]["health_score"].get("score")},
     )
 
 
@@ -601,21 +952,8 @@ def _handle_risks(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    intel = _load_intel(farm_file, selected)
-    risks = intel.get("biggest_risks") or []
-    if risks:
-        summary = "Your biggest financial risks: " + "; ".join(
-            f"{r.get('driver', 'Risk')} ({r.get('severity', 'Medium')})" for r in risks[:3]
-        ) + "."
-        key_points = [
-            f"{r.get('driver', 'Risk')} — {r.get('severity', 'Medium')}"
-            + (f": {r.get('commentary')}" if r.get("commentary") else "")
-            for r in risks[:5]
-        ]
-    else:
-        summary = f"No critical risks flagged. Overall risk level is {intel['forecast_summary'].get('risk_level', 'Medium')}."
-        key_points = [summary]
-
+    ctx = _load_advisor_context(farm_file, selected)
+    summary, key_points, recommendation = _format_risks_answer(ctx)
     return _base_response(
         question,
         intent,
@@ -623,8 +961,8 @@ def _handle_risks(
         unaffected,
         summary=summary,
         key_points=key_points,
-        recommendation="Address the highest-severity risk first and keep a cash buffer.",
-        metrics={"risk_level": intel["forecast_summary"].get("risk_level")},
+        recommendation=recommendation,
+        metrics={"risk_level": ctx["intel"]["forecast_summary"].get("risk_level")},
     )
 
 
@@ -636,32 +974,10 @@ def _handle_profitability(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    intel = _load_intel(farm_file, selected)
+    ctx = _load_advisor_context(farm_file, selected)
+    intel = ctx["intel"]
     forecast = intel["forecast_summary"]
-    profit = forecast.get("annual_profit", 0) or 0
-    margin = forecast.get("profit_margin", 0) or 0
-
-    if profit < 0:
-        summary = (
-            f"On current figures the farm may lose about €{abs(profit):,.0f} per year "
-            f"with a {margin:.1f}% margin — review costs and income urgently."
-        )
-        recommendation = "Focus on the largest cost lines and cashflow before new spending."
-    else:
-        summary = (
-            f"The farm is forecast to make about €{profit:,.0f} profit per year "
-            f"with a {margin:.1f}% margin on your selected sectors."
-        )
-        recommendation = "Protect margin by monitoring feed and keeping reserves for seasonal dips."
-
-    weaknesses = intel.get("key_weaknesses") or []
-    key_points = [
-        f"Annual profit: €{profit:,.0f}.",
-        f"Profit margin: {margin:.1f}%.",
-        f"Monthly cashflow: €{forecast.get('monthly_cashflow', 0):,.0f}.",
-    ]
-    if weaknesses:
-        key_points.append(f"Pressure area: {weaknesses[0]}")
+    summary, key_points, recommendation = _format_profitability_answer(ctx, question, farm_file, selected)
 
     return _base_response(
         question,
@@ -701,15 +1017,8 @@ def _handle_sector_comparison(
             recommendation="Select the sectors you want to compare in the header.",
         )
 
-    best = max(rows, key=lambda r: r.get("profit", 0))
-    summary = (
-        f"{best['label']} is performing best with about €{best['profit']:,.0f} profit "
-        f"and a {best['margin_pct']:.1f}% margin over the last 12 months."
-    )
-    key_points = [
-        f"{row['label']}: €{row['profit']:,.0f} profit, {row['margin_pct']:.1f}% margin ({row['status']})"
-        for row in rows
-    ]
+    summary, key_points, recommendation = _format_sector_comparison_answer(rows)
+    ctx = _load_advisor_context(farm_file, selected)
 
     return _base_response(
         question,
@@ -718,8 +1027,11 @@ def _handle_sector_comparison(
         unaffected,
         summary=summary,
         key_points=key_points,
-        recommendation=f"Learn from what is working in {best['label']} without neglecting weaker sectors.",
-        metrics={"health_score": None, "risk_level": None},
+        recommendation=recommendation,
+        metrics={
+            "health_score": ctx["intel"]["health_score"].get("score"),
+            "risk_level": ctx["intel"]["forecast_summary"].get("risk_level"),
+        },
     )
 
 
@@ -731,19 +1043,11 @@ def _handle_cashflow_forecast(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    intel = _load_intel(farm_file, selected)
+    ctx = _load_advisor_context(farm_file, selected)
+    intel = ctx["intel"]
     forecast = intel["forecast_summary"]
-    monthly_cf = forecast.get("monthly_cashflow", 0) or 0
-    summary = (
-        f"Average monthly cashflow is about €{monthly_cf:,.0f} on your selected sectors. "
-        "Seasonal dips are common — watch months where bills cluster."
-    )
-    key_points = [
-        f"Average monthly cashflow: €{monthly_cf:,.0f}.",
-        f"Opening cash balance: €{intel['profile'].get('opening_cash_balance', 0):,.0f}.",
-        f"Cashflow status: {intel['health_score'].get('cashflow', '—')}.",
-        "A month-by-month 12-month view will be added in the next phase.",
-    ]
+    summary, key_points, recommendation = _format_cashflow_answer(ctx, selected)
+
     return _base_response(
         question,
         intent,
@@ -751,8 +1055,12 @@ def _handle_cashflow_forecast(
         unaffected,
         summary=summary,
         key_points=key_points,
-        recommendation="Plan ahead for low-cash months before taking on new commitments.",
-        metrics={"cashflow_change": monthly_cf, "risk_level": forecast.get("risk_level")},
+        recommendation=recommendation,
+        metrics={
+            "cashflow_change": forecast.get("monthly_cashflow"),
+            "risk_level": forecast.get("risk_level"),
+            "health_score": intel["health_score"].get("score"),
+        },
     )
 
 
@@ -764,31 +1072,10 @@ def _handle_funding_need(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    intel = _load_intel(farm_file, selected)
-    health = intel["health_score"]
+    ctx = _load_advisor_context(farm_file, selected)
+    intel = ctx["intel"]
     forecast = intel["forecast_summary"]
-    monthly_cf = forecast.get("monthly_cashflow", 0) or 0
-    opening = intel["profile"].get("opening_cash_balance", 0) or 0
-    debt_pressure = health.get("debt_pressure", "Moderate")
-
-    if monthly_cf < 0 or opening < abs(monthly_cf):
-        summary = (
-            "Cash reserves look tight — you may need extra funding or stronger cash "
-            "management before major purchases."
-        )
-        recommendation = "Speak to your bank or adviser about short-term cash support before new debt."
-    elif debt_pressure == "High":
-        summary = (
-            "Debt repayments are already putting pressure on the farm — "
-            "additional borrowing should be approached carefully."
-        )
-        recommendation = "Improve cash reserves or reduce costs before taking on new loans."
-    else:
-        summary = (
-            "You may have some room for funding if needed, but keep a buffer for "
-            "feed bills and seasonal dips."
-        )
-        recommendation = "Only borrow for investments that clearly improve income or reduce costs."
+    summary, key_points, recommendation = _format_funding_answer(ctx)
 
     return _base_response(
         question,
@@ -796,16 +1083,11 @@ def _handle_funding_need(
         affected,
         unaffected,
         summary=summary,
-        key_points=[
-            f"Debt pressure: {debt_pressure}.",
-            f"Monthly cashflow: €{monthly_cf:,.0f}.",
-            f"Cash reserves: €{opening:,.0f}.",
-            _unaffected_note(affected, unaffected) or "Funding need applies to the whole farm.",
-        ],
+        key_points=key_points,
         recommendation=recommendation,
         metrics={
-            "health_score": health.get("score"),
-            "cashflow_change": monthly_cf,
+            "health_score": intel["health_score"].get("score"),
+            "cashflow_change": forecast.get("monthly_cashflow"),
             "risk_level": forecast.get("risk_level"),
         },
     )
@@ -819,11 +1101,9 @@ def _handle_general_recommendation(
     unaffected: list[str],
     intent: str,
 ) -> dict[str, Any]:
-    intel = _load_intel(farm_file, selected)
-    actions = intel.get("recommended_actions") or []
-    top = actions[0]["title"] if actions else "Review monthly cashflow and costs."
-    summary = intel.get("plain_summary") or intel.get("advisor_headline") or "Here is a summary of your farm finances."
-    key_points = [a["title"] for a in actions[:5]] or [summary]
+    ctx = _load_advisor_context(farm_file, selected)
+    intel = ctx["intel"]
+    summary, key_points, recommendation = _format_general_answer(ctx)
     return _base_response(
         question,
         intent,
@@ -831,8 +1111,11 @@ def _handle_general_recommendation(
         unaffected,
         summary=summary,
         key_points=key_points,
-        recommendation=top,
-        metrics={"health_score": intel["health_score"].get("score"), "risk_level": intel["forecast_summary"].get("risk_level")},
+        recommendation=recommendation,
+        metrics={
+            "health_score": intel["health_score"].get("score"),
+            "risk_level": intel["forecast_summary"].get("risk_level"),
+        },
     )
 
 

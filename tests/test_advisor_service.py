@@ -149,3 +149,40 @@ def test_farmer_advisor_api_endpoint():
     assert data["affected_sectors"] == ["dairy"]
     assert data["unaffected_sectors"] == ["beef", "lamb"]
     assert data["summary"]
+
+
+def test_health_score_uses_plain_english_summary():
+    result = ask_farm_intelligence(
+        "How healthy is my business?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    assert result["intent"] == "health_score"
+    assert "health score" in result["summary"].lower()
+    assert "Watch out" in result["summary"] or "Overall risk" in result["summary"] or "stable" in result["summary"].lower()
+
+
+def test_cashflow_forecast_includes_monthly_insights():
+    result = ask_farm_intelligence(
+        "What will my cashflow look like over the next 12 months?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    assert result["intent"] == "cashflow_forecast"
+    joined = " ".join(result["key_points"]).lower()
+    assert "opening cash" in joined
+    assert "next phase" not in joined
+    assert any(
+        token in joined
+        for token in ("lowest balance", "year-end running balance", "months below zero", "average monthly cashflow")
+    )
+
+
+def test_profitability_losing_money_mentions_weakest_sector():
+    result = ask_farm_intelligence(
+        "Where am I losing the most money?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    assert result["intent"] == "profitability"
+    assert "weakest" in result["summary"].lower() or "losing" in result["summary"].lower()
