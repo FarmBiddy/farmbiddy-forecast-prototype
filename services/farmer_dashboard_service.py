@@ -455,7 +455,7 @@ def run_advanced_forecast(
         profitability_dashboard=True,
         advisory_summary=True,
         kpis=True,
-        scenarios=True,
+        scenarios=False,
     )
 
     forecast = run_forecast(
@@ -463,13 +463,12 @@ def run_advanced_forecast(
         outputs=outputs,
         save_result=True,
         generate_charts=True,
-        chart_types=["running_balance", "revenue_vs_costs", "cost_breakdown", "scenario_profit"],
+        chart_types=["running_balance", "revenue_vs_costs", "cost_breakdown"],
         sectors=selected,
     )
 
     summary = forecast.get("forecast_summary") or {}
     monthly = forecast.get("monthly_forecast") or []
-    scenarios = calculate_scenarios(farm)
     monte = run_monte_carlo(farm, iterations=1000)
 
     advisory = forecast.get("advisory_summary") or {}
@@ -490,7 +489,6 @@ def run_advanced_forecast(
         "risk_level": forecast.get("risk_level"),
         "top_risk_drivers": forecast.get("top_risk_drivers") or [],
         "advisory_summary": advisory,
-        "scenarios": scenarios,
         "monte_carlo": monte,
         "charts": forecast.get("charts") or {},
         "interpretation": interpretation,

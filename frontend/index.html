@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=14" />
+  <link rel="stylesheet" href="/assets/styles.css?v=15" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -28,7 +28,7 @@
         <button type="button" class="nav-link" data-view="historical">Historical Data</button>
         <button type="button" class="nav-link nav-link-secondary" data-view="my-farm">My Farm</button>
         <button type="button" class="nav-link nav-link-secondary" data-view="daily">Daily Updates</button>
-        <button type="button" class="nav-link nav-link-secondary" data-view="alerts">Alerts</button>
+        <button type="button" id="nav-alerts" class="nav-link nav-link-secondary" data-view="alerts">Alerts</button>
         <button type="button" class="nav-link nav-link-secondary" data-view="settings">Settings</button>
       </nav>
 
@@ -125,7 +125,7 @@
       <section class="view hidden" id="view-forecasts">
         <div class="card">
           <h3>Advanced Forecast</h3>
-          <p class="muted">12-month cashflow, profit, scenarios, Monte Carlo, and risk range</p>
+          <p class="muted">12-month cashflow, profit forecast, and profit outlook</p>
         </div>
         <div id="forecast-results" class="hidden">
           <div class="interpretation-box" id="forecast-interpretation"></div>
@@ -134,12 +134,9 @@
             <div class="card"><h3>Cashflow Forecast</h3><div id="forecast-cashflow-chart" class="chart-area"></div></div>
             <div class="card"><h3>Profit Forecast</h3><div id="forecast-profit-chart" class="chart-area"></div></div>
           </div>
-          <div class="grid-row grid-2-1">
-            <div class="card"><h3>Best / Expected / Worst Case</h3><div id="forecast-scenarios"></div></div>
-            <div class="card">
-              <h3>Monte Carlo Simulation</h3>
-              <div id="monte-carlo-panel"></div>
-            </div>
+          <div class="card">
+            <h3>Profit outlook</h3>
+            <div id="monte-carlo-panel"></div>
           </div>
           <div class="card"><h3>Engine Charts</h3><div id="forecast-engine-charts" class="chart-iframes"></div></div>
         </div>
@@ -295,7 +292,7 @@
         <div id="historical-content" class="hidden"></div>
       </section>
       <section class="view hidden" id="view-alerts">
-        <div class="card"><h3>All Alerts</h3><ul id="alerts-full" class="alert-list"></ul></div>
+        <div class="card exec-alerts"><h3>All Alerts</h3><ul id="alerts-full" class="alert-list"></ul></div>
       </section>
       <section class="view hidden" id="view-settings">
         <div class="card"><h3>Settings</h3><p class="muted">Active farm: <strong id="settings-farm">Knockrow Mixed Farm</strong> (multi_sector_farm.json). Sector selection controls all analysis.</p></div>

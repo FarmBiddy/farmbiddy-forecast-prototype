@@ -399,6 +399,7 @@ function renderExecutiveDashboard(data) {
   renderSectorTable(data.sector_performance);
   renderExecutiveAlerts(data.alerts);
   renderExecutiveAlerts(data.alerts, "alerts-full");
+  updateAlertsNavHighlight(data.alerts);
   renderOverviewChart(data.overview_chart);
 }
 
@@ -439,27 +440,46 @@ function renderForecastResults(data) {
   renderBarChart("forecast-profit-chart", data.profit_chart_data, ["profit"]);
   renderEngineCharts(data.charts, "forecast-engine-charts");
   renderMonteCarlo(data.monte_carlo);
-  const scenBox = $("forecast-scenarios");
-  if (scenBox) {
-    scenBox.innerHTML = (data.scenarios || []).map((s) =>
-      `<div class="scenario-item"><strong>${s.name}</strong> — Profit €${Number(s.profit).toLocaleString()} @ €${s.milk_price}/L</div>`
-    ).join("");
-  }
 }
 
 function renderMonteCarlo(monte) {
   const box = $("monte-carlo-panel");
   if (!box || !monte) return;
+  const expected = Number(monte.expected_profit || 0);
+  const low = Number(monte.worst_case ?? monte.confidence_range?.[0] ?? 0);
+  const high = Number(monte.best_case ?? monte.confidence_range?.[1] ?? 0);
+  const lossPct = ((monte.probability_of_loss || 0) * 100).toFixed(1);
+  const summary = monte.plain_summary || (
+    `Expected profit is €${expected.toLocaleString()}, but it can range between `
+    + `€${low.toLocaleString()} and €${high.toLocaleString()}. `
+    + `Probability of making a loss is ${lossPct}%.`
+  );
   box.innerHTML = `
-    <div class="health-rows">
-      <div class="health-row"><span>Expected profit</span><strong>€${Number(monte.expected_profit || 0).toLocaleString()}</strong></div>
-      <div class="health-row"><span>Best case (90th)</span><strong>€${Number(monte.best_case || 0).toLocaleString()}</strong></div>
-      <div class="health-row"><span>Expected case</span><strong>€${Number(monte.expected_case || 0).toLocaleString()}</strong></div>
-      <div class="health-row"><span>Worst case (10th)</span><strong>€${Number(monte.worst_case || 0).toLocaleString()}</strong></div>
-      <div class="health-row"><span>Confidence range</span><strong>€${monte.confidence_range?.[0]?.toLocaleString()} – €${monte.confidence_range?.[1]?.toLocaleString()}</strong></div>
-      <div class="health-row"><span>P(loss)</span><strong>${((monte.probability_of_loss || 0) * 100).toFixed(1)}%</strong></div>
-    </div>
-    <p class="muted" style="margin-top:0.75rem">${monte.interpretation || ""}</p>`;
+    <p class="interpretation-box" style="margin:0">${summary}</p>
+    ${monte.interpretation ? `<p class="muted" style="margin-top:0.75rem">${monte.interpretation}</p>` : ""}`;
+}
+
+function countActionableAlerts(alerts) {
+  return (alerts || []).filter((a) => {
+    const sev = typeof a === "string" ? "medium" : (a.severity || "medium");
+    return sev !== "info";
+  }).length;
+}
+
+function updateAlertsNavHighlight(alerts) {
+  const btn = $("nav-alerts");
+  if (!btn) return;
+  const count = countActionableAlerts(alerts);
+  btn.classList.remove("nav-alerts--warn-low", "nav-alerts--warn-mid", "nav-alerts--warn-high");
+  btn.textContent = "Alerts";
+  if (count >= 5) {
+    btn.classList.add("nav-alerts--warn-high");
+    btn.textContent = "⚠ Alerts";
+  } else if (count >= 3) {
+    btn.classList.add("nav-alerts--warn-mid");
+  } else if (count >= 1) {
+    btn.classList.add("nav-alerts--warn-low");
+  }
 }
 
 function renderSandboxResults(data) {

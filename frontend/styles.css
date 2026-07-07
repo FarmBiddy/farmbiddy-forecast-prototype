@@ -99,6 +99,27 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+#nav-alerts.nav-alerts--warn-low {
+  color: #fde047;
+  background: rgba(234, 179, 8, 0.12);
+  font-weight: 600;
+}
+#nav-alerts.nav-alerts--warn-mid {
+  color: #fdba74;
+  background: rgba(249, 115, 22, 0.18);
+  font-weight: 600;
+}
+#nav-alerts.nav-alerts--warn-high {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.22);
+  font-weight: 700;
+}
+#nav-alerts.nav-alerts--warn-low.active,
+#nav-alerts.nav-alerts--warn-mid.active,
+#nav-alerts.nav-alerts--warn-high.active {
+  color: #fff;
+}
+
 .sidebar-farm {
   padding: 1rem 1.25rem;
   border-top: 1px solid rgba(255,255,255,0.08);

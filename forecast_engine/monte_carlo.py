@@ -42,16 +42,23 @@ def run_monte_carlo(farm: dict, iterations: int = 1000, seed: int = 42) -> dict[
     p50 = profits[int(n * 0.50)]
     p90 = profits[int(n * 0.90)]
     prob_loss = sum(1 for p in profits if p < 0) / n
+    expected_profit = round(sum(profits) / n, 0)
+
+    plain_summary = (
+        f"Expected profit is €{expected_profit:,.0f}, but it can range between "
+        f"€{round(p10, 0):,.0f} and €{round(p90, 0):,.0f}. "
+        f"Probability of making a loss is {prob_loss * 100:.1f}%."
+    )
 
     if prob_loss > 0.25:
         interpretation = (
-            "There is a meaningful chance of making a loss under variable milk prices "
-            "and costs. Build cash reserves and review fixed costs."
+            "There is a meaningful chance of making a loss if milk prices fall "
+            "or costs rise. Build cash reserves and review fixed costs."
         )
     elif prob_loss > 0.10:
         interpretation = (
-            "Your farm is likely to remain profitable, but winter cash reserves "
-            "may become tight in some scenarios."
+            "Your farm is likely to remain profitable, but keep an eye on "
+            "cash reserves during quieter months."
         )
     else:
         interpretation = (
@@ -61,12 +68,13 @@ def run_monte_carlo(farm: dict, iterations: int = 1000, seed: int = 42) -> dict[
 
     return {
         "iterations": iterations,
-        "expected_profit": round(sum(profits) / n, 0),
+        "expected_profit": expected_profit,
         "expected_revenue": round(sum(revenues) / n, 0),
         "best_case": round(p90, 0),
         "expected_case": round(p50, 0),
         "worst_case": round(p10, 0),
         "confidence_range": [round(p10, 0), round(p90, 0)],
         "probability_of_loss": round(prob_loss, 4),
+        "plain_summary": plain_summary,
         "interpretation": interpretation,
     }
