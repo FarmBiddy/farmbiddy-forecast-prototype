@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=9" />
+  <link rel="stylesheet" href="/assets/styles.css?v=10" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -25,6 +25,7 @@
         <button type="button" class="nav-link" data-view="my-farm">My Farm</button>
         <button type="button" class="nav-link" data-view="daily">Daily Updates</button>
         <button type="button" class="nav-link" data-view="forecasts">Forecasts</button>
+        <button type="button" class="nav-link" data-view="farm-intelligence">Farm Intelligence</button>
         <button type="button" class="nav-link" data-view="scenarios">Scenario Planner</button>
         <button type="button" class="nav-link" data-view="intelligence">Financial Intelligence</button>
         <button type="button" class="nav-link" data-view="reports">Reports</button>
@@ -172,6 +173,29 @@
             <div class="card"><h3>Comparison</h3><div id="sandbox-table"></div></div>
             <div class="card"><h3>Top Recommended Actions</h3><ol id="sandbox-recommendations" class="rec-list"></ol></div>
           </div>
+        </div>
+      </section>
+      <section class="view hidden" id="view-farm-intelligence">
+        <div class="card fi-header-card">
+          <h3>Farm Intelligence</h3>
+          <p class="fi-title">Ask anything about your farm</p>
+          <p class="muted">Get plain-English answers about scenarios, profitability, risk, and farm health — based on your selected sectors.</p>
+        </div>
+        <div class="card fi-chat-card">
+          <div id="fi-chat" class="fi-chat">
+            <div id="fi-empty" class="fi-empty">
+              <p class="muted">Ask a question below or choose a suggested question to get started.</p>
+            </div>
+            <div id="fi-messages" class="fi-messages hidden"></div>
+          </div>
+          <div class="fi-input-row">
+            <input type="text" id="fi-question" class="input-field" placeholder="e.g. What happens if milk price increases by 5c/L?" />
+            <button type="button" id="fi-ask-btn" class="btn-run">Ask</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Suggested questions</h3>
+          <div id="fi-suggestions" class="fi-suggestions"></div>
         </div>
       </section>
       <section class="view hidden" id="view-intelligence">

@@ -668,6 +668,62 @@ async function ensureAdvancedForecast(showMsg = false) {
   await runAdvancedForecast(showMsg);
 }
 
+const FARM_INTELLIGENCE_QUESTIONS = [
+  "What happens if milk price increases by 5c/L?",
+  "What happens if feed costs increase by 10%?",
+  "How healthy is my business?",
+  "What are my key strengths?",
+  "What are my biggest financial risks?",
+  "Where am I losing the most money?",
+  "Which sector is performing best?",
+  "How can I improve profitability?",
+  "Will I need additional funding?",
+  "What will my cashflow look like over the next 12 months?",
+];
+
+function initFarmIntelligencePage() {
+  const box = $("fi-suggestions");
+  if (!box || box.dataset.initialized) return;
+  box.dataset.initialized = "1";
+  box.innerHTML = FARM_INTELLIGENCE_QUESTIONS.map(
+    (q) => `<button type="button" class="fi-suggestion-btn" data-question="${q.replace(/"/g, "&quot;")}">${q}</button>`,
+  ).join("");
+  box.querySelectorAll(".fi-suggestion-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const question = btn.dataset.question || btn.textContent;
+      if ($("fi-question")) $("fi-question").value = question;
+      askFarmIntelligenceStub(question);
+    });
+  });
+}
+
+function askFarmIntelligenceStub(question) {
+  const q = (question || $("fi-question")?.value || "").trim();
+  if (!q) return;
+  if ($("fi-question")) $("fi-question").value = q;
+  $("fi-empty")?.classList.add("hidden");
+  const messages = $("fi-messages");
+  if (!messages) return;
+  messages.classList.remove("hidden");
+  messages.innerHTML = "";
+  const userMsg = document.createElement("div");
+  userMsg.className = "fi-message fi-message-user";
+  userMsg.innerHTML = '<div class="fi-message-label">You</div>';
+  const userBody = document.createElement("div");
+  userBody.className = "fi-message-body";
+  userBody.textContent = q;
+  userMsg.appendChild(userBody);
+  messages.appendChild(userMsg);
+  const advisorMsg = document.createElement("div");
+  advisorMsg.className = "fi-message fi-message-advisor";
+  advisorMsg.innerHTML = '<div class="fi-message-label">Farm Intelligence</div>';
+  const advisorBody = document.createElement("div");
+  advisorBody.className = "fi-message-body muted";
+  advisorBody.textContent = "Backend analysis connects in Phase 4. For now this is a UI preview only.";
+  advisorMsg.appendChild(advisorBody);
+  messages.appendChild(advisorMsg);
+}
+
 async function navigate(view) {
   state.view = view;
   document.querySelectorAll(".nav-link").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
@@ -675,6 +731,7 @@ async function navigate(view) {
   const section = $(`view-${view}`);
   if (section) { section.classList.add("active"); section.classList.remove("hidden"); }
   if (view === "forecasts") await ensureAdvancedForecast();
+  if (view === "farm-intelligence") initFarmIntelligencePage();
   if (view === "intelligence") await loadFinancialIntelligence();
   if (view === "historical") await loadHistoricalData();
   if (view === "reports") {
@@ -925,6 +982,10 @@ function setupNav() {
   $("ask-advisor-btn")?.addEventListener("click", askAdvisor);
   $("advisor-question")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") askAdvisor();
+  });
+  $("fi-ask-btn")?.addEventListener("click", () => askFarmIntelligenceStub());
+  $("fi-question")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") askFarmIntelligenceStub();
   });
   $("preview-report-btn")?.addEventListener("click", previewReport);
   $("generate-report-btn")?.addEventListener("click", generateReport);

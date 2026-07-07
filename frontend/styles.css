@@ -643,6 +643,59 @@ body {
   border: 1px solid rgba(45, 159, 95, 0.2);
   font-size: 0.92rem;
 }
+
+.fi-title { font-size: 1.15rem; font-weight: 600; color: var(--text); margin: 0.35rem 0 0.5rem; }
+.fi-chat-card { display: flex; flex-direction: column; gap: 1rem; }
+.fi-chat {
+  min-height: 220px;
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fafbfc;
+  padding: 1rem;
+}
+.fi-empty { display: flex; align-items: center; justify-content: center; min-height: 180px; text-align: center; }
+.fi-messages { display: flex; flex-direction: column; gap: 1rem; }
+.fi-message { max-width: 92%; }
+.fi-message-user { align-self: flex-end; }
+.fi-message-advisor { align-self: flex-start; }
+.fi-message-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 0.35rem; }
+.fi-message-body {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.fi-message-user .fi-message-body {
+  background: var(--green-dark);
+  color: white;
+  border-bottom-right-radius: 0.2rem;
+}
+.fi-message-advisor .fi-message-body {
+  background: white;
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 0.2rem;
+}
+.fi-input-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.fi-input-row .input-field { flex: 1; min-width: 220px; margin-bottom: 0; }
+.fi-suggestions { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+.fi-suggestion-btn {
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.fi-suggestion-btn:hover {
+  border-color: rgba(45, 159, 95, 0.45);
+  background: var(--green-light);
+}
 .intel-list { padding-left: 1.25rem; font-size: 0.9rem; }
 .intel-list li { margin-bottom: 0.5rem; }
 .intel-text { font-size: 0.92rem; line-height: 1.6; color: var(--text); }
