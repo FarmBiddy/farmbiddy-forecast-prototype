@@ -40,6 +40,12 @@ def detect_intent(question: str) -> str:
     if not q:
         return "general_recommendation"
 
+    if "what should i do next" in q:
+        return "general_recommendation"
+
+    if "explain" in q and "simpler" in q:
+        return "general_recommendation"
+
     if ("cow" in q or "cows" in q or "herd" in q) and any(
         w in q for w in ("add", "increase", "more", "what if", "what happens", "expand")
     ):
@@ -535,14 +541,36 @@ def _format_funding_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
     return summary, key_points[:5], recommendation
 
 
-def _format_general_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
+def _format_general_answer(ctx: dict[str, Any], question: str = "") -> tuple[str, list[str], str]:
     intel = ctx["intel"]
     actions = intel.get("recommended_actions") or []
     weaknesses = intel.get("key_weaknesses") or []
+    question_norm = _normalize_question(question)
+
+    if "explain" in question_norm and "simpler" in question_norm:
+        health = intel["health_score"]
+        forecast = intel["forecast_summary"]
+        summary = (
+            f"In simple terms, your farm scores {health.get('score', '—')}/100 for financial health. "
+            f"You are forecast to make about €{forecast.get('annual_profit', 0):,.0f} profit per year "
+            f"with {forecast.get('risk_level', 'Medium')} overall risk."
+        )
+        key_points = [
+            f"Health: {health.get('label', '—')}.",
+            f"Cashflow: {health.get('cashflow', '—')}.",
+        ]
+        if weaknesses:
+            key_points.append(f"Main pressure: {weaknesses[0]}.")
+        return summary, key_points[:3], _first_recommendation(intel)
+
     summary = intel.get("plain_summary") or _plain_summary(
         ctx["forecast"],
         intel["health_score"],
-        {"farm_name": intel.get("farm_name"), "opening_cash_balance": intel["profile"].get("opening_cash_balance", 0), "loan_repayments": intel["profile"].get("loan_repayments", 0)},
+        {
+            "farm_name": intel.get("farm_name"),
+            "opening_cash_balance": intel["profile"].get("opening_cash_balance", 0),
+            "loan_repayments": intel["profile"].get("loan_repayments", 0),
+        },
     )
     if weaknesses and weaknesses[0].lower() not in summary.lower():
         summary += f" The main pressure area is {weaknesses[0]}."
@@ -1103,7 +1131,7 @@ def _handle_general_recommendation(
 ) -> dict[str, Any]:
     ctx = _load_advisor_context(farm_file, selected)
     intel = ctx["intel"]
-    summary, key_points, recommendation = _format_general_answer(ctx)
+    summary, key_points, recommendation = _format_general_answer(ctx, question)
     return _base_response(
         question,
         intent,

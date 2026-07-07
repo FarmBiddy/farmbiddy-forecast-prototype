@@ -178,7 +178,30 @@ def test_cashflow_forecast_includes_monthly_insights():
     )
 
 
+def test_follow_up_intents():
+    assert detect_intent("What should I do next?") == "general_recommendation"
+    assert detect_intent("Explain in simpler terms: How healthy is my business?") == "general_recommendation"
+
+
+def test_explain_simpler_terms_answer():
+    result = ask_farm_intelligence(
+        "Explain in simpler terms: How healthy is my business?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    assert result["intent"] == "general_recommendation"
+    assert "simple terms" in result["summary"].lower()
+    assert len(result["key_points"]) <= 3
+
+
 def test_profitability_losing_money_mentions_weakest_sector():
+    result = ask_farm_intelligence(
+        "Where am I losing the most money?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    assert result["intent"] == "profitability"
+    assert "weakest" in result["summary"].lower() or "losing" in result["summary"].lower()
     result = ask_farm_intelligence(
         "Where am I losing the most money?",
         farm_file="multi_sector_farm.json",

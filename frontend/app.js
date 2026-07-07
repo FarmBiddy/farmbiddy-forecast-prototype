@@ -682,11 +682,80 @@ const FARM_INTELLIGENCE_QUESTIONS = [
 ];
 
 let fiBusy = false;
+let fiHistory = [];
+let fiLastQuestion = "";
+let fiLastResponse = null;
 
 const FI_SECTOR_LABELS = { dairy: "Dairy", beef: "Beef", lamb: "Lamb" };
 
 function fiSectorLabel(sectorId) {
   return FI_SECTOR_LABELS[sectorId] || sectorId.charAt(0).toUpperCase() + sectorId.slice(1);
+}
+
+function buildFiFollowUps(data, lastQuestion) {
+  const intent = data?.intent || "";
+  const followUps = [];
+
+  if (intent === "scenario_milk_price") {
+    followUps.push("What if milk price increases by 3c/L?");
+    followUps.push("What if milk price falls by 5c/L?");
+  } else if (intent === "scenario_feed_cost") {
+    followUps.push("What if feed costs increase by 5%?");
+    followUps.push("What if feed costs increase by 15%?");
+  } else if (intent === "scenario_labour_cost") {
+    followUps.push("What if labour costs increase by 5%?");
+  } else if (intent === "scenario_herd_size") {
+    followUps.push("What if I add 25 cows?");
+  } else if (intent === "health_score") {
+    followUps.push("What are my biggest financial risks?");
+    followUps.push("What will my cashflow look like over the next 12 months?");
+  } else if (intent === "risks") {
+    followUps.push("How can I improve profitability?");
+  } else if (intent === "profitability") {
+    followUps.push("Which sector is performing best?");
+  } else if (intent === "cashflow_forecast") {
+    followUps.push("Will I need additional funding?");
+  }
+
+  if (lastQuestion) {
+    followUps.push(`Explain in simpler terms: ${lastQuestion}`);
+  }
+  followUps.push("What should I do next?");
+
+  return [...new Set(followUps)].slice(0, 4);
+}
+
+function appendFiFollowUps(body, followUps) {
+  if (!followUps.length) return;
+  const row = document.createElement("div");
+  row.className = "fi-followups";
+  followUps.forEach((question) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fi-followup-btn";
+    btn.title = question;
+    btn.textContent = question.length > 52 ? `${question.slice(0, 49)}…` : question;
+    btn.addEventListener("click", () => {
+      if ($("fi-question")) $("fi-question").value = question;
+      askFarmIntelligence(question);
+    });
+    row.appendChild(btn);
+  });
+  body.appendChild(row);
+}
+
+function clearFiChat(showNotice = false) {
+  fiHistory = [];
+  fiLastQuestion = "";
+  fiLastResponse = null;
+  const messages = $("fi-messages");
+  if (messages) {
+    messages.innerHTML = "";
+    messages.classList.add("hidden");
+  }
+  $("fi-empty")?.classList.remove("hidden");
+  if ($("fi-question")) $("fi-question").value = "";
+  if (showNotice) showStatus("Chat cleared — selected sectors changed.", "info");
 }
 
 function formatFiSectorCallout(data) {
@@ -800,6 +869,11 @@ function renderFiAdvisorAnswer(data) {
   body.appendChild(summary);
 
   if (data.key_points?.length) {
+    const details = document.createElement("details");
+    details.className = "fi-details";
+    const summaryToggle = document.createElement("summary");
+    summaryToggle.textContent = `Show ${data.key_points.length} key point${data.key_points.length === 1 ? "" : "s"}`;
+    details.appendChild(summaryToggle);
     const list = document.createElement("ul");
     list.className = "fi-key-points";
     data.key_points.slice(0, 5).forEach((point) => {
@@ -807,7 +881,8 @@ function renderFiAdvisorAnswer(data) {
       item.textContent = point;
       list.appendChild(item);
     });
-    body.appendChild(list);
+    details.appendChild(list);
+    body.appendChild(details);
   }
 
   const metricItems = formatFiMetrics(data.metrics);
@@ -829,6 +904,8 @@ function renderFiAdvisorAnswer(data) {
     rec.textContent = `Recommendation: ${data.recommendation}`;
     body.appendChild(rec);
   }
+
+  appendFiFollowUps(body, buildFiFollowUps(data, fiLastQuestion));
 
   wrap.appendChild(body);
   messages.appendChild(wrap);
@@ -853,8 +930,10 @@ function renderFiAdvisorError(message) {
 function setFiBusy(busy) {
   fiBusy = busy;
   const askBtn = $("fi-ask-btn");
+  const clearBtn = $("fi-clear-btn");
   if (askBtn) askBtn.disabled = busy;
-  document.querySelectorAll(".fi-suggestion-btn").forEach((btn) => {
+  if (clearBtn) clearBtn.disabled = busy;
+  document.querySelectorAll(".fi-suggestion-btn, .fi-followup-btn").forEach((btn) => {
     btn.disabled = busy;
   });
 }
@@ -865,6 +944,7 @@ async function askFarmIntelligence(question) {
 
   setFiBusy(true);
   if ($("fi-question")) $("fi-question").value = q;
+  fiLastQuestion = q;
   appendFiUserMessage(q);
   appendFiLoadingMessage();
 
@@ -875,9 +955,12 @@ async function askFarmIntelligence(question) {
       body: sectorsBody({ question: q }),
     });
     removeFiLoadingMessage();
+    fiLastResponse = data;
+    fiHistory.push({ question: q, response: data });
     renderFiAdvisorAnswer(data);
   } catch (err) {
     removeFiLoadingMessage();
+    fiHistory.push({ question: q, error: err.message });
     renderFiAdvisorError(err.message);
     showStatus(err.message, "error");
   } finally {
@@ -1076,6 +1159,7 @@ async function onSectorChange(changedInput) {
   try {
     await refreshFarmData();
     if (state.view === "intelligence") await loadFinancialIntelligence();
+    if (state.view === "farm-intelligence") clearFiChat(true);
     if (state.view === "forecasts") await ensureAdvancedForecast();
     if (state.view === "historical") await loadHistoricalData();
     if (state.view === "reports") $("report-preview")?.classList.add("hidden");
@@ -1161,6 +1245,7 @@ function setupNav() {
     if (e.key === "Enter") askAdvisor();
   });
   $("fi-ask-btn")?.addEventListener("click", () => askFarmIntelligence());
+  $("fi-clear-btn")?.addEventListener("click", () => clearFiChat());
   $("fi-question")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") askFarmIntelligence();
   });

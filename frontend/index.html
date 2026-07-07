@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=11" />
+  <link rel="stylesheet" href="/assets/styles.css?v=13" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -22,16 +22,14 @@
 
       <nav class="sidebar-nav">
         <button type="button" class="nav-link active" data-view="dashboard">Dashboard</button>
-        <button type="button" class="nav-link" data-view="my-farm">My Farm</button>
-        <button type="button" class="nav-link" data-view="daily">Daily Updates</button>
-        <button type="button" class="nav-link" data-view="forecasts">Forecasts</button>
         <button type="button" class="nav-link" data-view="farm-intelligence">Farm Intelligence</button>
-        <button type="button" class="nav-link" data-view="scenarios">Scenario Planner</button>
-        <button type="button" class="nav-link" data-view="intelligence">Financial Intelligence</button>
+        <button type="button" class="nav-link" data-view="forecasts">Forecasts</button>
         <button type="button" class="nav-link" data-view="reports">Reports</button>
         <button type="button" class="nav-link" data-view="historical">Historical Data</button>
-        <button type="button" class="nav-link" data-view="alerts">Alerts</button>
-        <button type="button" class="nav-link" data-view="settings">Settings</button>
+        <button type="button" class="nav-link nav-link-secondary" data-view="my-farm">My Farm</button>
+        <button type="button" class="nav-link nav-link-secondary" data-view="daily">Daily Updates</button>
+        <button type="button" class="nav-link nav-link-secondary" data-view="alerts">Alerts</button>
+        <button type="button" class="nav-link nav-link-secondary" data-view="settings">Settings</button>
       </nav>
 
       <div class="sidebar-farm" id="sidebar-farm">
@@ -190,6 +188,7 @@
           </div>
           <div class="fi-input-row">
             <input type="text" id="fi-question" class="input-field" placeholder="e.g. What happens if milk price increases by 5c/L?" />
+            <button type="button" id="fi-clear-btn" class="btn-secondary">Clear chat</button>
             <button type="button" id="fi-ask-btn" class="btn-run">Ask</button>
           </div>
         </div>
