@@ -432,6 +432,8 @@ class FarmerAdvisorResponse(BaseModel):
     intent: str
     affected_sectors: List[str] = Field(default_factory=list)
     unaffected_sectors: List[str] = Field(default_factory=list)
+    selected_sectors: List[str] = Field(default_factory=list)
+    scope_summary: str = ""
     sector_impact: Dict[str, Any] = Field(default_factory=dict)
     overall_impact: Dict[str, Any] = Field(default_factory=dict)
     summary: str = ""

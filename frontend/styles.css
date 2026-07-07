@@ -689,6 +689,10 @@ body {
 }
 .fi-input-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .fi-input-row .input-field { flex: 1; min-width: 220px; margin-bottom: 0; }
+#fi-question::placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
 .fi-suggestions { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
 .fi-suggestion-btn {
   text-align: left;

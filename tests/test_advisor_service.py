@@ -19,6 +19,8 @@ REQUIRED_RESPONSE_KEYS = {
     "intent",
     "affected_sectors",
     "unaffected_sectors",
+    "selected_sectors",
+    "scope_summary",
     "sector_impact",
     "overall_impact",
     "summary",
@@ -194,14 +196,51 @@ def test_explain_simpler_terms_answer():
     assert len(result["key_points"]) <= 3
 
 
-def test_profitability_losing_money_mentions_weakest_sector():
+def test_milk_price_scope_summary():
     result = ask_farm_intelligence(
-        "Where am I losing the most money?",
+        "What happens if milk price increases by 5c/L?",
         farm_file="multi_sector_farm.json",
         sectors=["dairy", "beef", "lamb"],
     )
-    assert result["intent"] == "profitability"
-    assert "weakest" in result["summary"].lower() or "losing" in result["summary"].lower()
+    assert result["selected_sectors"] == ["dairy", "beef", "lamb"]
+    scope = result["scope_summary"].lower()
+    assert "direct impact" in scope
+    assert "dairy" in scope
+    assert "beef" in scope or "lamb" in scope
+
+
+def test_health_score_scope_summary():
+    result = ask_farm_intelligence(
+        "How healthy is my business?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    assert result["selected_sectors"] == ["dairy", "beef", "lamb"]
+    assert "whole farm" in result["scope_summary"].lower()
+
+
+def test_funding_scope_summary():
+    result = ask_farm_intelligence(
+        "Will I need additional funding?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef", "lamb"],
+    )
+    assert "whole farm" in result["scope_summary"].lower()
+
+
+def test_partial_sector_scope_summary():
+    result = ask_farm_intelligence(
+        "How healthy is my business?",
+        farm_file="multi_sector_farm.json",
+        sectors=["dairy", "beef"],
+    )
+    assert result["selected_sectors"] == ["dairy", "beef"]
+    assert "selected sectors" in result["scope_summary"].lower()
+    assert "dairy" in result["scope_summary"].lower()
+    assert "beef" in result["scope_summary"].lower()
+
+
+def test_profitability_losing_money_mentions_weakest_sector():
     result = ask_farm_intelligence(
         "Where am I losing the most money?",
         farm_file="multi_sector_farm.json",

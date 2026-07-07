@@ -19,6 +19,7 @@ from services.financial_intelligence_service import (
     _plain_summary,
     get_financial_intelligence,
 )
+from models.multi_sector_farm import VALID_SECTORS
 from services.multi_sector_farm import load_farm_for_analysis
 from services.scenario_sandbox_service import run_scenario_sandbox
 
@@ -173,11 +174,60 @@ def _unaffected_note(affected: list[str], unaffected: list[str]) -> str:
     return f"{names} {'is' if len(unaffected) == 1 else 'are'} not directly affected by this change."
 
 
+def _selected_sector_names(selected: list[str]) -> str:
+    labels = [_sector_label(sector) for sector in selected]
+    if len(labels) <= 1:
+        return labels[0] if labels else "your selected sectors"
+    if len(labels) == 2:
+        return f"{labels[0]} and {labels[1]}"
+    return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+
+def _is_whole_farm_selection(selected: list[str]) -> bool:
+    return set(selected) == set(VALID_SECTORS)
+
+
+def _build_scope_summary(
+    intent: str,
+    affected: list[str],
+    unaffected: list[str],
+    selected: list[str],
+) -> str:
+    selected_names = _selected_sector_names(selected)
+
+    if intent == "funding_need":
+        return "Scope: whole farm."
+
+    if intent in ("scenario_milk_price", "scenario_herd_size"):
+        if not affected:
+            return "Scope: dairy only — dairy is not in your current sector selection."
+        parts = [f"Direct impact: {_selected_sector_names(affected)}."]
+        if unaffected:
+            parts.append(f"No direct impact on {_selected_sector_names(unaffected)}.")
+        if _is_whole_farm_selection(selected):
+            parts.append("Whole-farm totals include all sectors.")
+        else:
+            parts.append(f"Totals based on selected sectors: {selected_names}.")
+        return " ".join(parts)
+
+    if intent in ("scenario_feed_cost", "scenario_labour_cost"):
+        scenario_label = "Feed costs" if intent == "scenario_feed_cost" else "Labour costs"
+        if _is_whole_farm_selection(selected):
+            return f"Scope: whole farm ({selected_names}). {scenario_label} apply to all selected sectors."
+        return f"Scope: selected sectors — {selected_names}. {scenario_label} apply to all selected sectors."
+
+    if _is_whole_farm_selection(selected):
+        return f"Scope: whole farm ({selected_names})."
+
+    return f"Scope: selected sectors — {selected_names}."
+
+
 def _base_response(
     question: str,
     intent: str,
     affected: list[str],
     unaffected: list[str],
+    selected: list[str],
     *,
     summary: str,
     key_points: list[str],
@@ -192,6 +242,8 @@ def _base_response(
         "intent": intent,
         "affected_sectors": affected,
         "unaffected_sectors": unaffected,
+        "selected_sectors": selected,
+        "scope_summary": _build_scope_summary(intent, affected, unaffected, selected),
         "sector_impact": sector_impact if sector_impact is not None else _sector_impact_for(affected),
         "overall_impact": overall_impact if overall_impact is not None else _empty_overall_impact(),
         "summary": summary,
@@ -254,11 +306,11 @@ def _first_recommendation(intel: dict[str, Any]) -> str:
 
 
 def _sector_scope_label(selected: list[str]) -> str:
-    if len(selected) == 3:
+    if _is_whole_farm_selection(selected):
         return "your whole farm"
     if len(selected) == 1:
         return f"{_sector_label(selected[0])} only"
-    return " and ".join(_sector_label(s) for s in selected)
+    return _selected_sector_names(selected)
 
 
 def _format_health_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
@@ -718,6 +770,7 @@ def _handle_scenario(
             intent,
             [],
             selected,
+            selected,
             summary=(
                 "This scenario only applies to the dairy sector, and dairy is not "
                 "in your current sector selection."
@@ -736,6 +789,7 @@ def _handle_scenario(
             intent,
             affected,
             unaffected,
+            selected,
             summary="I could not read the scenario details from your question.",
             key_points=[
                 "Try including a number, for example: 'add 50 cows' or 'feed costs increase by 10%'.",
@@ -859,6 +913,7 @@ def _handle_scenario(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points[:5],
         recommendation=recommendation,
@@ -937,6 +992,7 @@ def _handle_health_score(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points,
         recommendation=recommendation,
@@ -965,6 +1021,7 @@ def _handle_strengths(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points,
         recommendation=recommendation,
@@ -987,6 +1044,7 @@ def _handle_risks(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points,
         recommendation=recommendation,
@@ -1012,6 +1070,7 @@ def _handle_profitability(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points[:5],
         recommendation=recommendation,
@@ -1040,6 +1099,7 @@ def _handle_sector_comparison(
             intent,
             affected,
             unaffected,
+            selected,
             summary="No sector performance data is available for your current selection.",
             key_points=["Check that at least one sector is selected."],
             recommendation="Select the sectors you want to compare in the header.",
@@ -1053,6 +1113,7 @@ def _handle_sector_comparison(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points,
         recommendation=recommendation,
@@ -1081,6 +1142,7 @@ def _handle_cashflow_forecast(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points,
         recommendation=recommendation,
@@ -1110,6 +1172,7 @@ def _handle_funding_need(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points,
         recommendation=recommendation,
@@ -1137,6 +1200,7 @@ def _handle_general_recommendation(
         intent,
         affected,
         unaffected,
+        selected,
         summary=summary,
         key_points=key_points,
         recommendation=recommendation,

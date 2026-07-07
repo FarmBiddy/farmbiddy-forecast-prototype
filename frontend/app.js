@@ -736,7 +736,6 @@ function appendFiFollowUps(body, followUps) {
     btn.title = question;
     btn.textContent = question.length > 52 ? `${question.slice(0, 49)}…` : question;
     btn.addEventListener("click", () => {
-      if ($("fi-question")) $("fi-question").value = question;
       askFarmIntelligence(question);
     });
     row.appendChild(btn);
@@ -759,6 +758,10 @@ function clearFiChat(showNotice = false) {
 }
 
 function formatFiSectorCallout(data) {
+  if (data.scope_summary) {
+    return data.scope_summary;
+  }
+
   const intent = data.intent || "";
   const affected = data.affected_sectors || [];
   const unaffected = data.unaffected_sectors || [];
@@ -943,7 +946,7 @@ async function askFarmIntelligence(question) {
   if (!q || fiBusy) return;
 
   setFiBusy(true);
-  if ($("fi-question")) $("fi-question").value = q;
+  if ($("fi-question")) $("fi-question").value = "";
   fiLastQuestion = q;
   appendFiUserMessage(q);
   appendFiLoadingMessage();
@@ -978,7 +981,6 @@ function initFarmIntelligencePage() {
   box.querySelectorAll(".fi-suggestion-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const question = btn.dataset.question || btn.textContent;
-      if ($("fi-question")) $("fi-question").value = question;
       askFarmIntelligence(question);
     });
   });
