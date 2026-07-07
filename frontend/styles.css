@@ -658,6 +658,26 @@ body {
   color: var(--green-dark);
 }
 
+#monte-carlo-panel .profit-outlook-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+#monte-carlo-panel .profit-outlook-list li {
+  margin-bottom: 0.35rem;
+}
+
+#monte-carlo-panel .profit-outlook-list li:last-child {
+  margin-bottom: 0;
+}
+
+#monte-carlo-panel .profit-outlook-tip {
+  margin: 0.85rem 0 0;
+}
+
 .panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 
 .data-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }

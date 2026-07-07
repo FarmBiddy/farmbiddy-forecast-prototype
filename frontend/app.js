@@ -449,14 +449,13 @@ function renderMonteCarlo(monte) {
   const low = Number(monte.worst_case ?? monte.confidence_range?.[0] ?? 0);
   const high = Number(monte.best_case ?? monte.confidence_range?.[1] ?? 0);
   const lossPct = ((monte.probability_of_loss || 0) * 100).toFixed(1);
-  const summary = monte.plain_summary || (
-    `Expected profit is €${expected.toLocaleString()}, but it can range between `
-    + `€${low.toLocaleString()} and €${high.toLocaleString()}. `
-    + `Probability of making a loss is ${lossPct}%.`
-  );
   box.innerHTML = `
-    <p class="interpretation-box" style="margin:0">${summary}</p>
-    ${monte.interpretation ? `<p class="muted" style="margin-top:0.75rem">${monte.interpretation}</p>` : ""}`;
+    <ul class="profit-outlook-list">
+      <li>Expected profit is €${expected.toLocaleString()}</li>
+      <li>It can range between €${low.toLocaleString()} and €${high.toLocaleString()}</li>
+      <li>Probability of making a loss is ${lossPct}%.</li>
+    </ul>
+    ${monte.interpretation ? `<p class="muted profit-outlook-tip">${monte.interpretation}</p>` : ""}`;
 }
 
 function countActionableAlerts(alerts) {
