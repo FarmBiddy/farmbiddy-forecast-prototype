@@ -37,6 +37,8 @@ from models.api_models import (
     FinancialIntelligenceResponse,
     AskAdvisorRequest,
     AskAdvisorResponse,
+    FarmerAdvisorRequest,
+    FarmerAdvisorResponse,
     FarmerReportRequest,
     FarmerReportResponse,
     FarmerReportPreviewResponse,
@@ -46,6 +48,7 @@ from models.api_models import (
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
 from services.financial_intelligence_service import ask_farm_advisor, get_financial_intelligence
+from services.advisor_service import ask_farm_intelligence
 from services.report_service import generate_farmer_report, get_report_preview
 from services.farmer_dashboard_service import (
     get_farmer_dashboard_preview,
@@ -277,6 +280,25 @@ def farmer_ask_advisor(request: AskAdvisorRequest):
         ))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/advisor",
+    response_model=FarmerAdvisorResponse,
+    tags=["Farmer Edition"],
+    summary="Farm Intelligence — rule-based advisor with sector-aware routing",
+)
+def farmer_advisor(request: FarmerAdvisorRequest):
+    try:
+        return FarmerAdvisorResponse(**ask_farm_intelligence(
+            request.question,
+            request.farm_file,
+            sectors=request.sectors,
+        ))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.get(

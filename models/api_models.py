@@ -420,6 +420,26 @@ class AskAdvisorResponse(BaseModel):
     details: List[str] = Field(default_factory=list)
 
 
+class FarmerAdvisorRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    farm_file: Optional[str] = None
+    sectors: Optional[List[str]] = None
+
+
+class FarmerAdvisorResponse(BaseModel):
+    success: bool = True
+    question: str
+    intent: str
+    affected_sectors: List[str] = Field(default_factory=list)
+    unaffected_sectors: List[str] = Field(default_factory=list)
+    sector_impact: Dict[str, Any] = Field(default_factory=dict)
+    overall_impact: Dict[str, Any] = Field(default_factory=dict)
+    summary: str = ""
+    key_points: List[str] = Field(default_factory=list)
+    recommendation: str = ""
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+
+
 class FarmerReportRequest(BaseModel):
     farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
     sectors: Optional[List[str]] = Field(default=None, description="Sectors to include: dairy, beef, lamb")
