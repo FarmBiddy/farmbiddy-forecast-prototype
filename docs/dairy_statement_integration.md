@@ -225,7 +225,49 @@ not required for the current mock flow to run.
 dairy-statement integration makes a real HTTP request, reads a real credential,
 or talks to any external service. The only working provider is the mock.
 
-## 10. Current limitations
+## 10. Application service
+
+`services/dairy_statement_service.py` provides `process_dairy_statement(...)`, the
+single, stable internal entry point that orchestrates the full flow end to end:
+provider selection (`get_dairy_statement_provider`) → statement retrieval
+(`provider.get_milk_statement`) → the adapter
+(`adapt_dairy_statement_to_monthly_entry`). It is the intended call site for a
+future API route, document-management integration, background ingestion process,
+or internal financial-analysis workflow — none of which exist yet. It performs no
+persistence and no network call itself, and (like every other part of this
+integration) it never imports or instantiates `HttpDairyStatementProvider`.
+
+**Inputs:** `provider_id`, `supplier_no`, `invoice_id`, `month_no`, `year` — the
+same five values `DairyStatementProvider.get_milk_statement` already takes.
+
+**Result:** a frozen `ProcessedDairyStatement` dataclass with two fields —
+`statement` (the untouched, validated `DairyStatementResponse`) and
+`monthly_entry` (the adapter's own dict output, unchanged). No second
+monthly-entry schema is defined; no value is recalculated between retrieval and
+return.
+
+**Testability:** an optional keyword-only `provider_factory` parameter (defaulting
+to `get_dairy_statement_provider`) lets tests substitute a fake provider without
+a dependency-injection framework — a plain default argument is enough.
+
+Example internal usage:
+
+```python
+from services.dairy_statement_service import process_dairy_statement
+
+result = process_dairy_statement(
+    provider_id="STRATHROY",
+    supplier_no="152",
+    invoice_id="66518",
+    month_no=2,
+    year=2026,
+)
+
+result.statement       # validated DairyStatementResponse
+result.monthly_entry   # adapter's monthly-entry dict
+```
+
+## 11. Current limitations
 
 - Only `STRATHROY` is mocked. Any other `provider_id` raises
   `UnsupportedDairyProviderError`.
