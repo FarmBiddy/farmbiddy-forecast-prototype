@@ -168,9 +168,10 @@ calculation cannot reproduce. Because of this:
 with one method, `get_milk_statement(...)`, that returns a `DairyStatementResponse`.
 `MockDairyStatementProvider` is one implementation of that protocol.
 
-A future real implementation — for example, a class named `HttpDairyStatementProvider`
-that calls a real document-management service — only needs to implement the same
-method signature and return the same validated `DairyStatementResponse`. It can
+A future real implementation — such as `HttpDairyStatementProvider`
+(`services/http_dairy_statement_provider.py`), which calls a real
+document-management service — only needs to implement the same method
+signature and return the same validated `DairyStatementResponse`. It can
 replace `MockDairyStatementProvider` directly:
 
 - `services/dairy_statement_adapter.py` never imports or references
@@ -179,14 +180,58 @@ replace `MockDairyStatementProvider` directly:
 - The financial engine (`forecast_engine/`, `services/multi_sector_farm.py`) never
   imports anything from the dairy-statement integration at all.
 
-Swapping the provider is therefore a one-file change (introduce the new provider
-class, wire it in wherever the mock is currently instantiated) with no changes
-required to the adapter or the financial engine.
+Swapping the provider is therefore a one-file change (implement the new provider
+class, register it in the factory below) with no changes required to the adapter
+or the financial engine.
 
-## 9. Current limitations
+## 9. Provider selection
+
+`services/dairy_statement_provider_factory.py` provides
+`get_dairy_statement_provider(provider_id)`, the single place that decides which
+concrete provider implementation to construct for a given `provider_id`. Callers
+are expected to use this factory rather than importing a concrete provider class
+directly, so a provider ID can be re-pointed to a different implementation with a
+one-line change in the factory's routing table — no caller needs to change.
+
+**Current mock mode.** Today, every registered provider ID resolves to
+`MockDairyStatementProvider`. The factory's routing table is built directly from
+that class's own `SUPPORTED_PROVIDER_NAMES`, so there is exactly one place
+(`services/mock_dairy_statement_provider.py`) that lists which provider IDs are
+known. Provider-ID matching in the factory is exact and case-sensitive after
+stripping surrounding whitespace — `"STRATHROY"` resolves to the mock
+implementation, `"strathroy"` does not — intentionally matching the strict,
+case-sensitive `provider_id` validation performed inside `get_milk_statement`
+itself, so a provider ID is either valid at both stages or rejected at both,
+never accepted at one and rejected at the other.
+
+**Future HTTP provider replacement point.** `services/http_dairy_statement_provider.py`
+defines `HttpDairyStatementProvider`, a non-functional skeleton implementing the
+same protocol. It accepts an `HttpDairyStatementProviderConfig` (`base_url`,
+`api_key`, both blank/`None` by default — no real URL or credential is embedded
+anywhere in this repository) and documents the intended future request/response
+flow in its docstring. Calling `get_milk_statement` on it always raises
+`DairyStatementProviderNotConfiguredError` — it makes no network call and imports
+no HTTP client library. It is not registered in the factory; wiring it in for a
+real provider ID is a deliberate future step, not something that happens
+automatically.
+
+**Required future configuration.** `.env.example` documents three placeholder
+variables — `DAIRY_STATEMENT_PROVIDER_MODE`, `DAIRY_STATEMENT_API_BASE_URL`,
+`DAIRY_STATEMENT_API_KEY` — for whenever a real provider is wired in. **No code
+in this repository currently reads any of them.** They are commented out and are
+not required for the current mock flow to run.
+
+**No external integration is active.** As of this phase, nothing in the
+dairy-statement integration makes a real HTTP request, reads a real credential,
+or talks to any external service. The only working provider is the mock.
+
+## 10. Current limitations
 
 - Only `STRATHROY` is mocked. Any other `provider_id` raises
   `UnsupportedDairyProviderError`.
+- `HttpDairyStatementProvider` exists only as a non-functional skeleton — calling
+  it always raises `DairyStatementProviderNotConfiguredError`. It is not wired
+  into the provider factory.
 - All returned statement values are static sample data from the reference document
   — the mock does not vary its output based on input beyond `provider_id`,
   `supplier_no`, `invoice_id`, `month_no`, and `year`.

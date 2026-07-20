@@ -34,7 +34,11 @@ from services.dairy_statement_provider import UnsupportedDairyProviderError
 # differently-cased provider_id is treated as unsupported rather than
 # silently coerced, since real provider IDs are expected to be fixed,
 # known values (e.g. from a future provider registry), not free text.
-_SUPPORTED_PROVIDER_NAMES = {
+#
+# Public (not underscore-prefixed) so services/dairy_statement_provider_factory.py
+# can build its routing table from this single source of truth instead of
+# redeclaring "STRATHROY" a second time.
+SUPPORTED_PROVIDER_NAMES = {
     "STRATHROY": "Strathroy Dairy",
 }
 
@@ -70,17 +74,17 @@ class MockDairyStatementProvider:
             year=year,
         )
 
-        if request.provider_id not in _SUPPORTED_PROVIDER_NAMES:
+        if request.provider_id not in SUPPORTED_PROVIDER_NAMES:
             raise UnsupportedDairyProviderError(
                 f"Unsupported dairy provider_id: {request.provider_id!r}. "
-                f"Supported providers: {sorted(_SUPPORTED_PROVIDER_NAMES)}"
+                f"Supported providers: {sorted(SUPPORTED_PROVIDER_NAMES)}"
             )
 
         return DairyStatementResponse(
             success=True,
             provider=DairyProviderInfo(
                 id=request.provider_id,
-                name=_SUPPORTED_PROVIDER_NAMES[request.provider_id],
+                name=SUPPORTED_PROVIDER_NAMES[request.provider_id],
             ),
             statement=DairyStatementInfo(
                 statement_id=request.invoice_id,
