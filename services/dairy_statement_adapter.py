@@ -127,7 +127,12 @@ def adapt_dairy_statement_to_monthly_entry(
             "milk_litres": float(statement.collections.total_litres),
         },
         "pricing": {
-            "milk_price_per_litre": round(float(milk_price_per_litre), 4),
+            # Rounded to 6 decimal places, not 4: a pence-per-litre value
+            # with up to 4 decimal places (e.g. 37.419) needs up to 6
+            # decimal places once divided by 100 to be preserved losslessly
+            # (37.419 / 100 = 0.37419, which 4-decimal rounding would
+            # silently truncate to 0.3742).
+            "milk_price_per_litre": round(float(milk_price_per_litre), 6),
         },
         "revenue": {
             "milk": round(milk_revenue, 2),
