@@ -225,7 +225,7 @@ class DairyStatementResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Request contract (mirrors Norma's get_milk_statement signature)
+# Request contract (mirrors the reference document's get_milk_statement signature)
 # ---------------------------------------------------------------------------
 
 class DairyStatementRequest(BaseModel):
