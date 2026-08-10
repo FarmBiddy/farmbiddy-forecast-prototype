@@ -9,8 +9,10 @@ introduced (`combined_cashflow` in services/multi_sector_farm.py), so
 
 from __future__ import annotations
 
-from models.multi_sector_farm import compute_household_month
+from forecast_engine.cashflow_classifier import classify_cashflow_entries
+from models.multi_sector_farm import build_debt_register, compute_household_month
 from services.dashboard_summary import get_selected_sector_data, get_sector_monthly_history
+from services.multi_sector_farm import aggregate_sector_financials
 
 DEFICIT = "deficit"
 SURPLUS = "surplus"
@@ -160,8 +162,26 @@ def compare_budget_vs_actual(
         entries.append(_compare_entry(actual, budget))
 
     entries.sort(key=lambda e: (e["year"], e["month"]))
+
+    aggregated = aggregate_sector_financials(filtered)
+    revenue_totals = aggregated.get("revenue_totals") or {}
+    cost_totals = aggregated.get("cost_totals") or {}
+    annual_revenue = float(revenue_totals.get("total") or 0)
+    annual_costs = sum(float(v) for v in cost_totals.values())
+    profit_margin = ((annual_revenue - annual_costs) / annual_revenue * 100) if annual_revenue else None
+    debt_register = build_debt_register(farm_summary.get("loans") or [])
+
+    entries = classify_cashflow_entries(
+        entries,
+        debt_register=debt_register,
+        annual_revenue=annual_revenue,
+        profit_margin=profit_margin,
+    )
+
     deficit_months = sum(1 for e in entries if e["cashflow_status"] == DEFICIT)
     behind_budget_months = sum(1 for e in entries if e["budget_status"] == BEHIND)
+    long_term_deficit_months = sum(1 for e in entries if e.get("classification") == "long_term")
+    short_term_deficit_months = sum(1 for e in entries if e.get("classification") == "short_term")
 
     return {
         "success": True,
@@ -170,4 +190,6 @@ def compare_budget_vs_actual(
         "entries": entries,
         "deficit_months": deficit_months,
         "behind_budget_months": behind_budget_months,
+        "long_term_deficit_months": long_term_deficit_months,
+        "short_term_deficit_months": short_term_deficit_months,
     }

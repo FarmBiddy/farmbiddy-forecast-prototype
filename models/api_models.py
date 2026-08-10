@@ -509,4 +509,6 @@ class CashFlowBudgetResponse(BaseModel):
     entries: List[Dict[str, Any]] = Field(default_factory=list)
     deficit_months: int = 0
     behind_budget_months: int = 0
+    long_term_deficit_months: int = 0
+    short_term_deficit_months: int = 0
 

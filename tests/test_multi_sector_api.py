@@ -73,6 +73,10 @@ def test_cashflow_budget_endpoint():
     assert len(data["entries"]) == 24
     assert "deficit_months" in data
     assert "behind_budget_months" in data
+    assert "long_term_deficit_months" in data
+    assert "short_term_deficit_months" in data
     for entry in data["entries"]:
         assert entry["cashflow_status"] in ("deficit", "surplus", "breakeven")
         assert entry["budget_status"] in ("ahead", "behind", "on_budget")
+        assert "classification" in entry
+        assert "classification_reason" in entry

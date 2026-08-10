@@ -53,10 +53,22 @@ def test_compare_budget_vs_actual_counts_and_shape():
         "period", "actual_cash_in", "actual_cash_out", "actual_net",
         "budgeted_cash_in", "budgeted_cash_out", "budgeted_net",
         "variance", "cashflow_status", "budget_status", "cause_summary",
+        "classification", "classification_reason",
     ):
         assert key in entry
     assert entry["cashflow_status"] in (DEFICIT, SURPLUS, BREAKEVEN)
     assert entry["budget_status"] in (AHEAD, BEHIND, ON_BUDGET)
+
+
+def test_compare_budget_vs_actual_classifies_deficit_months():
+    result = compare_budget_vs_actual("multi_sector_farm.json", ["dairy", "beef", "lamb"])
+    assert result["deficit_months"] == result["long_term_deficit_months"] + result["short_term_deficit_months"]
+    for entry in result["entries"]:
+        if entry["cashflow_status"] == DEFICIT:
+            assert entry["classification"] in ("short_term", "long_term")
+            assert entry["classification_reason"]
+        else:
+            assert entry["classification"] is None
 
 
 def test_compare_budget_vs_actual_beef_only_still_returns_entries():
