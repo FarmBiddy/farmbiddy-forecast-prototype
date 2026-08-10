@@ -1355,6 +1355,91 @@ async function runSandbox() {
   }
 }
 
+function renderCashflowActionsResults(data) {
+  const summary = $("cashflow-actions-summary");
+  if (summary) {
+    summary.classList.remove("hidden");
+    summary.textContent = `Current lowest cash balance: €${Number(data.base_lowest_balance || 0).toLocaleString()} `
+      + `(${data.base_deficit_months || 0} month${data.base_deficit_months === 1 ? "" : "s"} in deficit over the next 12 months).`;
+  }
+  const table = $("cashflow-actions-table");
+  if (!table) return;
+  const rows = (data.results || []).map((r) => `
+    <tr>
+      <td><strong>${r.label}</strong><br><span class="muted">${r.description}</span></td>
+      <td>€${Number(r.lowest_balance_scenario || 0).toLocaleString()}</td>
+      <td>${r.deficit_months_scenario}</td>
+      <td class="${r.improvement > 0 ? "positive" : r.improvement < 0 ? "negative" : ""}">€${Number(r.improvement || 0).toLocaleString()}</td>
+    </tr>`).join("");
+  table.innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>Action</th><th>Lowest balance after</th><th>Deficit months after</th><th>Improvement</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function testAllCashflowActions() {
+  const btn = $("test-all-actions-btn");
+  if (btn) btn.disabled = true;
+  showStatus("Testing all cash-flow actions…", "info");
+  try {
+    const data = await api(`/farmer/cashflow-actions${sectorsQuery()}`);
+    renderCashflowActionsResults(data);
+    showStatus("Cash-flow actions tested.", "success");
+  } catch (err) {
+    showStatus(err.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function getCashflowActionInputs() {
+  const val = (id) => { const v = $(id)?.value; return v === "" || v == null ? undefined : parseFloat(v); };
+  const intVal = (id) => { const v = $(id)?.value; return v === "" || v == null ? undefined : parseInt(v, 10); };
+  const action = $("cfa-action")?.value || "bring_forward_sales";
+  const amount = val("cfa-amount");
+  const from = intVal("cfa-from-month");
+  const to = intVal("cfa-to-month");
+  const inputs = { action, amount };
+  if (action === "use_short_term_credit") {
+    inputs.draw_month = from;
+    inputs.repay_month = to;
+  } else if (action === "match_payments_to_surplus") {
+    inputs.payment_month = from;
+  } else {
+    inputs.from_month = from;
+    inputs.to_month = to;
+  }
+  return inputs;
+}
+
+async function testOneCashflowAction() {
+  const btn = $("test-one-action-btn");
+  if (btn) btn.disabled = true;
+  showStatus("Testing action…", "info");
+  try {
+    const data = await api("/farmer/cashflow-action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: sectorsBody(getCashflowActionInputs()),
+    });
+    const box = $("cashflow-action-result");
+    if (box) {
+      box.classList.remove("hidden");
+      box.innerHTML = `
+        <strong>${data.label}</strong><br>
+        ${data.description}<br><br>
+        Lowest balance: €${Number(data.lowest_balance_base || 0).toLocaleString()} → €${Number(data.lowest_balance_scenario || 0).toLocaleString()}<br>
+        Deficit months: ${data.deficit_months_base} → ${data.deficit_months_scenario}`;
+    }
+    showStatus("Action tested.", "success");
+  } catch (err) {
+    showStatus(err.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function setupNav() {
   document.querySelectorAll(".nav-link").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1362,6 +1447,8 @@ function setupNav() {
     });
   });
   $("run-sandbox-btn")?.addEventListener("click", runSandbox);
+  $("test-all-actions-btn")?.addEventListener("click", testAllCashflowActions);
+  $("test-one-action-btn")?.addEventListener("click", testOneCashflowAction);
   $("sector-select")?.querySelectorAll("input[data-sector]").forEach((input) => {
     input.addEventListener("change", () => onSectorChange(input));
   });

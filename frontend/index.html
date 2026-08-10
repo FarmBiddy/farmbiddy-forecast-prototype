@@ -171,6 +171,33 @@
             <div class="card"><h3>Top Recommended Actions</h3><ol id="sandbox-recommendations" class="rec-list"></ol></div>
           </div>
         </div>
+        <div class="card">
+          <h3>Cash-Flow Actions</h3>
+          <p class="muted">Practical actions to fix a cash-flow gap — see the effect each one would have on your lowest cash balance and number of deficit months over the next 12 months.</p>
+          <button type="button" id="test-all-actions-btn" class="btn-run">Test All 5 Actions</button>
+          <div id="cashflow-actions-summary" class="interpretation-box hidden"></div>
+          <div id="cashflow-actions-table"></div>
+        </div>
+        <div class="card">
+          <h3>Try One Action In Detail</h3>
+          <p class="muted">Optionally set your own amount and months — leave blank to use sensible defaults.</p>
+          <div class="sandbox-grid">
+            <label>Action
+              <select id="cfa-action" class="input-field">
+                <option value="bring_forward_sales">Bring forward sales</option>
+                <option value="defer_purchases">Defer purchases</option>
+                <option value="adjust_loan_timing">Adjust loan timing</option>
+                <option value="match_payments_to_surplus">Match payments to surplus</option>
+                <option value="use_short_term_credit">Use short-term credit</option>
+              </select>
+            </label>
+            <label>Amount (€)<input type="number" step="100" id="cfa-amount" class="input-field" placeholder="auto" /></label>
+            <label>From / draw month (1-12)<input type="number" step="1" min="1" max="12" id="cfa-from-month" class="input-field" placeholder="auto" /></label>
+            <label>To / repay month (1-12)<input type="number" step="1" min="1" max="12" id="cfa-to-month" class="input-field" placeholder="auto" /></label>
+          </div>
+          <button type="button" id="test-one-action-btn" class="btn-run">Test This Action</button>
+          <div id="cashflow-action-result" class="interpretation-box hidden"></div>
+        </div>
       </section>
       <section class="view hidden" id="view-farm-intelligence">
         <div class="card fi-header-card">

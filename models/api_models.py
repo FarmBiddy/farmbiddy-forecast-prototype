@@ -385,6 +385,49 @@ class ScenarioSandboxResponse(BaseModel):
     monthly_forecast_scenario: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class CashflowActionRequest(BaseModel):
+    farm_file: Optional[str] = None
+    sectors: Optional[List[str]] = None
+    action: str = Field(description=(
+        "One of: bring_forward_sales, defer_purchases, adjust_loan_timing, "
+        "match_payments_to_surplus, use_short_term_credit"
+    ))
+    amount: Optional[float] = None
+    from_month: Optional[int] = None
+    to_month: Optional[int] = None
+    payment_month: Optional[int] = None
+    draw_month: Optional[int] = None
+    repay_month: Optional[int] = None
+    annual_rate: Optional[float] = None
+
+
+class CashflowActionResponse(BaseModel):
+    success: bool
+    farm_file: str
+    farm_name: str
+    action: str
+    label: str
+    description: str
+    lowest_balance_base: float
+    lowest_balance_scenario: float
+    lowest_balance_month_base: Optional[int] = None
+    lowest_balance_month_scenario: Optional[int] = None
+    deficit_months_base: int
+    deficit_months_scenario: int
+    improvement: float
+    monthly_forecast_base: List[Dict[str, Any]] = Field(default_factory=list)
+    monthly_forecast_scenario: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class CashflowActionsTestAllResponse(BaseModel):
+    success: bool
+    farm_file: str
+    farm_name: str
+    base_lowest_balance: float
+    base_deficit_months: int
+    results: List[Dict[str, Any]] = Field(default_factory=list)
+
+
 class FarmerRunAnalysisRequest(BaseModel):
     farm_file: Optional[str] = Field(default=None, description="Farm JSON filename")
     sectors: Optional[List[str]] = Field(default=None, description="Sectors to include: dairy, beef, lamb")

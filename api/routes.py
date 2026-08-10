@@ -45,6 +45,9 @@ from models.api_models import (
     SectorListResponse,
     FarmerHistoricalDataResponse,
     CashFlowBudgetResponse,
+    CashflowActionRequest,
+    CashflowActionResponse,
+    CashflowActionsTestAllResponse,
 )
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
@@ -63,7 +66,11 @@ from services.farmer_dashboard_service import (
     get_cashflow_budget_comparison,
     resolve_farm_file,
 )
-from services.scenario_sandbox_service import run_scenario_sandbox
+from services.scenario_sandbox_service import (
+    run_scenario_sandbox,
+    run_cashflow_action,
+    run_all_cashflow_actions,
+)
 from services.forecast_service import (
     list_available_farms,
     run_chart_generation,
@@ -251,6 +258,47 @@ def farmer_scenario_sandbox(request: ScenarioSandboxRequest):
         sectors = body.pop("sectors", None)
         payload = run_scenario_sandbox(farm_file, body, sectors=sectors)
         return ScenarioSandboxResponse(**payload)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/cashflow-action",
+    response_model=CashflowActionResponse,
+    tags=["Farmer Edition"],
+    summary="Test one practical cash-flow action (Teagasc item 6)",
+)
+def farmer_cashflow_action(request: CashflowActionRequest):
+    try:
+        farm_file = resolve_farm_file(request.farm_file)
+        body = request.model_dump()
+        action = body.pop("action")
+        body.pop("farm_file", None)
+        sectors = body.pop("sectors", None)
+        payload = run_cashflow_action(farm_file, action, body, sectors=sectors)
+        return CashflowActionResponse(**payload)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/cashflow-actions",
+    response_model=CashflowActionsTestAllResponse,
+    tags=["Farmer Edition"],
+    summary="Test all 5 practical cash-flow actions with auto-detected defaults",
+)
+def farmer_cashflow_actions(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        payload = run_all_cashflow_actions(farm_file, _parse_sectors_query(sectors))
+        return CashflowActionsTestAllResponse(**payload)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:

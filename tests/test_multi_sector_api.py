@@ -80,3 +80,60 @@ def test_cashflow_budget_endpoint():
         assert entry["budget_status"] in ("ahead", "behind", "on_budget")
         assert "classification" in entry
         assert "classification_reason" in entry
+
+
+def test_cashflow_actions_endpoint_defaults():
+    response = client.get(
+        "/api/farmer/cashflow-actions?farm_file=multi_sector_farm.json&sectors=dairy,beef,lamb"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "base_lowest_balance" in data
+    assert "base_deficit_months" in data
+    assert len(data["results"]) == 5
+    action_names = {r["action"] for r in data["results"]}
+    assert action_names == {
+        "bring_forward_sales",
+        "defer_purchases",
+        "adjust_loan_timing",
+        "match_payments_to_surplus",
+        "use_short_term_credit",
+    }
+    for result in data["results"]:
+        assert isinstance(result["description"], str) and result["description"]
+        assert "lowest_balance_scenario" in result
+        assert "deficit_months_scenario" in result
+
+
+def test_cashflow_action_endpoint_single_action_with_explicit_inputs():
+    response = client.post(
+        "/api/farmer/cashflow-action",
+        json={
+            "farm_file": "multi_sector_farm.json",
+            "sectors": ["dairy", "beef", "lamb"],
+            "action": "defer_purchases",
+            "from_month": 4,
+            "to_month": 6,
+            "amount": 5000,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["action"] == "defer_purchases"
+    assert isinstance(data["description"], str) and data["description"]
+    assert "lowest_balance_base" in data
+    assert "lowest_balance_scenario" in data
+    assert "improvement" in data
+
+
+def test_cashflow_action_endpoint_unknown_action_returns_400():
+    response = client.post(
+        "/api/farmer/cashflow-action",
+        json={
+            "farm_file": "multi_sector_farm.json",
+            "action": "not_a_real_action",
+        },
+    )
+    assert response.status_code == 400

@@ -12,6 +12,12 @@ from forecast_engine.costs import calculate_costs
 from forecast_engine.profit import calculate_profit
 from forecast_engine.risk_level import calculate_risk_level
 from forecast_engine.alerts import generate_alerts
+from forecast_engine.cashflow_actions import (
+    ACTION_LABELS,
+    ALL_ACTIONS,
+    apply_cashflow_action,
+    lowest_balance_and_deficits,
+)
 from models.api_models import ForecastOutputs, SandboxOutputs
 from services.farmer_dashboard_service import resolve_sectors
 from services.forecast_service import load_farm, run_forecast, run_sandbox_forecast
@@ -216,6 +222,96 @@ def run_scenario_sandbox(
         },
         "monthly_forecast_base": base_monthly,
         "monthly_forecast_scenario": scenario_monthly,
+    }
+
+
+def _cashflow_action_params(inputs: dict) -> dict:
+    params = {}
+    for key in ("amount", "from_month", "to_month", "payment_month", "draw_month", "repay_month", "annual_rate"):
+        value = inputs.get(key)
+        if value is not None and value != "":
+            params[key] = value
+    return params
+
+
+def run_cashflow_action(
+    farm_file: str,
+    action: str,
+    inputs: dict | None = None,
+    sectors: list[str] | None = None,
+) -> dict:
+    """Test one of the 5 practical cash-flow actions (Teagasc item 6).
+
+    Reuses the farm+household-aware `monthly_forecast` already computed by
+    `services/multi_sector_farm.py` (Phases 2-3) rather than re-running the
+    forecast engine, then reports the resulting lowest cash balance and
+    number of deficit months — the two metrics the document asks for.
+    """
+    if action not in ALL_ACTIONS:
+        raise ValueError(f"Unknown cash-flow action: {action}. Choose one of {sorted(ALL_ACTIONS)}.")
+
+    inputs = inputs or {}
+    resolved_sectors = resolve_sectors(sectors, farm_file) if sectors else resolve_sectors(None, farm_file)
+    farm = load_farm_for_analysis(farm_file, resolved_sectors)
+    base_monthly = farm.get("monthly_forecast") or []
+
+    params = _cashflow_action_params(inputs)
+    scenario_monthly, description = apply_cashflow_action(action, base_monthly, **params)
+
+    base_metrics = lowest_balance_and_deficits(base_monthly)
+    scenario_metrics = lowest_balance_and_deficits(scenario_monthly)
+
+    return {
+        "success": True,
+        "farm_file": farm_file,
+        "farm_name": farm.get("farm_name"),
+        "action": action,
+        "label": ACTION_LABELS.get(action, action),
+        "description": description,
+        "lowest_balance_base": base_metrics["lowest_balance"],
+        "lowest_balance_scenario": scenario_metrics["lowest_balance"],
+        "lowest_balance_month_base": base_metrics["lowest_balance_month"],
+        "lowest_balance_month_scenario": scenario_metrics["lowest_balance_month"],
+        "deficit_months_base": base_metrics["deficit_months"],
+        "deficit_months_scenario": scenario_metrics["deficit_months"],
+        "improvement": round(scenario_metrics["lowest_balance"] - base_metrics["lowest_balance"], 2),
+        "monthly_forecast_base": base_monthly,
+        "monthly_forecast_scenario": scenario_monthly,
+    }
+
+
+def run_all_cashflow_actions(
+    farm_file: str,
+    sectors: list[str] | None = None,
+) -> dict:
+    """Test all 5 practical cash-flow actions with auto-detected defaults."""
+    resolved_sectors = resolve_sectors(sectors, farm_file) if sectors else resolve_sectors(None, farm_file)
+    farm = load_farm_for_analysis(farm_file, resolved_sectors)
+    base_monthly = farm.get("monthly_forecast") or []
+    base_metrics = lowest_balance_and_deficits(base_monthly)
+
+    results = []
+    for action in ALL_ACTIONS:
+        scenario_monthly, description = apply_cashflow_action(action, base_monthly)
+        scenario_metrics = lowest_balance_and_deficits(scenario_monthly)
+        results.append({
+            "action": action,
+            "label": ACTION_LABELS.get(action, action),
+            "description": description,
+            "lowest_balance_base": base_metrics["lowest_balance"],
+            "lowest_balance_scenario": scenario_metrics["lowest_balance"],
+            "deficit_months_base": base_metrics["deficit_months"],
+            "deficit_months_scenario": scenario_metrics["deficit_months"],
+            "improvement": round(scenario_metrics["lowest_balance"] - base_metrics["lowest_balance"], 2),
+        })
+
+    return {
+        "success": True,
+        "farm_file": farm_file,
+        "farm_name": farm.get("farm_name"),
+        "base_lowest_balance": base_metrics["lowest_balance"],
+        "base_deficit_months": base_metrics["deficit_months"],
+        "results": results,
     }
 
 
