@@ -11,6 +11,7 @@ from services.dashboard_summary import (
     get_selected_sector_data,
     sector_status_label,
     sum_loan_principal,
+    sum_outstanding_debt,
 )
 
 
@@ -42,7 +43,26 @@ def test_calculate_dashboard_kpis_six_cards():
         "revenue", "operating_profit", "cash_available",
         "debt_outstanding", "profit_margin", "risk_rating",
     ]
+    # No debt register supplied: falls back to summed loan principal.
     assert cards[3]["value"] == "€220,000"
+
+
+def test_calculate_dashboard_kpis_prefers_debt_register():
+    summary = {"annual_revenue": 1000000, "annual_profit": 150000, "profit_margin": 15.0}
+    farm = {
+        "opening_cash_balance": 28500,
+        "_loans": [{"principal": 220000}],
+        "_debt_register": [{"outstanding_balance": 95000}, {"outstanding_balance": 15000}],
+    }
+    cards = calculate_dashboard_kpis(summary, farm, [], "Low")
+    assert cards[3]["value"] == "€110,000"
+
+
+def test_sum_outstanding_debt():
+    register = [{"outstanding_balance": 1000}, {"outstanding_balance": 2500.5}]
+    assert sum_outstanding_debt(register) == 3500.5
+    assert sum_outstanding_debt(None) == 0
+    assert sum_outstanding_debt([]) == 0
 
 
 def test_calculate_sector_performance_selected_only():

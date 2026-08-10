@@ -71,3 +71,29 @@ def test_aggregate_sector_financials_sums(farm):
     assert aggregated["revenue_totals"]["milk"] > 0
     legacy = to_legacy_farm_dict(aggregated, farm)
     assert legacy["feed"] > 0
+
+
+def test_aggregate_sector_financials_keeps_per_lender_loans(farm):
+    filtered = filter_farm_by_sectors(farm, ["dairy", "beef", "lamb"])
+    aggregated = aggregate_sector_financials(filtered)
+    assert len(aggregated["loans"]) == 2
+    assert aggregated["loans"][0]["lender"] == "AIB Agri Finance"
+
+
+def test_aggregate_sector_financials_builds_debt_register(farm):
+    filtered = filter_farm_by_sectors(farm, ["dairy", "beef", "lamb"])
+    aggregated = aggregate_sector_financials(filtered)
+    register = aggregated["debt_register"]
+    assert len(register) == 2
+    for loan in register:
+        assert loan["outstanding_balance"] >= 0
+        assert loan["outstanding_balance"] <= loan["principal"]
+        assert loan["years_remaining"] >= 0
+
+
+def test_to_legacy_farm_dict_exposes_debt_register(farm):
+    filtered = filter_farm_by_sectors(farm, ["dairy", "beef", "lamb"])
+    aggregated = aggregate_sector_financials(filtered)
+    legacy = to_legacy_farm_dict(aggregated, farm)
+    assert legacy["debt_register"] == aggregated["debt_register"]
+    assert legacy["_loans"] == aggregated["loans"]

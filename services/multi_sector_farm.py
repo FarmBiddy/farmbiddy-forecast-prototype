@@ -18,6 +18,7 @@ from models.multi_sector_farm import (
     MULTI_SECTOR_FILE,
     SECTOR_LABELS,
     VALID_SECTORS,
+    build_debt_register,
 )
 
 COST_TO_LEGACY = {
@@ -222,6 +223,8 @@ def aggregate_sector_financials(filtered: dict) -> dict:
         "revenue_totals": dict(revenue_totals),
         "cost_totals": cost_totals,
         "loan_repayments_annual": loan_repayments,
+        "loans": loans,
+        "debt_register": build_debt_register(loans),
         "dairy": {
             "milking_cows": round(dairy_cows),
             "litres_per_cow": round(litres_per_cow * 12, 2) if dairy_cows else 0,
@@ -351,6 +354,8 @@ def to_legacy_farm_dict(aggregated: dict, farm: dict) -> dict:
         },
         "monthly_forecast": _build_monthly_forecast(farm, aggregated),
         "kpi_visibility": get_kpi_visibility(selected),
+        "_loans": aggregated.get("loans") or [],
+        "debt_register": aggregated.get("debt_register") or [],
     }
     for field in LEGACY_COST_FIELDS:
         legacy.setdefault(field, 0)

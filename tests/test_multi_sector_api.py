@@ -47,6 +47,10 @@ def test_run_analysis_all_sectors():
     assert len(data["sector_performance"]) == 3
     assert len(data["overview_chart"]) >= 12
     assert data["overview_header"]["status_label"] == "Combined Overview"
+    assert len(data["debt_register"]) == 2
+    for loan in data["debt_register"]:
+        assert "outstanding_balance" in loan
+        assert "years_remaining" in loan
 
 
 def test_historical_data_endpoint():

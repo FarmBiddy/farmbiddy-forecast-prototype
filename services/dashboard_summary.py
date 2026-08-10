@@ -14,7 +14,7 @@ from forecast_engine.alerts import generate_alerts
 from forecast_engine.costs import calculate_costs
 from forecast_engine.profit import calculate_profit
 from forecast_engine.revenue import calculate_revenue
-from models.multi_sector_farm import SECTOR_LABELS, VALID_SECTORS
+from models.multi_sector_farm import SECTOR_LABELS, VALID_SECTORS, build_debt_register
 from services.multi_sector_farm import (
     aggregate_sector_financials,
     filter_farm_by_sectors,
@@ -44,6 +44,19 @@ def aggregate_selected_sectors(filtered: dict) -> dict:
 def sum_loan_principal(farm_summary: dict) -> float:
     loans = (farm_summary or {}).get("loans") or []
     return sum(float(loan.get("principal") or 0) for loan in loans)
+
+
+def sum_outstanding_debt(debt_register: list[dict] | None) -> float:
+    """Total outstanding balance across the per-lender debt register."""
+    return sum(float(loan.get("outstanding_balance") or 0) for loan in (debt_register or []))
+
+
+def _debt_outstanding(farm: dict) -> float:
+    """Prefer the per-lender debt register; fall back to summed loan principal."""
+    debt_register = farm.get("_debt_register")
+    if debt_register is not None:
+        return sum_outstanding_debt(debt_register)
+    return sum_loan_principal({"loans": farm.get("_loans") or []})
 
 
 def sector_status_label(selected_sectors: list[str]) -> str:
@@ -102,7 +115,7 @@ def calculate_dashboard_kpis(
     revenue = float(forecast_summary.get("annual_revenue") or 0)
     profit = float(forecast_summary.get("annual_profit") or 0)
     margin = float(forecast_summary.get("profit_margin") or 0)
-    debt = sum_loan_principal({"loans": farm.get("_loans") or []})
+    debt = _debt_outstanding(farm)
 
     cash = float(farm.get("opening_cash_balance") or 0)
     if monthly_forecast:
@@ -134,7 +147,7 @@ def calculate_dashboard_kpis(
             "id": "debt_outstanding",
             "title": "Debt Outstanding",
             "value": f"€{debt:,.0f}",
-            "subtitle": "Total loan principal",
+            "subtitle": "Estimated outstanding balance across all loans",
             "trend": "neutral",
         },
         {
@@ -192,7 +205,7 @@ def calculate_financial_health_snapshot(
 
     debtors = float(farm.get("debtors") or 0)
     creditors = float(farm.get("creditors") or 0)
-    debt = sum_loan_principal({"loans": farm.get("_loans") or []})
+    debt = _debt_outstanding(farm)
 
     leverage_ratio = (debt / revenue) if revenue else 0
     working_capital = debtors - creditors
@@ -317,11 +330,13 @@ def build_executive_dashboard(
     generated_at = forecast.get("generated_at")
 
     farm_summary = (filtered_raw.get("farm_summary") or {})
+    debt_register = farm.get("debt_register") or build_debt_register(farm_summary.get("loans") or [])
     farm_enriched = {
         **farm,
         "debtors": farm_summary.get("debtors", 0),
         "creditors": farm_summary.get("creditors", 0),
         "_loans": farm_summary.get("loans") or [],
+        "_debt_register": debt_register,
     }
 
     return {
@@ -336,6 +351,7 @@ def build_executive_dashboard(
         "alerts": generate_dashboard_alerts(farm, summary, kpis_block),
         "overview_chart": build_overview_chart_data(filtered_raw),
         "forecast_summary": summary,
+        "debt_register": debt_register,
     }
 
 
@@ -386,6 +402,7 @@ def calculate_preview_kpis(farm: dict, filtered_raw: dict) -> list[dict]:
             "debtors": farm_summary.get("debtors", 0),
             "creditors": farm_summary.get("creditors", 0),
             "_loans": farm_summary.get("loans") or [],
+            "_debt_register": build_debt_register(farm_summary.get("loans") or []),
         },
         [],
         "Low",

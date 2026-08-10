@@ -301,6 +301,39 @@ function renderSectorTable(rows) {
     </table>`;
 }
 
+function renderDebtRegister(loans) {
+  const box = $("debt-register-table");
+  if (!box) return;
+  if (!loans?.length) {
+    box.innerHTML = `<p class="muted">No outstanding loans on record.</p>`;
+    return;
+  }
+  box.innerHTML = `
+    <table class="sector-table">
+      <thead>
+        <tr>
+          <th>Lender</th>
+          <th>Outstanding Balance</th>
+          <th>Interest Rate</th>
+          <th>Years Remaining</th>
+          <th>Repayment</th>
+          <th>Maturity</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${loans.map((l) => `
+          <tr>
+            <td><strong>${l.lender}</strong></td>
+            <td>€${Number(l.outstanding_balance || 0).toLocaleString()}</td>
+            <td>${Number(l.rate || 0).toFixed(2)}%</td>
+            <td>${l.years_remaining} yrs</td>
+            <td>€${Number(l.monthly_repayment || 0).toLocaleString()}/mo</td>
+            <td>${l.maturity || "—"}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatChartEuro(value) {
@@ -471,6 +504,7 @@ function renderExecutiveDashboard(data) {
   renderExecutiveAlerts(data.alerts, "alerts-full");
   updateAlertsNavHighlight(data.alerts);
   renderOverviewChart(data.overview_chart);
+  renderDebtRegister(data.debt_register);
 }
 
 function renderRecommendations(recs, listId = "recommendations") {
