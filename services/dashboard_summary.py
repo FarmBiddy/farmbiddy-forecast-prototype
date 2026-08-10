@@ -16,6 +16,7 @@ from forecast_engine.costs import calculate_costs
 from forecast_engine.data_quality import build_data_quality_warnings
 from forecast_engine.formatting import format_currency, format_percent
 from forecast_engine.health_score import calculate_health_score
+from forecast_engine.period_labels import point_in_time, trailing_12_months
 from forecast_engine.profit import calculate_profit
 from forecast_engine.revenue import calculate_revenue
 from models.multi_sector_farm import SECTOR_LABELS, VALID_SECTORS, build_debt_register
@@ -217,6 +218,9 @@ def calculate_dashboard_kpis(
     if monthly_forecast:
         cash = float(monthly_forecast[-1].get("running_balance") or cash)
 
+    ttm = trailing_12_months()
+    now = point_in_time()
+
     return [
         {
             "id": "revenue",
@@ -224,6 +228,7 @@ def calculate_dashboard_kpis(
             "value": format_currency(revenue),
             "subtitle": "Trailing 12 months (annualised)",
             "trend": "up" if revenue > 0 else "neutral",
+            "period": ttm,
         },
         {
             "id": "operating_profit",
@@ -231,6 +236,7 @@ def calculate_dashboard_kpis(
             "value": format_currency(profit),
             "subtitle": "After operating costs",
             "trend": "up" if profit > 0 else "down",
+            "period": ttm,
         },
         {
             "id": "cash_available",
@@ -238,6 +244,7 @@ def calculate_dashboard_kpis(
             "value": format_currency(cash),
             "subtitle": "Projected year-end balance",
             "trend": "up" if cash > 0 else "down",
+            "period": now,
         },
         {
             "id": "debt_outstanding",
@@ -245,6 +252,7 @@ def calculate_dashboard_kpis(
             "value": format_currency(debt),
             "subtitle": "Estimated outstanding balance across all loans",
             "trend": "neutral",
+            "period": now,
         },
         {
             "id": "profit_margin",
@@ -252,6 +260,7 @@ def calculate_dashboard_kpis(
             "value": format_percent(margin),
             "subtitle": _margin_status(margin),
             "trend": "up" if margin >= 15 else ("neutral" if margin >= 8 else "down"),
+            "period": ttm,
         },
         {
             "id": "risk_rating",
@@ -259,6 +268,7 @@ def calculate_dashboard_kpis(
             "value": risk_level or "Low",
             "subtitle": "Stable" if risk_level == "Low" else "Monitor closely",
             "trend": "neutral",
+            "period": now,
         },
     ]
 
@@ -283,6 +293,7 @@ def calculate_sector_performance(filtered: dict) -> list[dict]:
             "profit": round(profit, 0),
             "margin_pct": round(margin, 1),
             "status": status,
+            "period": trailing_12_months(),
         })
     return rows
 

@@ -58,6 +58,10 @@ def test_compare_budget_vs_actual_counts_and_shape():
         assert key in entry
     assert entry["cashflow_status"] in (DEFICIT, SURPLUS, BREAKEVEN)
     assert entry["budget_status"] in (AHEAD, BEHIND, ON_BUDGET)
+    # Phase 10: each entry names the calendar month it covers.
+    assert entry["period_info"]["period_type"] == "Historical Actual"
+    assert entry["period_info"]["label"]
+    assert entry["period"] == entry["period_info"]["start_date"]
 
 
 def test_compare_budget_vs_actual_classifies_deficit_months():

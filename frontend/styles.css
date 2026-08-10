@@ -491,11 +491,30 @@ body {
   box-shadow: var(--shadow);
 }
 
-.kpi-title { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; }
+.kpi-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.4rem; margin-bottom: 0.4rem; }
+.kpi-title { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-title-row .kpi-title { margin-bottom: 0; }
 .kpi-value { font-size: 1.45rem; font-weight: 700; color: var(--text); }
 .kpi-sub { font-size: 0.8rem; color: var(--green); margin-top: 0.3rem; }
 .kpi-sub.down { color: #dc2626; }
 .kpi-sub.neutral { color: var(--muted); }
+
+/* Period badge (Phase 10 / UX item 3) — a figure's time window at a glance */
+.card-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.period-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: #eef2f7;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  white-space: nowrap;
+  cursor: help;
+}
 
 /* Cards & grid */
 .card {

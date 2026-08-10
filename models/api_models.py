@@ -417,6 +417,7 @@ class CashflowActionResponse(BaseModel):
     improvement: float
     monthly_forecast_base: List[Dict[str, Any]] = Field(default_factory=list)
     monthly_forecast_scenario: List[Dict[str, Any]] = Field(default_factory=list)
+    period: Dict[str, Any] = Field(default_factory=dict)
 
 
 class CashflowActionsTestAllResponse(BaseModel):
@@ -426,6 +427,7 @@ class CashflowActionsTestAllResponse(BaseModel):
     base_lowest_balance: float
     base_deficit_months: int
     results: List[Dict[str, Any]] = Field(default_factory=list)
+    period: Dict[str, Any] = Field(default_factory=dict)
 
 
 class FarmerRunAnalysisRequest(BaseModel):

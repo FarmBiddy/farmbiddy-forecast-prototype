@@ -18,6 +18,7 @@ from forecast_engine.cashflow_actions import (
     apply_cashflow_action,
     lowest_balance_and_deficits,
 )
+from forecast_engine.period_labels import scenario_result as scenario_result_period
 from models.api_models import ForecastOutputs, SandboxOutputs
 from services.farmer_dashboard_service import resolve_sectors
 from services.forecast_service import load_farm, run_forecast, run_sandbox_forecast
@@ -192,6 +193,7 @@ def run_scenario_sandbox(
         "min_cash_scenario": min_cash_scenario,
         "risk_base": base_result.get("risk_level"),
         "risk_scenario": scenario_result.get("risk_level"),
+        "period": scenario_result_period(),
     }
 
     changes_applied = scenario_result.get("changes_applied") or {}
@@ -277,6 +279,7 @@ def run_cashflow_action(
         "improvement": round(scenario_metrics["lowest_balance"] - base_metrics["lowest_balance"], 2),
         "monthly_forecast_base": base_monthly,
         "monthly_forecast_scenario": scenario_monthly,
+        "period": scenario_result_period(),
     }
 
 
@@ -312,6 +315,7 @@ def run_all_cashflow_actions(
         "base_lowest_balance": base_metrics["lowest_balance"],
         "base_deficit_months": base_metrics["deficit_months"],
         "results": results,
+        "period": scenario_result_period(),
     }
 
 

@@ -10,6 +10,7 @@ introduced (`combined_cashflow` in services/multi_sector_farm.py), so
 from __future__ import annotations
 
 from forecast_engine.cashflow_classifier import classify_cashflow_entries
+from forecast_engine.period_labels import historical_month
 from models.multi_sector_farm import build_debt_register, compute_household_month
 from services.dashboard_summary import get_selected_sector_data, get_sector_monthly_history
 from services.multi_sector_farm import aggregate_sector_financials
@@ -137,6 +138,9 @@ def _compare_entry(actual: dict, budget: dict) -> dict:
         "cashflow_status": cashflow_status,
         "budget_status": budget_status,
         "cause_summary": _cause_summary(cash_in_variance, cash_out_variance, net_variance, tolerance),
+        # Named distinctly from the existing "period" ("YYYY-MM") field above
+        # to avoid overwriting it; this carries the Phase 10 period-type badge.
+        "period_info": historical_month(actual["period"]),
     }
 
 

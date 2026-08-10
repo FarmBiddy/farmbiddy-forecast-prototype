@@ -45,6 +45,16 @@ def test_calculate_dashboard_kpis_six_cards():
     ]
     # No debt register supplied: falls back to summed loan principal.
     assert cards[3]["value"] == "€220,000"
+    # Phase 10: every KPI card names the time window it covers.
+    for card in cards:
+        assert "period_type" in card["period"]
+    ttm_ids = {"revenue", "operating_profit", "profit_margin"}
+    point_in_time_ids = {"cash_available", "debt_outstanding", "risk_rating"}
+    for card in cards:
+        if card["id"] in ttm_ids:
+            assert card["period"]["period_type"] == "Trailing 12 Months"
+        elif card["id"] in point_in_time_ids:
+            assert card["period"]["period_type"] == "Point in Time"
 
 
 def test_calculate_dashboard_kpis_prefers_debt_register():
@@ -88,6 +98,7 @@ def test_calculate_sector_performance_selected_only():
         assert row["revenue"] > 0
         assert "margin_pct" in row
         assert row["status"] in ("Good", "Fair", "Watch")
+        assert row["period"]["period_type"] == "Trailing 12 Months"
 
 
 def test_build_overview_chart_24_months():

@@ -103,6 +103,8 @@ def test_cashflow_budget_endpoint():
         assert entry["budget_status"] in ("ahead", "behind", "on_budget")
         assert "classification" in entry
         assert "classification_reason" in entry
+        # Phase 10: each month names the calendar period it covers.
+        assert entry["period_info"]["period_type"] == "Historical Actual"
 
 
 def test_cashflow_actions_endpoint_defaults():
@@ -114,6 +116,8 @@ def test_cashflow_actions_endpoint_defaults():
     assert data["success"] is True
     assert "base_lowest_balance" in data
     assert "base_deficit_months" in data
+    # Phase 10: a scenario-testing result is not a calendar-anchored figure.
+    assert data["period"]["period_type"] == "Scenario Result"
     assert len(data["results"]) == 5
     action_names = {r["action"] for r in data["results"]}
     assert action_names == {
@@ -149,6 +153,7 @@ def test_cashflow_action_endpoint_single_action_with_explicit_inputs():
     assert "lowest_balance_base" in data
     assert "lowest_balance_scenario" in data
     assert "improvement" in data
+    assert data["period"]["period_type"] == "Scenario Result"
 
 
 def test_cashflow_action_endpoint_unknown_action_returns_400():

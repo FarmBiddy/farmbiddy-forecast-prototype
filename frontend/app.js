@@ -224,7 +224,10 @@ function renderKpis(kpis, containerId = "kpi-row") {
   if (!row || !kpis) return;
   row.innerHTML = kpis.map((k) => `
     <div class="kpi-card">
-      <div class="kpi-title">${k.title}</div>
+      <div class="kpi-title-row">
+        <div class="kpi-title">${k.title}</div>
+        ${periodBadgeHtml(k.period)}
+      </div>
       <div class="kpi-value">${k.value}</div>
       <div class="kpi-sub ${k.trend === "down" ? "down" : k.trend === "neutral" ? "neutral" : ""}">${k.subtitle || ""}</div>
     </div>`).join("");
@@ -235,7 +238,10 @@ function renderMetricCards(items, containerId) {
   if (!box) return;
   box.innerHTML = items.map((i) => `
     <div class="kpi-card">
-      <div class="kpi-title">${i.label}</div>
+      <div class="kpi-title-row">
+        <div class="kpi-title">${i.label}</div>
+        ${periodBadgeHtml(i.period)}
+      </div>
       <div class="kpi-value">${i.value}</div>
       ${i.sub ? `<div class="kpi-sub">${i.sub}</div>` : ""}
     </div>`).join("");
@@ -351,6 +357,8 @@ function renderHealthScoreDetail(health) {
 function renderSectorTable(rows) {
   const box = $("sector-performance-table");
   if (!box) return;
+  const periodSlot = $("sector-performance-period");
+  if (periodSlot) periodSlot.innerHTML = periodBadgeHtml(rows?.[0]?.period);
   if (!rows?.length) {
     box.innerHTML = `<p class="muted">No sector data for current selection.</p>`;
     return;
@@ -405,6 +413,21 @@ function renderDebtRegister(loans) {
           </tr>`).join("")}
       </tbody>
     </table>`;
+}
+
+/**
+ * Small reusable "period badge" (Phase 10 / UX item 3) — shown on every KPI
+ * card and table so a figure's time window (Trailing 12 Months, Forecast,
+ * Historical Actual, Scenario Result, Point in Time…) is never ambiguous.
+ * `period` is the {period_type, start_date, end_date, label} object the
+ * backend attaches to the relevant figure.
+ */
+function periodBadgeHtml(period) {
+  if (!period?.period_type) return "";
+  const title = period.start_date && period.end_date && period.start_date !== period.end_date
+    ? `${period.start_date} to ${period.end_date}`
+    : (period.start_date || period.period_type);
+  return `<span class="period-badge" title="${title}">${period.label || period.period_type}</span>`;
 }
 
 /**
@@ -696,6 +719,8 @@ function renderSandboxResults(data) {
   $("sandbox-results")?.classList.remove("hidden");
   if ($("sandbox-summary")) $("sandbox-summary").textContent = data.summary || "";
   const c = data.comparison || {};
+  const sandboxPeriodSlot = $("sandbox-period");
+  if (sandboxPeriodSlot) sandboxPeriodSlot.innerHTML = periodBadgeHtml(c.period);
   renderMetricCards([
     { label: "Profit (base)", value: formatCurrency(c.profit_base) },
     { label: "Profit (scenario)", value: formatCurrency(c.profit_scenario) },
@@ -1466,8 +1491,9 @@ function renderCashflowActionsResults(data) {
   const summary = $("cashflow-actions-summary");
   if (summary) {
     summary.classList.remove("hidden");
-    summary.textContent = `Current lowest cash balance: ${formatCurrency(data.base_lowest_balance)} `
-      + `(${data.base_deficit_months || 0} month${data.base_deficit_months === 1 ? "" : "s"} in deficit over the next 12 months).`;
+    summary.innerHTML = `Current lowest cash balance: ${formatCurrency(data.base_lowest_balance)} `
+      + `(${data.base_deficit_months || 0} month${data.base_deficit_months === 1 ? "" : "s"} in deficit over the next 12 months). `
+      + periodBadgeHtml(data.period);
   }
   const table = $("cashflow-actions-table");
   if (!table) return;
