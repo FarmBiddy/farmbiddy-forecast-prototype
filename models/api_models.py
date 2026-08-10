@@ -501,3 +501,12 @@ class FarmerHistoricalDataResponse(BaseModel):
     combined_monthly: List[Dict[str, Any]] = Field(default_factory=list)
     sectors: List[Dict[str, Any]] = Field(default_factory=list)
 
+
+class CashFlowBudgetResponse(BaseModel):
+    success: bool
+    farm_name: str
+    selected_sectors: List[str] = Field(default_factory=list)
+    entries: List[Dict[str, Any]] = Field(default_factory=list)
+    deficit_months: int = 0
+    behind_budget_months: int = 0
+

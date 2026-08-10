@@ -44,6 +44,7 @@ from models.api_models import (
     FarmerReportPreviewResponse,
     SectorListResponse,
     FarmerHistoricalDataResponse,
+    CashFlowBudgetResponse,
 )
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
@@ -59,6 +60,7 @@ from services.farmer_dashboard_service import (
     run_farmer_analysis,
     run_monte_carlo_for_farm,
     get_farmer_historical_data,
+    get_cashflow_budget_comparison,
     resolve_farm_file,
 )
 from services.scenario_sandbox_service import run_scenario_sandbox
@@ -154,6 +156,26 @@ def farmer_historical_data(
 ):
     try:
         return FarmerHistoricalDataResponse(**get_farmer_historical_data(
+            farm_id, _parse_sectors_query(sectors),
+        ))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/cashflow-budget",
+    response_model=CashFlowBudgetResponse,
+    tags=["Farmer Edition"],
+    summary="Monthly cash-flow budget vs. actual comparison",
+)
+def farmer_cashflow_budget(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    try:
+        return CashFlowBudgetResponse(**get_cashflow_budget_comparison(
             farm_id, _parse_sectors_query(sectors),
         ))
     except FileNotFoundError as error:

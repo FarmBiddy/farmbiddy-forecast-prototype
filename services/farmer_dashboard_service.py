@@ -43,6 +43,7 @@ from services.dashboard_summary import (
     get_historical_data,
     get_selected_sector_data,
 )
+from services.cashflow_budget_service import compare_budget_vs_actual
 
 
 DEFAULT_FARM_FILE = MULTI_SECTOR_FILE
@@ -503,6 +504,16 @@ def get_farmer_historical_data(
     farm_file = resolve_farm_file(farm_id)
     selected = resolve_sectors(sectors, farm_id)
     return get_historical_data(farm_file, selected)
+
+
+def get_cashflow_budget_comparison(
+    farm_id: str | None = None,
+    sectors: list[str] | str | None = None,
+) -> dict:
+    """Budget-vs-actual monthly cash-flow comparison (Teagasc items 1-2)."""
+    farm_file = resolve_farm_file(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    return compare_budget_vs_actual(farm_file, selected)
 
 
 def run_advanced_forecast(

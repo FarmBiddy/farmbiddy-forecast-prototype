@@ -61,3 +61,18 @@ def test_historical_data_endpoint():
     data = response.json()
     assert data["selected_sectors"] == ["dairy"]
     assert len(data["sectors"]) == 1
+
+
+def test_cashflow_budget_endpoint():
+    response = client.get(
+        "/api/farmer/cashflow-budget?farm_file=multi_sector_farm.json&sectors=dairy,beef,lamb"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert len(data["entries"]) == 24
+    assert "deficit_months" in data
+    assert "behind_budget_months" in data
+    for entry in data["entries"]:
+        assert entry["cashflow_status"] in ("deficit", "surplus", "breakeven")
+        assert entry["budget_status"] in ("ahead", "behind", "on_budget")

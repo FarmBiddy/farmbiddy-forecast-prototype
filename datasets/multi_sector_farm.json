@@ -69,7 +69,9 @@
       "pension_insurance_monthly": 280,
       "farm_to_household_transfer_monthly": 2200,
       "tax_annual": 8400,
-      "tax_payment_months": [11]
+      "tax_payment_months": [
+        11
+      ]
     },
     "notes": "Mixed enterprise \u2014 dairy, beef finishing, and sheep. Family labour with one part-time employee."
   },
@@ -83,6 +85,176 @@
       "other_grants": 11
     }
   },
+  "cash_flow_budget": [
+    {
+      "year": 2024,
+      "month": 1,
+      "period": "2024-01",
+      "expected_cash_in": 12572.0,
+      "expected_cash_out": 48748.0
+    },
+    {
+      "year": 2024,
+      "month": 2,
+      "period": "2024-02",
+      "expected_cash_in": 13707.0,
+      "expected_cash_out": 43526.0
+    },
+    {
+      "year": 2024,
+      "month": 3,
+      "period": "2024-03",
+      "expected_cash_in": 18135.0,
+      "expected_cash_out": 49600.0
+    },
+    {
+      "year": 2024,
+      "month": 4,
+      "period": "2024-04",
+      "expected_cash_in": 16658.0,
+      "expected_cash_out": 54189.0
+    },
+    {
+      "year": 2024,
+      "month": 5,
+      "period": "2024-05",
+      "expected_cash_in": 17730.0,
+      "expected_cash_out": 41582.0
+    },
+    {
+      "year": 2024,
+      "month": 6,
+      "period": "2024-06",
+      "expected_cash_in": 24612.0,
+      "expected_cash_out": 41198.0
+    },
+    {
+      "year": 2024,
+      "month": 7,
+      "period": "2024-07",
+      "expected_cash_in": 33222.0,
+      "expected_cash_out": 41352.0
+    },
+    {
+      "year": 2024,
+      "month": 8,
+      "period": "2024-08",
+      "expected_cash_in": 30058.0,
+      "expected_cash_out": 42474.0
+    },
+    {
+      "year": 2024,
+      "month": 9,
+      "period": "2024-09",
+      "expected_cash_in": 33447.0,
+      "expected_cash_out": 43050.0
+    },
+    {
+      "year": 2024,
+      "month": 10,
+      "period": "2024-10",
+      "expected_cash_in": 43551.0,
+      "expected_cash_out": 48276.0
+    },
+    {
+      "year": 2024,
+      "month": 11,
+      "period": "2024-11",
+      "expected_cash_in": 20728.0,
+      "expected_cash_out": 51898.0
+    },
+    {
+      "year": 2024,
+      "month": 12,
+      "period": "2024-12",
+      "expected_cash_in": 21207.0,
+      "expected_cash_out": 43502.0
+    },
+    {
+      "year": 2025,
+      "month": 1,
+      "period": "2025-01",
+      "expected_cash_in": 12949.16,
+      "expected_cash_out": 50210.44
+    },
+    {
+      "year": 2025,
+      "month": 2,
+      "period": "2025-02",
+      "expected_cash_in": 14118.21,
+      "expected_cash_out": 44831.78
+    },
+    {
+      "year": 2025,
+      "month": 3,
+      "period": "2025-03",
+      "expected_cash_in": 18679.05,
+      "expected_cash_out": 51088.0
+    },
+    {
+      "year": 2025,
+      "month": 4,
+      "period": "2025-04",
+      "expected_cash_in": 17157.74,
+      "expected_cash_out": 55814.67
+    },
+    {
+      "year": 2025,
+      "month": 5,
+      "period": "2025-05",
+      "expected_cash_in": 18261.9,
+      "expected_cash_out": 42829.46
+    },
+    {
+      "year": 2025,
+      "month": 6,
+      "period": "2025-06",
+      "expected_cash_in": 25350.36,
+      "expected_cash_out": 42433.94
+    },
+    {
+      "year": 2025,
+      "month": 7,
+      "period": "2025-07",
+      "expected_cash_in": 34218.66,
+      "expected_cash_out": 42592.56
+    },
+    {
+      "year": 2025,
+      "month": 8,
+      "period": "2025-08",
+      "expected_cash_in": 30959.74,
+      "expected_cash_out": 43748.22
+    },
+    {
+      "year": 2025,
+      "month": 9,
+      "period": "2025-09",
+      "expected_cash_in": 34450.41,
+      "expected_cash_out": 44341.5
+    },
+    {
+      "year": 2025,
+      "month": 10,
+      "period": "2025-10",
+      "expected_cash_in": 44857.53,
+      "expected_cash_out": 49724.28
+    },
+    {
+      "year": 2025,
+      "month": 11,
+      "period": "2025-11",
+      "expected_cash_in": 21349.84,
+      "expected_cash_out": 53454.94
+    },
+    {
+      "year": 2025,
+      "month": 12,
+      "period": "2025-12",
+      "expected_cash_in": 21843.21,
+      "expected_cash_out": 44807.06
+    }
+  ],
   "available_sectors": [
     "dairy",
     "beef",
