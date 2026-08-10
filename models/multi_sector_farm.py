@@ -102,3 +102,31 @@ def estimate_loan_position(loan: dict, as_of: date | None = None) -> dict:
 def build_debt_register(loans: list[dict] | None, as_of: date | None = None) -> list[dict]:
     """Per-lender debt register: outstanding balance, rate, and years remaining."""
     return [estimate_loan_position(loan, as_of) for loan in (loans or [])]
+
+
+def compute_household_month(household: dict | None, month: int) -> dict:
+    """Household-only cash movement for a given calendar month (1-12).
+
+    Additive on top of the farm dataset: drawings/living costs, off-farm
+    income, and pension/insurance are modelled as constant monthly figures;
+    tax lands as a lump sum in its configured payment month(s) - the same
+    pattern `scheme_payments`/`scheme_payment_months` uses for farm income.
+    """
+    household = household or {}
+    income = float(household.get("off_farm_income_monthly") or 0)
+    transfer_in = float(household.get("farm_to_household_transfer_monthly") or 0)
+    outgoings = (
+        float(household.get("drawings_monthly") or 0)
+        + float(household.get("pension_insurance_monthly") or 0)
+    )
+    tax_annual = float(household.get("tax_annual") or 0)
+    tax_months = household.get("tax_payment_months") or []
+    if tax_months and month in tax_months:
+        outgoings += tax_annual / len(tax_months)
+
+    return {
+        "income": round(income, 2),
+        "transfer_in": round(transfer_in, 2),
+        "outgoings": round(outgoings, 2),
+        "net": round(income + transfer_in - outgoings, 2),
+    }

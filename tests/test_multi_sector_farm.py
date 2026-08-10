@@ -97,3 +97,40 @@ def test_to_legacy_farm_dict_exposes_debt_register(farm):
     legacy = to_legacy_farm_dict(aggregated, farm)
     assert legacy["debt_register"] == aggregated["debt_register"]
     assert legacy["_loans"] == aggregated["loans"]
+
+
+def test_monthly_forecast_keeps_legacy_fields_unchanged(farm):
+    """Farm/household split (Phase 2) must not alter the pre-existing figures."""
+    legacy = load_farm_for_analysis(MULTI_SECTOR_FILE, ["dairy", "beef", "lamb"])
+    for entry in legacy["monthly_forecast"]:
+        assert entry["cashflow"] == round(entry["revenue"] - entry["costs"], 2)
+
+
+def test_monthly_forecast_adds_household_and_combined_fields(farm):
+    legacy = load_farm_for_analysis(MULTI_SECTOR_FILE, ["dairy", "beef", "lamb"])
+    entry = legacy["monthly_forecast"][0]
+    for key in (
+        "farm_cashflow", "farm_running_balance",
+        "household_income", "household_transfer_in", "household_outgoings",
+        "household_net", "household_running_balance",
+        "combined_cashflow", "combined_running_balance",
+    ):
+        assert key in entry
+
+
+def test_combined_cashflow_nets_out_transfer_and_matches_legacy_plus_household(farm):
+    legacy = load_farm_for_analysis(MULTI_SECTOR_FILE, ["dairy", "beef", "lamb"])
+    for entry in legacy["monthly_forecast"]:
+        expected_combined = round(
+            entry["cashflow"] + entry["household_income"] - entry["household_outgoings"], 2
+        )
+        assert entry["combined_cashflow"] == expected_combined
+        assert entry["farm_cashflow"] == round(entry["cashflow"] - entry["household_transfer_in"], 2)
+
+
+def test_tax_month_increases_household_outgoings(farm):
+    legacy = load_farm_for_analysis(MULTI_SECTOR_FILE, ["dairy", "beef", "lamb"])
+    monthly = {e["month"]: e for e in legacy["monthly_forecast"]}
+    tax_month = monthly[11]
+    non_tax_month = monthly[10]
+    assert tax_month["household_outgoings"] > non_tax_month["household_outgoings"]

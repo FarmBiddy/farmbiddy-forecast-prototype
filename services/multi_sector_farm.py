@@ -19,6 +19,7 @@ from models.multi_sector_farm import (
     SECTOR_LABELS,
     VALID_SECTORS,
     build_debt_register,
+    compute_household_month,
 )
 
 COST_TO_LEGACY = {
@@ -257,8 +258,12 @@ def _build_monthly_forecast(farm: dict, aggregated: dict) -> list[dict]:
 
     scheme = farm.get("scheme_payments") or {}
     scheme_months = scheme.get("scheme_payment_months") or {}
-    opening = float((farm.get("farm_summary") or {}).get("opening_cash_balance") or 0)
+    farm_summary = farm.get("farm_summary") or {}
+    household = farm_summary.get("household") or {}
+    opening = float(farm_summary.get("opening_cash_balance") or 0)
     running = opening
+    farm_running = opening
+    household_running = 0.0
     forecast: list[dict] = []
 
     for month in range(1, 13):
@@ -276,12 +281,34 @@ def _build_monthly_forecast(farm: dict, aggregated: dict) -> list[dict]:
         monthly_costs = avg_costs + loan_monthly
         cashflow = monthly_revenue - monthly_costs
         running += cashflow
+
+        # Farm/household split (Teagasc item 5). `cashflow`/`running_balance`
+        # above are left untouched for backward compatibility; the fields
+        # below are additive and net out the inter-account transfer so
+        # `combined_*` always equals the untouched legacy figures plus the
+        # household's own income/outgoings.
+        hh = compute_household_month(household, month)
+        farm_cashflow = cashflow - hh["transfer_in"]
+        farm_running += farm_cashflow
+        household_running += hh["net"]
+        combined_cashflow = farm_cashflow + hh["net"]
+        combined_running = farm_running + household_running
+
         forecast.append({
             "month": month,
             "revenue": round(monthly_revenue, 2),
             "costs": round(monthly_costs, 2),
             "cashflow": round(cashflow, 2),
             "running_balance": round(running, 2),
+            "farm_cashflow": round(farm_cashflow, 2),
+            "farm_running_balance": round(farm_running, 2),
+            "household_income": hh["income"],
+            "household_transfer_in": hh["transfer_in"],
+            "household_outgoings": hh["outgoings"],
+            "household_net": hh["net"],
+            "household_running_balance": round(household_running, 2),
+            "combined_cashflow": round(combined_cashflow, 2),
+            "combined_running_balance": round(combined_running, 2),
         })
     return forecast
 
