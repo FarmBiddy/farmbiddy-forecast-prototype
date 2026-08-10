@@ -11,7 +11,8 @@ let state = {
   activeFarmFile: ACTIVE_FARM_FILE,
   selectedSectors: ["dairy", "beef", "lamb"],
   availableSectors: [],
-  view: "dashboard",
+  view: "overview",
+  activeSubtab: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -621,16 +622,63 @@ function renderExecutiveAlerts(alerts, listId = "alerts-list") {
   }).join("");
 }
 
+function overviewMetricCard(label, valueHtml, subHtml, extraClass = "") {
+  return `
+    <div class="overview-metric-card ${extraClass}">
+      <div class="overview-metric-label">${label}</div>
+      <div class="overview-metric-value">${valueHtml}</div>
+      ${subHtml ? `<div class="overview-metric-sub">${subHtml}</div>` : ""}
+    </div>`;
+}
+
+function renderOverviewSummary(summary) {
+  const box = $("overview-summary");
+  if (!box || !summary) return;
+  const cash = summary.current_cash_position || {};
+  const lowest = summary.lowest_projected_cash_balance || {};
+  const annual = summary.projected_annual_cashflow || {};
+
+  box.innerHTML = [
+    overviewMetricCard(
+      "Current Cash Position",
+      cash.value ?? "—",
+      cash.period?.label || "",
+    ),
+    overviewMetricCard(
+      "Lowest Projected Cash Balance",
+      `<span class="${lowest.is_deficit ? "negative" : ""}">${lowest.value ?? "—"}</span>`,
+      lowest.month_label ? `${lowest.month_label} of the forecast` : "Next 12 months",
+    ),
+    overviewMetricCard(
+      "Projected Annual Cashflow",
+      `<span class="${annual.is_deficit ? "negative" : "positive"}">${annual.value ?? "—"}</span>`,
+      annual.is_deficit ? "Projected deficit" : "Projected surplus",
+    ),
+    overviewMetricCard(
+      "Main Financial Concern",
+      summary.main_financial_concern || "—",
+      "",
+      "overview-metric-wide",
+    ),
+    overviewMetricCard(
+      "Recommended Next Action",
+      summary.recommended_next_action || "—",
+      "",
+      "overview-metric-wide",
+    ),
+  ].join("");
+}
+
 function renderExecutiveDashboard(data) {
   $("dashboard-empty")?.classList.add("hidden");
   $("dashboard-results")?.classList.remove("hidden");
   renderDataQualityWarnings(data.data_quality_warnings);
   renderOverviewHeader(data.overview_header);
+  renderOverviewSummary(data.overview_summary);
   renderKpis(data.executive_kpis || data.kpis);
   renderHealthSnapshot(data.health_snapshot);
   renderHealthScoreDetail(data.health_score);
   renderSectorTable(data.sector_performance);
-  renderExecutiveAlerts(data.alerts);
   renderExecutiveAlerts(data.alerts, "alerts-full");
   updateAlertsNavHighlight(data.alerts);
   renderOverviewChart(data.overview_chart);
@@ -704,10 +752,10 @@ function updateAlertsNavHighlight(alerts) {
   if (!btn) return;
   const count = countActionableAlerts(alerts);
   btn.classList.remove("nav-alerts--warn-low", "nav-alerts--warn-mid", "nav-alerts--warn-high");
-  btn.textContent = "Alerts";
+  btn.textContent = "Action Plan";
   if (count >= 5) {
     btn.classList.add("nav-alerts--warn-high");
-    btn.textContent = "⚠ Alerts";
+    btn.textContent = "⚠ Action Plan";
   } else if (count >= 3) {
     btn.classList.add("nav-alerts--warn-mid");
   } else if (count >= 1) {
@@ -1241,20 +1289,74 @@ function initFarmIntelligencePage() {
   });
 }
 
+// Five main sections (Overview, Cash Flow, Farm Performance, Action Plan,
+// Farm Data) plus Advanced Analysis / Settings replaced the old flat list of
+// 8 nav items (UX items 1/7/9/13). Several of those sections now hold more
+// than one page's worth of content behind in-page sub-tabs, so navigation
+// and lazy-loading are keyed on (view, sub-tab) rather than view alone.
+const DEFAULT_SUBTAB = {
+  cashflow: "cashflow-forecast",
+  "farm-performance": "fp-sectors",
+  "action-plan": "ap-alerts",
+};
+
+const SUBTAB_LOADERS = {
+  "cashflow-forecast": () => ensureAdvancedForecast(),
+  "cashflow-budget": () => loadCashflowBudget(),
+  "fp-historical": () => loadHistoricalData(),
+  "ap-recommendations": () => loadFinancialIntelligence(),
+  "ap-ask": () => initFarmIntelligencePage(),
+  "ap-reports": () => {
+    initReportDate();
+    updateReportSections();
+  },
+};
+
+async function runSubtabLoader(tab) {
+  const loader = SUBTAB_LOADERS[tab];
+  if (!loader) return;
+  try {
+    await loader();
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+function switchSubtab(group, tab) {
+  const groupEl = document.querySelector(`[data-subtab-group="${group}"]`);
+  const section = groupEl?.closest(".view");
+  if (!section) return;
+  section.querySelectorAll(`[data-subtab-group="${group}"] .subtab-btn`).forEach((b) => {
+    b.classList.toggle("active", b.dataset.subtab === tab);
+  });
+  section.querySelectorAll("[data-subtab-panel]").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.subtabPanel !== tab);
+  });
+  state.activeSubtab = tab;
+  runSubtabLoader(tab);
+}
+
+function setupSubtabs() {
+  document.querySelectorAll(".subtab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const group = btn.closest("[data-subtab-group]")?.dataset.subtabGroup;
+      const tab = btn.dataset.subtab;
+      if (group && tab) switchSubtab(group, tab);
+    });
+  });
+}
+
 async function navigate(view) {
   state.view = view;
   document.querySelectorAll(".nav-link").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
   document.querySelectorAll(".view").forEach((v) => { v.classList.remove("active"); v.classList.add("hidden"); });
   const section = $(`view-${view}`);
   if (section) { section.classList.add("active"); section.classList.remove("hidden"); }
-  if (view === "forecasts") await ensureAdvancedForecast();
-  if (view === "farm-intelligence") initFarmIntelligencePage();
-  if (view === "intelligence") await loadFinancialIntelligence();
-  if (view === "historical") await loadHistoricalData();
-  if (view === "reports") {
-    initReportDate();
-    updateReportSections();
-  }
+
+  const defaultSubtab = DEFAULT_SUBTAB[view] || null;
+  state.activeSubtab = defaultSubtab;
+  if (defaultSubtab) await runSubtabLoader(defaultSubtab);
+  if (view === "advanced-analysis") await ensureAdvancedForecast();
 }
 
 function renderFinancialIntelligence(data) {
@@ -1329,6 +1431,80 @@ function renderHistoricalData(data) {
     html += renderTable(s.monthly, `${s.label} — totals: ${formatCurrency(s.totals?.revenue)} revenue`);
   });
   box.innerHTML = html || `<p class="muted">No historical data available.</p>`;
+}
+
+function budgetStatusLabel(status) {
+  if (status === "ahead") return "Ahead";
+  if (status === "behind") return "Behind";
+  return "On budget";
+}
+
+function classificationLabel(classification) {
+  if (classification === "long_term") return "Long-term / structural";
+  if (classification === "short_term") return "Short-term";
+  return "—";
+}
+
+function renderCashflowBudgetTable(data) {
+  $("cashflow-budget-loading")?.classList.add("hidden");
+  const entries = data.entries || [];
+
+  const summary = $("cashflow-budget-summary");
+  if (summary) {
+    summary.classList.remove("hidden");
+    summary.innerHTML = `${entries.length} month(s) compared. `
+      + `${data.deficit_months || 0} month(s) in deficit `
+      + `(${data.short_term_deficit_months || 0} short-term, ${data.long_term_deficit_months || 0} long-term/structural). `
+      + `${data.behind_budget_months || 0} month(s) behind budget.`;
+  }
+
+  const table = $("cashflow-budget-table");
+  if (!table) return;
+  if (!entries.length) {
+    table.innerHTML = `<p class="muted">No overlapping budget and actual months found.</p>`;
+    return;
+  }
+  table.innerHTML = `
+    <table class="sector-table data-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Actual Net</th>
+          <th>Budgeted Net</th>
+          <th>Variance</th>
+          <th>Budget Status</th>
+          <th>Classification</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${entries.map((e) => `
+          <tr>
+            <td>${e.period_info?.label || e.period}</td>
+            <td class="${signClass(e.actual_net)}">${formatCurrency(e.actual_net)}</td>
+            <td>${formatCurrency(e.budgeted_net)}</td>
+            <td class="${signClass(e.variance)}">${formatCurrency(e.variance)}</td>
+            <td>${budgetStatusLabel(e.budget_status)}</td>
+            <td>${classificationLabel(e.classification)}</td>
+            <td class="muted">${e.classification_reason || e.cause_summary || ""}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+async function loadCashflowBudget() {
+  $("cashflow-budget-loading")?.classList.remove("hidden");
+  $("cashflow-budget-summary")?.classList.add("hidden");
+  try {
+    const data = await api(`/farmer/cashflow-budget${sectorsQuery()}`);
+    renderCashflowBudgetTable(data);
+  } catch (err) {
+    if ($("cashflow-budget-loading")) {
+      $("cashflow-budget-loading").classList.remove("hidden");
+      $("cashflow-budget-loading").textContent = `Could not load: ${err.message}`;
+    }
+    showStatus(err.message, "error");
+  }
 }
 
 async function loadHistoricalData() {
@@ -1415,11 +1591,12 @@ async function onSectorChange(changedInput) {
   showStatus("Updating analysis for selected sectors…", "info");
   try {
     await refreshFarmData();
-    if (state.view === "intelligence") await loadFinancialIntelligence();
-    if (state.view === "farm-intelligence") clearFiChat(true);
-    if (state.view === "forecasts") await ensureAdvancedForecast();
-    if (state.view === "historical") await loadHistoricalData();
-    if (state.view === "reports") $("report-preview")?.classList.add("hidden");
+    if (state.activeSubtab === "ap-recommendations") await loadFinancialIntelligence();
+    if (state.activeSubtab === "ap-ask") clearFiChat(true);
+    if (state.activeSubtab === "cashflow-forecast" || state.view === "advanced-analysis") await ensureAdvancedForecast();
+    if (state.activeSubtab === "fp-historical") await loadHistoricalData();
+    if (state.activeSubtab === "cashflow-budget") await loadCashflowBudget();
+    if (state.activeSubtab === "ap-reports") $("report-preview")?.classList.add("hidden");
     showStatus(`Analyzing: ${sectorSummaryLabel()}`, "success");
   } catch (err) {
     showStatus(err.message, "error");
@@ -1579,6 +1756,7 @@ function setupNav() {
       navigate(btn.dataset.view).catch((err) => showStatus(err.message, "error"));
     });
   });
+  setupSubtabs();
   $("run-sandbox-btn")?.addEventListener("click", runSandbox);
   $("test-all-actions-btn")?.addEventListener("click", testAllCashflowActions);
   $("test-one-action-btn")?.addEventListener("click", testOneCashflowAction);

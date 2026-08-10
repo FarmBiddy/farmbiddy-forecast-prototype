@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from services.dashboard_summary import (
     build_overview_chart_data,
+    build_overview_summary,
     calculate_dashboard_kpis,
     calculate_sector_performance,
     generate_dashboard_alerts,
@@ -66,6 +67,53 @@ def test_calculate_dashboard_kpis_prefers_debt_register():
     }
     cards = calculate_dashboard_kpis(summary, farm, [], "Low")
     assert cards[3]["value"] == "€110,000"
+
+
+def test_build_overview_summary_no_alerts_is_reassuring():
+    farm = {"opening_cash_balance": 28500}
+    monthly_forecast = [
+        {"month": m, "combined_running_balance": 10000 + m * 100, "combined_cashflow": 100}
+        for m in range(1, 13)
+    ]
+    alerts = [{
+        "message": "No critical alerts — farm metrics look stable.",
+        "severity": "info",
+        "what": "No critical alerts",
+        "review": "No action needed — recheck after your next analysis run.",
+    }]
+    summary = build_overview_summary(farm, monthly_forecast, alerts)
+    assert summary["current_cash_position"]["value"] == "€28,500"
+    assert summary["lowest_projected_cash_balance"]["month"] == 1
+    assert summary["lowest_projected_cash_balance"]["is_deficit"] is False
+    assert summary["projected_annual_cashflow"]["value"] == "€1,200"
+    assert "No critical concerns" in summary["main_financial_concern"]
+    assert "No action needed" in summary["recommended_next_action"]
+
+
+def test_build_overview_summary_surfaces_top_alert():
+    farm = {"opening_cash_balance": 5000}
+    monthly_forecast = [
+        {"month": 1, "combined_running_balance": 4000, "combined_cashflow": -1000},
+        {"month": 2, "combined_running_balance": -2000, "combined_cashflow": -6000},
+        {"month": 3, "combined_running_balance": 500, "combined_cashflow": 2500},
+    ]
+    alerts = [{
+        "message": "Cash-flow warning: the forecast shows a negative cash balance in month 2.",
+        "severity": "high",
+        "what": "Future months show a negative cash balance",
+        "review": "Plan ahead for the shortfall — bring forward income, defer costs, or arrange short-term credit.",
+    }]
+    summary = build_overview_summary(farm, monthly_forecast, alerts)
+    assert summary["lowest_projected_cash_balance"]["month"] == 2
+    assert summary["lowest_projected_cash_balance"]["is_deficit"] is True
+    assert summary["projected_annual_cashflow"]["is_deficit"] is True
+    assert summary["main_financial_concern"] == "Future months show a negative cash balance"
+    assert "bring forward income" in summary["recommended_next_action"]
+
+
+def test_build_overview_summary_handles_empty_forecast():
+    summary = build_overview_summary({"opening_cash_balance": 1000}, [], [])
+    assert summary["main_financial_concern"].startswith("Not enough data")
 
 
 def test_latest_period_finds_most_recent_across_sectors():

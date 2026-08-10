@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=17" />
+  <link rel="stylesheet" href="/assets/styles.css?v=18" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -21,13 +21,14 @@
       </div>
 
       <nav class="sidebar-nav">
-        <button type="button" class="nav-link active" data-view="dashboard">Dashboard</button>
-        <button type="button" class="nav-link" data-view="farm-intelligence">Farm Intelligence</button>
-        <button type="button" class="nav-link" data-view="forecasts">Forecasts</button>
-        <button type="button" class="nav-link" data-view="reports">Reports</button>
-        <button type="button" class="nav-link" data-view="historical">Historical Data</button>
-        <button type="button" class="nav-link nav-link-secondary" data-view="my-farm">My Farm</button>
-        <button type="button" id="nav-alerts" class="nav-link nav-link-secondary" data-view="alerts">Alerts</button>
+        <button type="button" class="nav-link active" data-view="overview">Overview</button>
+        <button type="button" class="nav-link" data-view="cashflow">Cash Flow</button>
+        <button type="button" class="nav-link" data-view="farm-performance">Farm Performance</button>
+        <button type="button" id="nav-alerts" class="nav-link" data-view="action-plan">Action Plan</button>
+        <button type="button" class="nav-link" data-view="farm-data">Farm Data</button>
+      </nav>
+      <nav class="sidebar-nav sidebar-nav-utility">
+        <button type="button" class="nav-link nav-link-secondary" data-view="advanced-analysis">Advanced Analysis</button>
         <button type="button" class="nav-link nav-link-secondary" data-view="settings">Settings</button>
       </nav>
 
@@ -80,11 +81,9 @@
         </div>
       </div>
 
-      <!-- Dashboard view -->
-      <section class="view active" id="view-dashboard">
+      <!-- Overview: the whole farm, at a glance -->
+      <section class="view active" id="view-overview">
         <div id="exec-overview-header" class="card exec-overview-card"></div>
-
-        <div class="kpi-row exec-kpi-row" id="kpi-row"></div>
 
         <div id="dashboard-empty" class="empty-state">
           <p>Loading farm performance overview…</p>
@@ -93,32 +92,253 @@
         <div id="dashboard-results" class="hidden">
           <div id="data-quality-warnings" class="dq-warnings hidden"></div>
 
+          <div class="card overview-summary-card">
+            <h3>Your Farm at a Glance</h3>
+            <div id="overview-summary" class="overview-summary-grid"></div>
+          </div>
+
+          <details class="card overview-detail-toggle">
+            <summary>More detail — KPIs, financial health &amp; trend</summary>
+            <div class="overview-detail-body">
+              <div class="kpi-row exec-kpi-row" id="kpi-row"></div>
+              <div class="card-inner">
+                <h3>Financial Health Snapshot</h3>
+                <div id="health-snapshot" class="health-snapshot"></div>
+                <div id="health-score-detail" class="health-score-detail"></div>
+              </div>
+              <div class="card-inner chart-card">
+                <h3>Revenue vs Costs — Last 24 Months</h3>
+                <div id="overview-chart" class="chart-area overview-chart-area"></div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Cash Flow: forecast, and budget vs actual -->
+      <section class="view hidden" id="view-cashflow">
+        <div class="card">
+          <h3>Cash Flow</h3>
+          <p class="muted">12-month cash-flow forecast, and how actuals have compared to budget.</p>
+          <div class="subtabs" data-subtab-group="cashflow">
+            <button type="button" class="subtab-btn active" data-subtab="cashflow-forecast">Forecast</button>
+            <button type="button" class="subtab-btn" data-subtab="cashflow-budget">Budget vs Actual</button>
+          </div>
+        </div>
+
+        <div class="subtab-panel" data-subtab-panel="cashflow-forecast">
+          <div id="forecast-results" class="hidden">
+            <div class="interpretation-box" id="forecast-interpretation"></div>
+            <div class="metric-grid" id="forecast-kpis"></div>
+            <div class="grid-row grid-2-1">
+              <div class="card"><h3>Cashflow Forecast</h3><div id="forecast-cashflow-chart" class="chart-area"></div></div>
+              <div class="card"><h3>Profit Forecast</h3><div id="forecast-profit-chart" class="chart-area"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="cashflow-budget">
           <div class="card">
-            <h3>Financial Health Snapshot</h3>
-            <div id="health-snapshot" class="health-snapshot"></div>
-            <div id="health-score-detail" class="health-score-detail"></div>
-          </div>
-
-          <div class="grid-row grid-2-1">
-            <div class="card">
-              <div class="card-title-row"><h3>Sector Performance</h3><span id="sector-performance-period"></span></div>
-              <div id="sector-performance-table" class="table-wrap"></div>
-            </div>
-            <div class="card">
-              <h3>Key Alerts</h3>
-              <ul id="alerts-list" class="alert-list exec-alerts"></ul>
-            </div>
-          </div>
-
-          <div class="card chart-card">
-            <h3>Revenue vs Costs — Last 24 Months</h3>
-            <div id="overview-chart" class="chart-area overview-chart-area"></div>
+            <h3>Monthly Budget vs Actual</h3>
+            <p class="muted">How actual cash in/out compared to the monthly budget, and whether any shortfall looks short-term or structural.</p>
+            <div id="cashflow-budget-loading" class="muted">Loading budget comparison…</div>
+            <div id="cashflow-budget-summary" class="interpretation-box hidden"></div>
+            <div id="cashflow-budget-table" class="table-wrap"></div>
           </div>
         </div>
       </section>
 
-      <!-- Other views -->
-      <section class="view hidden" id="view-my-farm">
+      <!-- Farm Performance: whole-farm and per-sector results, historical trend -->
+      <section class="view hidden" id="view-farm-performance">
+        <div class="card">
+          <h3>Farm Performance</h3>
+          <p class="muted">How each enterprise is performing, and how figures have trended over time.</p>
+          <div class="subtabs" data-subtab-group="farm-performance">
+            <button type="button" class="subtab-btn active" data-subtab="fp-sectors">Sector Performance</button>
+            <button type="button" class="subtab-btn" data-subtab="fp-historical">Historical Data</button>
+          </div>
+        </div>
+
+        <div class="subtab-panel" data-subtab-panel="fp-sectors">
+          <div class="card">
+            <div class="card-title-row"><h3>Sector Performance</h3><span id="sector-performance-period"></span></div>
+            <div id="sector-performance-table" class="table-wrap"></div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="fp-historical">
+          <div class="card">
+            <h3>Historical Data</h3>
+            <p class="muted">24-month revenue and cost history for selected sectors.</p>
+          </div>
+          <div id="historical-loading" class="muted">Loading historical data…</div>
+          <div id="historical-content" class="hidden"></div>
+        </div>
+      </section>
+
+      <!-- Action Plan: everything a farmer might act on -->
+      <section class="view hidden" id="view-action-plan">
+        <div class="card">
+          <h3>Action Plan</h3>
+          <p class="muted">Alerts, recommendations, practical cash-flow actions, reports, and Farm Intelligence — everything you might act on.</p>
+          <div class="subtabs" data-subtab-group="action-plan">
+            <button type="button" class="subtab-btn active" data-subtab="ap-alerts">Alerts</button>
+            <button type="button" class="subtab-btn" data-subtab="ap-recommendations">Recommendations</button>
+            <button type="button" class="subtab-btn" data-subtab="ap-cashflow-actions">Cash-Flow Actions</button>
+            <button type="button" class="subtab-btn" data-subtab="ap-ask">Ask Farm Intelligence</button>
+            <button type="button" class="subtab-btn" data-subtab="ap-reports">Reports</button>
+          </div>
+        </div>
+
+        <div class="subtab-panel" data-subtab-panel="ap-alerts">
+          <div class="card exec-alerts"><h3>All Alerts</h3><ul id="alerts-full" class="alert-list"></ul></div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="ap-recommendations">
+          <div id="intelligence-loading" class="muted">Loading financial intelligence…</div>
+          <div id="intelligence-content" class="hidden">
+            <div class="interpretation-box" id="intel-summary"></div>
+            <div class="grid-row grid-2-1">
+              <div class="card">
+                <h3>Farm Health Score</h3>
+                <div id="intel-health" class="health-block"></div>
+              </div>
+              <div class="card">
+                <h3>Plain-English Summary</h3>
+                <p id="intel-plain" class="intel-text"></p>
+              </div>
+            </div>
+            <div class="grid-row grid-2-1">
+              <div class="card"><h3>Key Strengths</h3><ul id="intel-strengths" class="intel-list"></ul></div>
+              <div class="card"><h3>Key Weaknesses</h3><ul id="intel-weaknesses" class="intel-list"></ul></div>
+            </div>
+            <div class="grid-row grid-2-1">
+              <div class="card"><h3>Biggest Financial Risks</h3><div id="intel-risks"></div></div>
+              <div class="card"><h3>Opportunities</h3><ul id="intel-opportunities" class="intel-list"></ul></div>
+            </div>
+            <div class="card">
+              <h3>Top 5 Recommended Actions</h3>
+              <ol id="intel-actions" class="rec-list"></ol>
+            </div>
+            <div class="card advisor-box">
+              <h3>AI Farm Advisor</h3>
+              <p class="muted">Ask a question about your farm finances.</p>
+              <div class="advisor-input-row">
+                <input type="text" id="advisor-question" class="input-field" placeholder="e.g. Can I afford new machinery?" />
+                <button type="button" id="ask-advisor-btn" class="btn-run">Ask</button>
+              </div>
+              <div id="advisor-answer" class="advisor-answer hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="ap-cashflow-actions">
+          <div class="card">
+            <h3>Cash-Flow Actions</h3>
+            <p class="muted">Practical actions to fix a cash-flow gap — see the effect each one would have on your lowest cash balance and number of deficit months over the next 12 months.</p>
+            <button type="button" id="test-all-actions-btn" class="btn-run">Test All 5 Actions</button>
+            <div id="cashflow-actions-summary" class="interpretation-box hidden"></div>
+            <div id="cashflow-actions-table"></div>
+          </div>
+          <div class="card">
+            <h3>Try One Action In Detail</h3>
+            <p class="muted">Optionally set your own amount and months — leave blank to use sensible defaults.</p>
+            <div class="sandbox-grid">
+              <label>Action
+                <select id="cfa-action" class="input-field">
+                  <option value="bring_forward_sales">Bring forward sales</option>
+                  <option value="defer_purchases">Defer purchases</option>
+                  <option value="adjust_loan_timing">Adjust loan timing</option>
+                  <option value="match_payments_to_surplus">Match payments to surplus</option>
+                  <option value="use_short_term_credit">Use short-term credit</option>
+                </select>
+              </label>
+              <label>Amount (€)<input type="number" step="100" id="cfa-amount" class="input-field" placeholder="auto" /></label>
+              <label>From / draw month (1-12)<input type="number" step="1" min="1" max="12" id="cfa-from-month" class="input-field" placeholder="auto" /></label>
+              <label>To / repay month (1-12)<input type="number" step="1" min="1" max="12" id="cfa-to-month" class="input-field" placeholder="auto" /></label>
+            </div>
+            <button type="button" id="test-one-action-btn" class="btn-run">Test This Action</button>
+            <div id="cashflow-action-result" class="interpretation-box hidden"></div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="ap-ask">
+          <div class="card fi-header-card">
+            <h3>Farm Intelligence</h3>
+            <p class="fi-title">Ask anything about your farm</p>
+            <p class="muted">Get plain-English answers about scenarios, profitability, risk, and farm health — based on your selected sectors.</p>
+          </div>
+          <div class="card fi-chat-card">
+            <div id="fi-chat" class="fi-chat">
+              <div id="fi-empty" class="fi-empty">
+                <p class="muted">Ask a question below or choose a suggested question to get started.</p>
+              </div>
+              <div id="fi-messages" class="fi-messages hidden"></div>
+            </div>
+            <div class="fi-input-row">
+              <input type="text" id="fi-question" class="input-field" placeholder="e.g. What happens if milk price increases by 5c/L?" />
+              <button type="button" id="fi-clear-btn" class="btn-secondary">Clear chat</button>
+              <button type="button" id="fi-ask-btn" class="btn-run">Ask</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Suggested questions</h3>
+            <div id="fi-suggestions" class="fi-suggestions"></div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="ap-reports">
+          <div class="card report-header-card">
+            <div class="report-header-row">
+              <div>
+                <h3>Reports</h3>
+                <p class="muted">Generate professional PDF reports for your farm — ready for accountants, banks, and advisors.</p>
+              </div>
+              <span class="report-badge">FarmBiddy Premium Reports</span>
+            </div>
+          </div>
+          <div class="grid-row grid-2-1">
+            <div class="card">
+              <h3>Generate Report</h3>
+              <label class="field-label" for="report-type">Report Type</label>
+              <select id="report-type" class="input-field">
+                <option value="full">Full Financial Report</option>
+                <option value="executive">Executive Report</option>
+                <option value="scenario">Scenario Report</option>
+                <option value="investment">Investment Report</option>
+              </select>
+              <label class="field-label" for="report-date">Report Date</label>
+              <input type="date" id="report-date" class="input-field" />
+              <div class="report-actions">
+                <button type="button" id="preview-report-btn" class="btn-secondary">Preview Report</button>
+                <button type="button" id="generate-report-btn" class="btn-run">Generate &amp; Download PDF</button>
+              </div>
+              <p id="report-status" class="muted report-status hidden"></p>
+            </div>
+            <div class="card">
+              <h3>Report Includes</h3>
+              <ul id="report-sections" class="intel-list">
+                <li>Executive summary with KPI cards</li>
+                <li>Financial snapshot and charts</li>
+                <li>12-month forecast and scenarios</li>
+                <li>Monte Carlo simulation</li>
+                <li>Financial intelligence insights</li>
+                <li>Investment readiness score</li>
+              </ul>
+            </div>
+          </div>
+          <div id="report-preview" class="card hidden">
+            <h3>Report Preview</h3>
+            <div class="interpretation-box" id="report-preview-headline"></div>
+            <div class="grid-row grid-4" id="report-preview-kpis"></div>
+            <p id="report-preview-summary" class="intel-text"></p>
+            <a id="report-download-link" class="btn-run report-download hidden" href="#" target="_blank" rel="noopener">Download PDF</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Farm Data: inputs, assumptions, and supporting information -->
+      <section class="view hidden" id="view-farm-data">
         <div class="card"><h3>My Farm Profile</h3><div id="farm-profile-detail" class="profile-grid"></div></div>
         <div class="card">
           <h3>Debt Register</h3>
@@ -126,27 +346,19 @@
           <div id="debt-register-table" class="table-wrap"></div>
         </div>
       </section>
-      <section class="view hidden" id="view-daily"></section>
-      <section class="view hidden" id="view-forecasts">
+
+      <!-- Advanced Analysis: Monte Carlo, scenario sandbox, engine detail -->
+      <section class="view hidden" id="view-advanced-analysis">
         <div class="card">
-          <h3>Advanced Forecast</h3>
-          <p class="muted">12-month cashflow, profit forecast, and profit outlook</p>
+          <h3>Advanced Analysis</h3>
+          <p class="muted">Deeper, exploratory analysis: risk simulation, what-if scenarios, and the underlying engine charts.</p>
         </div>
-        <div id="forecast-results" class="hidden">
-          <div class="interpretation-box" id="forecast-interpretation"></div>
-          <div class="metric-grid" id="forecast-kpis"></div>
-          <div class="grid-row grid-2-1">
-            <div class="card"><h3>Cashflow Forecast</h3><div id="forecast-cashflow-chart" class="chart-area"></div></div>
-            <div class="card"><h3>Profit Forecast</h3><div id="forecast-profit-chart" class="chart-area"></div></div>
-          </div>
-          <div class="card">
-            <h3>Profit outlook</h3>
-            <div id="monte-carlo-panel"></div>
-          </div>
-          <div class="card"><h3>Engine Charts</h3><div id="forecast-engine-charts" class="chart-iframes"></div></div>
+        <div class="card">
+          <h3>Profit Outlook (Monte Carlo)</h3>
+          <div id="monte-carlo-panel"></div>
         </div>
-      </section>
-      <section class="view hidden" id="view-scenarios">
+        <div class="card"><h3>Engine Charts</h3><div id="forecast-engine-charts" class="chart-iframes"></div></div>
+
         <div class="card">
           <h3>Scenario Sandbox</h3>
           <p class="muted">Change assumptions and see the impact on profit, cashflow, and risk.</p>
@@ -175,163 +387,13 @@
             <div class="card"><h3>Top Recommended Actions</h3><ol id="sandbox-recommendations" class="rec-list"></ol></div>
           </div>
         </div>
-        <div class="card">
-          <h3>Cash-Flow Actions</h3>
-          <p class="muted">Practical actions to fix a cash-flow gap — see the effect each one would have on your lowest cash balance and number of deficit months over the next 12 months.</p>
-          <button type="button" id="test-all-actions-btn" class="btn-run">Test All 5 Actions</button>
-          <div id="cashflow-actions-summary" class="interpretation-box hidden"></div>
-          <div id="cashflow-actions-table"></div>
-        </div>
-        <div class="card">
-          <h3>Try One Action In Detail</h3>
-          <p class="muted">Optionally set your own amount and months — leave blank to use sensible defaults.</p>
-          <div class="sandbox-grid">
-            <label>Action
-              <select id="cfa-action" class="input-field">
-                <option value="bring_forward_sales">Bring forward sales</option>
-                <option value="defer_purchases">Defer purchases</option>
-                <option value="adjust_loan_timing">Adjust loan timing</option>
-                <option value="match_payments_to_surplus">Match payments to surplus</option>
-                <option value="use_short_term_credit">Use short-term credit</option>
-              </select>
-            </label>
-            <label>Amount (€)<input type="number" step="100" id="cfa-amount" class="input-field" placeholder="auto" /></label>
-            <label>From / draw month (1-12)<input type="number" step="1" min="1" max="12" id="cfa-from-month" class="input-field" placeholder="auto" /></label>
-            <label>To / repay month (1-12)<input type="number" step="1" min="1" max="12" id="cfa-to-month" class="input-field" placeholder="auto" /></label>
-          </div>
-          <button type="button" id="test-one-action-btn" class="btn-run">Test This Action</button>
-          <div id="cashflow-action-result" class="interpretation-box hidden"></div>
-        </div>
       </section>
-      <section class="view hidden" id="view-farm-intelligence">
-        <div class="card fi-header-card">
-          <h3>Farm Intelligence</h3>
-          <p class="fi-title">Ask anything about your farm</p>
-          <p class="muted">Get plain-English answers about scenarios, profitability, risk, and farm health — based on your selected sectors.</p>
-        </div>
-        <div class="card fi-chat-card">
-          <div id="fi-chat" class="fi-chat">
-            <div id="fi-empty" class="fi-empty">
-              <p class="muted">Ask a question below or choose a suggested question to get started.</p>
-            </div>
-            <div id="fi-messages" class="fi-messages hidden"></div>
-          </div>
-          <div class="fi-input-row">
-            <input type="text" id="fi-question" class="input-field" placeholder="e.g. What happens if milk price increases by 5c/L?" />
-            <button type="button" id="fi-clear-btn" class="btn-secondary">Clear chat</button>
-            <button type="button" id="fi-ask-btn" class="btn-run">Ask</button>
-          </div>
-        </div>
-        <div class="card">
-          <h3>Suggested questions</h3>
-          <div id="fi-suggestions" class="fi-suggestions"></div>
-        </div>
-      </section>
-      <section class="view hidden" id="view-intelligence">
-        <div class="card">
-          <h3>Financial Intelligence</h3>
-          <p class="muted">Practical insights and recommendations for your selected farm.</p>
-        </div>
-        <div id="intelligence-loading" class="muted">Loading financial intelligence…</div>
-        <div id="intelligence-content" class="hidden">
-          <div class="interpretation-box" id="intel-summary"></div>
-          <div class="grid-row grid-2-1">
-            <div class="card">
-              <h3>Farm Health Score</h3>
-              <div id="intel-health" class="health-block"></div>
-            </div>
-            <div class="card">
-              <h3>Plain-English Summary</h3>
-              <p id="intel-plain" class="intel-text"></p>
-            </div>
-          </div>
-          <div class="grid-row grid-2-1">
-            <div class="card"><h3>Key Strengths</h3><ul id="intel-strengths" class="intel-list"></ul></div>
-            <div class="card"><h3>Key Weaknesses</h3><ul id="intel-weaknesses" class="intel-list"></ul></div>
-          </div>
-          <div class="grid-row grid-2-1">
-            <div class="card"><h3>Biggest Financial Risks</h3><div id="intel-risks"></div></div>
-            <div class="card"><h3>Opportunities</h3><ul id="intel-opportunities" class="intel-list"></ul></div>
-          </div>
-          <div class="card">
-            <h3>Top 5 Recommended Actions</h3>
-            <ol id="intel-actions" class="rec-list"></ol>
-          </div>
-          <div class="card advisor-box">
-            <h3>AI Farm Advisor</h3>
-            <p class="muted">Ask a question about your farm finances.</p>
-            <div class="advisor-input-row">
-              <input type="text" id="advisor-question" class="input-field" placeholder="e.g. Can I afford new machinery?" />
-              <button type="button" id="ask-advisor-btn" class="btn-run">Ask</button>
-            </div>
-            <div id="advisor-answer" class="advisor-answer hidden"></div>
-          </div>
-        </div>
-      </section>
-      <section class="view hidden" id="view-reports">
-        <div class="card report-header-card">
-          <div class="report-header-row">
-            <div>
-              <h3>Reports</h3>
-              <p class="muted">Generate professional PDF reports for your farm — ready for accountants, banks, and advisors.</p>
-            </div>
-            <span class="report-badge">FarmBiddy Premium Reports</span>
-          </div>
-        </div>
-        <div class="grid-row grid-2-1">
-          <div class="card">
-            <h3>Generate Report</h3>
-            <label class="field-label" for="report-type">Report Type</label>
-            <select id="report-type" class="input-field">
-              <option value="full">Full Financial Report</option>
-              <option value="executive">Executive Report</option>
-              <option value="scenario">Scenario Report</option>
-              <option value="investment">Investment Report</option>
-            </select>
-            <label class="field-label" for="report-date">Report Date</label>
-            <input type="date" id="report-date" class="input-field" />
-            <div class="report-actions">
-              <button type="button" id="preview-report-btn" class="btn-secondary">Preview Report</button>
-              <button type="button" id="generate-report-btn" class="btn-run">Generate &amp; Download PDF</button>
-            </div>
-            <p id="report-status" class="muted report-status hidden"></p>
-          </div>
-          <div class="card">
-            <h3>Report Includes</h3>
-            <ul id="report-sections" class="intel-list">
-              <li>Executive summary with KPI cards</li>
-              <li>Financial snapshot and charts</li>
-              <li>12-month forecast and scenarios</li>
-              <li>Monte Carlo simulation</li>
-              <li>Financial intelligence insights</li>
-              <li>Investment readiness score</li>
-            </ul>
-          </div>
-        </div>
-        <div id="report-preview" class="card hidden">
-          <h3>Report Preview</h3>
-          <div class="interpretation-box" id="report-preview-headline"></div>
-          <div class="grid-row grid-4" id="report-preview-kpis"></div>
-          <p id="report-preview-summary" class="intel-text"></p>
-          <a id="report-download-link" class="btn-run report-download hidden" href="#" target="_blank" rel="noopener">Download PDF</a>
-        </div>
-      </section>
-      <section class="view hidden" id="view-historical">
-        <div class="card">
-          <h3>Historical Data</h3>
-          <p class="muted">24-month revenue and cost history for selected sectors.</p>
-        </div>
-        <div id="historical-loading" class="muted">Loading historical data…</div>
-        <div id="historical-content" class="hidden"></div>
-      </section>
-      <section class="view hidden" id="view-alerts">
-        <div class="card exec-alerts"><h3>All Alerts</h3><ul id="alerts-full" class="alert-list"></ul></div>
-      </section>
+
       <section class="view hidden" id="view-settings">
         <div class="card"><h3>Settings</h3><p class="muted">Active farm: <strong id="settings-farm">Knockrow Mixed Farm</strong> (multi_sector_farm.json). Sector selection controls all analysis.</p></div>
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=9"></script>
+  <script src="/assets/app.js?v=10"></script>
 </body>
 </html>

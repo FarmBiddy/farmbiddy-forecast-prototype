@@ -73,6 +73,13 @@ body {
   overflow-y: auto;
 }
 
+.sidebar-nav.sidebar-nav-utility {
+  flex: 0 0 auto;
+  padding-top: 0.5rem;
+  margin-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .nav-link {
   background: transparent;
   border: none;
@@ -961,10 +968,86 @@ body {
 .view { display: none; }
 .view.active { display: block; }
 
+/* Navigation/IA rework (Phase 11 / UX items 1, 7, 9, 13) — in-page sub-tabs
+   for the sections that fold several old pages into one. */
+.subtabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.subtab-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.subtab-btn:hover { border-color: var(--green); color: var(--green-dark); }
+.subtab-btn.active {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: #fff;
+}
+.subtab-panel.hidden { display: none; }
+
+/* Overview "at a glance" summary — the six headline figures a farmer should
+   never have to hunt for (current position, trajectory, concern, action) */
+.overview-summary-card h3 { margin-bottom: 0.9rem; }
+.overview-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.overview-metric-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.1rem;
+}
+.overview-metric-wide { grid-column: span 3; }
+.overview-metric-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+.overview-metric-value { font-size: 1.3rem; font-weight: 700; color: var(--text); }
+.overview-metric-value .positive { color: var(--green-dark); }
+.overview-metric-value .negative { color: #b3261e; }
+.overview-metric-text { font-size: 0.95rem; font-weight: 600; color: var(--text); line-height: 1.4; }
+.overview-metric-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+
+/* Progressive disclosure for the Overview's deeper detail (native <details>
+   keeps this accessible and JS-free) */
+.overview-detail-toggle summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--green-dark);
+  list-style: none;
+}
+.overview-detail-toggle summary::-webkit-details-marker { display: none; }
+.overview-detail-toggle summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.overview-detail-toggle[open] summary::before { transform: rotate(90deg); }
+.overview-detail-body { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.overview-detail-body .card-inner { padding-top: 0.25rem; }
+.overview-detail-body .kpi-row { margin-bottom: 0; }
+
 @media (max-width: 1200px) {
   .kpi-row, .exec-kpi-row { grid-template-columns: repeat(3, 1fr); }
   .health-snapshot { grid-template-columns: repeat(3, 1fr); }
   .grid-2-1, .grid-3 { grid-template-columns: 1fr; }
+  .overview-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .overview-metric-wide { grid-column: span 2; }
 }
 
 @media (max-width: 768px) {
@@ -981,4 +1064,8 @@ body {
   .fi-input-row .btn-secondary { width: 100%; }
   .fi-metrics-row { flex-direction: column; }
   .fi-metric-chip { width: 100%; }
+  .overview-summary-grid { grid-template-columns: 1fr; }
+  .overview-metric-wide { grid-column: span 1; }
+  .subtabs { gap: 0.3rem; }
+  .subtab-btn { flex: 1 1 auto; text-align: center; }
 }

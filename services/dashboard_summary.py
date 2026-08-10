@@ -16,7 +16,7 @@ from forecast_engine.costs import calculate_costs
 from forecast_engine.data_quality import build_data_quality_warnings
 from forecast_engine.formatting import format_currency, format_percent
 from forecast_engine.health_score import calculate_health_score
-from forecast_engine.period_labels import point_in_time, trailing_12_months
+from forecast_engine.period_labels import forecast_window, point_in_time, trailing_12_months
 from forecast_engine.profit import calculate_profit
 from forecast_engine.revenue import calculate_revenue
 from models.multi_sector_farm import SECTOR_LABELS, VALID_SECTORS, build_debt_register
@@ -448,6 +448,70 @@ def build_overview_chart_data(filtered: dict, months: int = 24) -> list[dict]:
     return combined
 
 
+def build_overview_summary(
+    farm: dict,
+    monthly_forecast: list[dict],
+    alerts: list[dict],
+) -> dict:
+    """The six headline figures for the reworked Overview page (UX items 1/9):
+    position, trajectory, concern, and next step, all in one place, so a
+    farmer never has to hunt across sections just to answer "how am I doing
+    and what should I do about it?"
+
+    Reuses the already-computed alerts (Phase 8's `what`/`review` fields)
+    rather than re-deriving "concern" and "next action" independently, so
+    the Overview can never disagree with the Action Plan's own alert list.
+    """
+    opening = float(farm.get("opening_cash_balance") or 0)
+
+    top_alert = (alerts or [{}])[0]
+    no_critical = top_alert.get("severity") == "info"
+
+    if not monthly_forecast:
+        return {
+            "current_cash_position": {"value": format_currency(opening), "period": point_in_time()},
+            "lowest_projected_cash_balance": {"value": format_currency(opening), "month": None},
+            "projected_annual_cashflow": {"value": format_currency(0), "period": forecast_window()},
+            "main_financial_concern": "Not enough data yet — run an analysis to see this farm's outlook.",
+            "recommended_next_action": "Complete the farm data and run an analysis.",
+        }
+
+    worst = min(
+        monthly_forecast,
+        key=lambda m: m.get("combined_running_balance", m.get("running_balance", 0)),
+    )
+    lowest_balance = float(worst.get("combined_running_balance", worst.get("running_balance", 0)))
+    annual_cashflow = sum(
+        float(m.get("combined_cashflow", m.get("cashflow", 0))) for m in monthly_forecast
+    )
+
+    return {
+        "current_cash_position": {
+            "value": format_currency(opening),
+            "period": point_in_time(),
+        },
+        "lowest_projected_cash_balance": {
+            "value": format_currency(lowest_balance),
+            "month": worst.get("month"),
+            "month_label": f"Month {worst.get('month')}" if worst.get("month") else "—",
+            "is_deficit": lowest_balance < 0,
+        },
+        "projected_annual_cashflow": {
+            "value": format_currency(annual_cashflow),
+            "is_deficit": annual_cashflow < 0,
+            "period": forecast_window(),
+        },
+        "main_financial_concern": (
+            "No critical concerns — farm metrics look stable."
+            if no_critical else top_alert.get("what") or top_alert.get("message", "")
+        ),
+        "recommended_next_action": (
+            "No action needed — recheck after your next analysis run."
+            if no_critical else top_alert.get("review") or "Review the alert in the Action Plan section."
+        ),
+    }
+
+
 def _latest_period(filtered: dict) -> str | None:
     """Most recent "YYYY-MM" period found across all sectors' monthly entries."""
     periods = [
@@ -483,8 +547,14 @@ def build_executive_dashboard(
         "_debt_register": debt_register,
     }
 
+    alerts = generate_dashboard_alerts(
+        farm, summary, kpis_block,
+        monthly_forecast=monthly_forecast, debt_register=debt_register,
+    )
+
     return {
         "overview_header": build_overview_header(profile, selected_sectors, generated_at),
+        "overview_summary": build_overview_summary(farm_enriched, monthly_forecast, alerts),
         "executive_kpis": calculate_dashboard_kpis(
             summary, farm_enriched, monthly_forecast, forecast.get("risk_level", "Low"),
         ),
@@ -500,10 +570,7 @@ def build_executive_dashboard(
             "annual_costs": summary.get("annual_costs"),
         }, farm_enriched),
         "sector_performance": calculate_sector_performance(filtered_raw),
-        "alerts": generate_dashboard_alerts(
-            farm, summary, kpis_block,
-            monthly_forecast=monthly_forecast, debt_register=debt_register,
-        ),
+        "alerts": alerts,
         "overview_chart": build_overview_chart_data(filtered_raw),
         "forecast_summary": summary,
         "debt_register": debt_register,

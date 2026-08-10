@@ -527,6 +527,7 @@ class FarmerAnalysisResponse(BaseModel):
     generated_at: Optional[str] = None
     profile: Dict[str, Any]
     overview_header: Dict[str, Any] = Field(default_factory=dict)
+    overview_summary: Dict[str, Any] = Field(default_factory=dict)
     executive_kpis: List[Dict[str, Any]] = Field(default_factory=list)
     health_snapshot: List[Dict[str, Any]] = Field(default_factory=list)
     health_score: Dict[str, Any] = Field(default_factory=dict)
