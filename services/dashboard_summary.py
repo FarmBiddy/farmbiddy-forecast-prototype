@@ -23,8 +23,12 @@ from services.multi_sector_farm import (
 
 ALERT_PRIORITY = {
     "negative profit": 1,
+    "increasing overdraft use": 1,
     "negative monthly cashflow": 2,
+    "cash-flow warning": 2,
+    "insufficient cash for direct debits": 2,
     "low cash balance": 3,
+    "loan repayments due in a low-cash month": 3,
     "low profit margin": 4,
     "high feed cost": 5,
 }
@@ -246,6 +250,8 @@ def generate_dashboard_alerts(
     forecast_summary: dict,
     kpis_block: dict,
     limit: int = 5,
+    monthly_forecast: list[dict] | None = None,
+    debt_register: list[dict] | None = None,
 ) -> list[dict]:
     """Prioritised alerts for the executive dashboard (max 5)."""
     revenue = float(forecast_summary.get("annual_revenue") or 0)
@@ -253,7 +259,10 @@ def generate_dashboard_alerts(
     profit = float(forecast_summary.get("annual_profit") or 0)
     monthly_cf = float(kpis_block.get("monthly_cashflow") or 0)
 
-    raw_alerts = generate_alerts(farm, profit, revenue, costs, monthly_cf)
+    raw_alerts = generate_alerts(
+        farm, profit, revenue, costs, monthly_cf,
+        monthly_forecast=monthly_forecast, debt_register=debt_register,
+    )
     if not raw_alerts:
         return [{
             "message": "No critical alerts — farm metrics look stable.",
@@ -348,7 +357,10 @@ def build_executive_dashboard(
             summary, farm_enriched, kpis_block, forecast.get("risk_level", "Low"),
         ),
         "sector_performance": calculate_sector_performance(filtered_raw),
-        "alerts": generate_dashboard_alerts(farm, summary, kpis_block),
+        "alerts": generate_dashboard_alerts(
+            farm, summary, kpis_block,
+            monthly_forecast=monthly_forecast, debt_register=debt_register,
+        ),
         "overview_chart": build_overview_chart_data(filtered_raw),
         "forecast_summary": summary,
         "debt_register": debt_register,

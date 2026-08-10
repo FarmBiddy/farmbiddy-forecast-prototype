@@ -51,6 +51,10 @@ def test_run_analysis_all_sectors():
     for loan in data["debt_register"]:
         assert "outstanding_balance" in loan
         assert "years_remaining" in loan
+    # Phase 6: month-by-month early cash-flow warnings should surface alongside
+    # the legacy annual-level alerts when the farm's monthly forecast dips negative.
+    alert_messages = " | ".join(a["message"] for a in data["alerts"])
+    assert "Cash-flow warning" in alert_messages or "Increasing overdraft use" in alert_messages
 
 
 def test_historical_data_endpoint():

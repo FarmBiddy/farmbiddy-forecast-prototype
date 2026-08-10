@@ -95,6 +95,26 @@ def test_generate_dashboard_alerts_max_five():
     assert all("message" in a for a in alerts)
 
 
+def test_generate_dashboard_alerts_includes_early_cashflow_warnings():
+    farm = {"opening_cash_balance": 5000, "feed": 5000}
+    summary = {"annual_revenue": 100000, "annual_profit": 20000, "annual_costs": 80000}
+    kpis = {"monthly_cashflow": 500}
+    monthly_forecast = [
+        {"month": 1, "combined_running_balance": 1000},
+        {"month": 2, "combined_running_balance": -500},
+        {"month": 3, "combined_running_balance": -1500},
+        {"month": 4, "combined_running_balance": -3000},
+    ]
+    debt_register = [{"lender": "Bank", "monthly_repayment": 400}]
+    alerts = generate_dashboard_alerts(
+        farm, summary, kpis, monthly_forecast=monthly_forecast, debt_register=debt_register,
+    )
+    messages = " | ".join(a["message"] for a in alerts)
+    assert "Increasing overdraft use" in messages
+    assert "Cash-flow warning" in messages
+    assert all(a["severity"] in ("high", "medium", "low") for a in alerts)
+
+
 def test_get_historical_data():
     data = get_historical_data("multi_sector_farm.json", ["lamb"])
     assert data["success"] is True
