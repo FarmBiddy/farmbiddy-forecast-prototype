@@ -95,6 +95,56 @@ def test_generate_dashboard_alerts_max_five():
     assert all("message" in a for a in alerts)
 
 
+def test_generate_dashboard_alerts_max_five_has_rich_fields():
+    farm = {"opening_cash_balance": 500, "feed": 500000}
+    summary = {"annual_revenue": 1000000, "annual_profit": -5000, "annual_costs": 1005000}
+    kpis = {"monthly_cashflow": -500}
+    alerts = generate_dashboard_alerts(farm, summary, kpis, limit=5)
+    assert len(alerts) <= 5
+    for alert in alerts:
+        assert set(("message", "severity", "priority", "what", "when", "cause", "review")) <= set(alert.keys())
+        assert alert["what"]
+        assert alert["cause"]
+        assert alert["review"]
+        assert alert["when"]
+
+
+def test_generate_dashboard_alerts_no_alerts_case_has_rich_fields():
+    farm = {"opening_cash_balance": 100000, "feed": 1000}
+    summary = {"annual_revenue": 1000000, "annual_profit": 500000, "annual_costs": 500000}
+    kpis = {"monthly_cashflow": 10000}
+    alerts = generate_dashboard_alerts(farm, summary, kpis, limit=5)
+    assert len(alerts) == 1
+    assert alerts[0]["severity"] == "info"
+    assert alerts[0]["what"]
+    assert alerts[0]["cause"]
+    assert alerts[0]["review"]
+
+
+def test_generate_dashboard_alerts_when_extracts_month_span():
+    farm = {"opening_cash_balance": 5000, "feed": 5000}
+    summary = {"annual_revenue": 100000, "annual_profit": 20000, "annual_costs": 80000}
+    kpis = {"monthly_cashflow": 500}
+    monthly_forecast = [
+        {"month": 1, "combined_running_balance": 1000},
+        {"month": 2, "combined_running_balance": -500},
+        {"month": 3, "combined_running_balance": -1500},
+    ]
+    alerts = generate_dashboard_alerts(farm, summary, kpis, monthly_forecast=monthly_forecast)
+    cashflow_alert = next(a for a in alerts if "Cash-flow warning" in a["message"])
+    assert cashflow_alert["when"] == "Months 2-3"
+    assert "negative cash balance" in cashflow_alert["cause"].lower() or cashflow_alert["cause"]
+
+
+def test_generate_dashboard_alerts_annual_alert_when_is_generic():
+    farm = {"opening_cash_balance": 500, "feed": 500000}
+    summary = {"annual_revenue": 1000000, "annual_profit": -5000, "annual_costs": 1005000}
+    kpis = {"monthly_cashflow": -500}
+    alerts = generate_dashboard_alerts(farm, summary, kpis)
+    profit_alert = next(a for a in alerts if "Negative profit" in a["message"])
+    assert profit_alert["when"] == "Across the current 12-month forecast"
+
+
 def test_generate_dashboard_alerts_includes_early_cashflow_warnings():
     farm = {"opening_cash_balance": 5000, "feed": 5000}
     summary = {"annual_revenue": 100000, "annual_profit": 20000, "annual_costs": 80000}

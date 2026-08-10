@@ -62,6 +62,10 @@ def test_run_analysis_all_sectors():
         "/api/farmer/financial-intelligence?farm_file=multi_sector_farm.json&sectors=dairy,beef,lamb"
     ).json()
     assert data["health_score"] == intelligence["health_score"]
+    # Phase 8: every dashboard alert carries the richer what/when/cause/review fields.
+    for alert in data["alerts"]:
+        assert set(("what", "when", "cause", "review")) <= set(alert.keys())
+        assert alert["what"] and alert["when"] and alert["cause"] and alert["review"]
 
 
 def test_historical_data_endpoint():

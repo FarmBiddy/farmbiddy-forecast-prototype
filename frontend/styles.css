@@ -548,6 +548,28 @@ body {
   font-size: 0.88rem;
 }
 
+.alert-headline-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.alert-headline { font-weight: 700; }
+.alert-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  white-space: nowrap;
+}
+.alert-message { margin-top: 0.3rem; }
+.alert-detail { margin-top: 0.3rem; font-size: 0.82rem; }
+
 /* Health */
 .health-block { text-align: center; }
 .health-score { font-size: 2.5rem; font-weight: 700; color: var(--green); }

@@ -532,9 +532,20 @@ function renderExecutiveAlerts(alerts, listId = "alerts-list") {
   if (!list) return;
   const items = alerts?.length ? alerts : [{ message: "No critical alerts right now.", severity: "info" }];
   list.innerHTML = items.map((a) => {
-    const msg = typeof a === "string" ? a : a.message;
-    const sev = typeof a === "string" ? "medium" : (a.severity || "medium");
-    return `<li class="alert-${sev}">${msg}</li>`;
+    if (typeof a === "string") return `<li class="alert-medium">${a}</li>`;
+    const sev = a.severity || "medium";
+    const rows = [];
+    if (a.cause) rows.push(`<div class="alert-detail"><strong>Why:</strong> ${a.cause}</div>`);
+    if (a.review) rows.push(`<div class="alert-detail"><strong>Review:</strong> ${a.review}</div>`);
+    return `
+      <li class="alert-${sev}">
+        <div class="alert-headline-row">
+          <span class="alert-headline">${a.what || a.message}</span>
+          ${a.when ? `<span class="alert-badge">${a.when}</span>` : ""}
+        </div>
+        <div class="alert-message muted">${a.message}</div>
+        ${rows.join("")}
+      </li>`;
   }).join("");
 }
 

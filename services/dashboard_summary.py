@@ -7,6 +7,7 @@ All calculations run on the backend; the frontend renders summaries only.
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -33,6 +34,91 @@ ALERT_PRIORITY = {
     "low profit margin": 4,
     "high feed cost": 5,
 }
+
+# What/cause/review reference text for each known alert type (Phase 8). Reuses
+# the plain-language reasoning already produced by the Phase 4 classifier and
+# Phase 6 early-warning scan rather than inventing a second explanation path;
+# "when" is derived per-message below since most of these are month-specific.
+ALERT_DETAILS = {
+    "negative profit": {
+        "what": "Forecast annual loss",
+        "cause": "Annual costs are projected to exceed annual revenue on current assumptions.",
+        "review": "Review cost assumptions, output volumes, and pricing for the year ahead.",
+    },
+    "increasing overdraft use": {
+        "what": "Overdraft use is widening, not stabilising",
+        "cause": "The projected cash balance has worsened for several consecutive months.",
+        "review": "Investigate whether the shortfall is short-term or structural, and test the practical cash-flow actions in the Scenario Sandbox.",
+    },
+    "negative monthly cashflow": {
+        "what": "Monthly income is not covering monthly costs",
+        "cause": "Average monthly cash inflows are below average monthly outflows.",
+        "review": "Review the timing of major costs and test the cash-flow actions in the Scenario Sandbox.",
+    },
+    "cash-flow warning": {
+        "what": "Future months show a negative cash balance",
+        "cause": "Projected outgoings exceed projected income in the affected month(s).",
+        "review": "Plan ahead for the shortfall — bring forward income, defer costs, or arrange short-term credit.",
+    },
+    "insufficient cash for direct debits": {
+        "what": "Balance may not cover that month's fixed commitments",
+        "cause": "Loan repayments and/or household costs due that month exceed the projected balance.",
+        "review": "Check direct debit and standing order dates against expected income timing for that month.",
+    },
+    "low cash balance": {
+        "what": "Cash buffer is thin",
+        "cause": "The lowest projected cash balance falls below one month of operating costs.",
+        "review": "Build a stronger cash reserve before taking on new spending or credit.",
+    },
+    "loan repayments due in a low-cash month": {
+        "what": "Loan repayments land in an already low-cash month",
+        "cause": "A scheduled loan repayment coincides with a month where cash is tight.",
+        "review": "Consider the 'adjust loan timing' action in the Scenario Sandbox.",
+    },
+    "low profit margin": {
+        "what": "Profit margin is below target",
+        "cause": "Profit margin is under the 15% threshold considered healthy for this farm type.",
+        "review": "Review the biggest cost lines relative to revenue, and pricing or contract terms.",
+    },
+    "high feed cost": {
+        "what": "Feed costs are a high share of revenue",
+        "cause": "Feed spend exceeds 35% of revenue, above the recommended range.",
+        "review": "Review feed supplier contracts, ration efficiency, and grazing plans.",
+    },
+}
+
+_MONTH_SPAN_RE = re.compile(r"months? (\d+)(?:-(\d+))?", re.IGNORECASE)
+_CONSECUTIVE_RE = re.compile(r"(\d+) consecutive\s+months? starting month (\d+)", re.IGNORECASE)
+
+
+def _alert_when(message: str) -> str:
+    """Best-effort "when this applies" label, parsed from the alert text.
+
+    Falls back to describing the whole forecast window for annual-level
+    alerts (negative profit, low margin, etc.) that have no specific month.
+    """
+    consecutive = _CONSECUTIVE_RE.search(message)
+    if consecutive:
+        length, start = consecutive.groups()
+        return f"Month {start} onward ({length} months)"
+    span = _MONTH_SPAN_RE.search(message)
+    if span:
+        start, end = span.groups()
+        return f"Month {start}" if not end or end == start else f"Months {start}-{end}"
+    return "Across the current 12-month forecast"
+
+
+def _alert_details(message: str) -> dict:
+    lower = message.lower()
+    for keyword, details in ALERT_DETAILS.items():
+        if keyword in lower:
+            return details
+    headline = message.split(":", 1)[0].strip() if ":" in message else message
+    return {
+        "what": headline,
+        "cause": "See the alert message for the underlying figures.",
+        "review": "Review the affected figures in Forecasts or Farm Data.",
+    }
 
 
 def get_selected_sector_data(farm_file: str, sectors: list[str]) -> dict:
@@ -280,13 +366,26 @@ def generate_dashboard_alerts(
             "message": "No critical alerts — farm metrics look stable.",
             "severity": "info",
             "priority": 99,
+            "what": "No critical alerts",
+            "when": "Across the current 12-month forecast",
+            "cause": "All monitored figures are within normal ranges.",
+            "review": "No action needed — recheck after your next analysis run.",
         }]
 
     enriched = []
     for msg in raw_alerts:
         priority = _alert_priority(msg)
         severity = "high" if priority <= 3 else ("medium" if priority <= 5 else "low")
-        enriched.append({"message": msg, "severity": severity, "priority": priority})
+        details = _alert_details(msg)
+        enriched.append({
+            "message": msg,
+            "severity": severity,
+            "priority": priority,
+            "what": details["what"],
+            "when": _alert_when(msg),
+            "cause": details["cause"],
+            "review": details["review"],
+        })
 
     enriched.sort(key=lambda a: a["priority"])
     return enriched[:limit]
