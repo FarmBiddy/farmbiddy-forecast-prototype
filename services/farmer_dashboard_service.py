@@ -19,6 +19,7 @@ from forecast_engine.profit import calculate_profit
 from forecast_engine.risk_level import calculate_risk_level
 from forecast_engine.alerts import generate_alerts
 from forecast_engine.cashflow import calculate_monthly_cashflow
+from forecast_engine.health_score import calculate_health_score
 from models.api_models import ForecastOutputs, SandboxOutputs
 from services.forecast_service import (
     apply_sandbox_changes,
@@ -230,27 +231,20 @@ def _read_farm_json_for_profile(farm_file: str) -> dict:
         return json.load(fh)
 
 
-def _risk_to_score(risk_level: str) -> int:
-    mapping = {"Low": 78, "Medium": 58, "High": 35}
-    return mapping.get(risk_level or "", 65)
-
-
 def _health_breakdown(forecast: dict, farm: dict) -> dict:
-    margin = forecast.get("profit_margin", 0)
-    risk = forecast.get("risk_level", "Medium")
-    profit_label = "Good" if margin >= 15 else ("Fair" if margin >= 8 else "Watch")
-    liquidity_label = "Good"
+    """Health summary for this dashboard, delegating scoring to the
+    canonical `calculate_health_score` formula (Phase 7) so it agrees with
+    Farm Intelligence and the executive dashboard snapshot.
+    """
+    health = calculate_health_score(forecast, farm)
     monthly_cf = forecast.get("monthly_cashflow", 0)
-    if monthly_cf < 0:
-        liquidity_label = "Tight"
-    elif monthly_cf < 2000:
-        liquidity_label = "Fair"
+    liquidity_label = "Good" if monthly_cf >= 2000 else ("Fair" if monthly_cf >= 0 else "Tight")
     return {
-        "score": _risk_to_score(risk),
-        "label": "Good" if _risk_to_score(risk) >= 70 else ("Fair" if _risk_to_score(risk) >= 50 else "Needs attention"),
-        "profitability": profit_label,
+        "score": health["score"],
+        "label": health["label"],
+        "profitability": health["profitability"],
         "liquidity": liquidity_label,
-        "solvency": "Good" if risk != "High" else "Watch",
+        "solvency": "Good" if health["risk_level"] != "High" else "Watch",
         "efficiency": "Good" if forecast.get("feed_cost_ratio", 100) < 35 else "Fair",
     }
 

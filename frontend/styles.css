@@ -303,6 +303,26 @@ body {
 .health-pill.amber { border-color: #fde68a; background: #fffbeb; }
 .health-pill.red { border-color: #fecaca; background: #fef2f2; }
 
+.health-score-detail { margin-top: 0.85rem; }
+.health-detail-toggle-row { text-align: right; }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--green-dark);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0;
+}
+.link-btn:hover { text-decoration: underline; }
+.health-detail-body {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.health-detail-score { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+.health-detail-table { margin-bottom: 0.6rem; }
+
 .table-wrap { overflow-x: auto; }
 
 .sector-table {

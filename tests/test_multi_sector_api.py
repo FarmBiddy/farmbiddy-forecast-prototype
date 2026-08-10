@@ -55,6 +55,13 @@ def test_run_analysis_all_sectors():
     # the legacy annual-level alerts when the farm's monthly forecast dips negative.
     alert_messages = " | ".join(a["message"] for a in data["alerts"])
     assert "Cash-flow warning" in alert_messages or "Increasing overdraft use" in alert_messages
+    # Phase 7: the dashboard's health score must be the same canonical number
+    # Farm Intelligence shows — the two surfaces should never disagree.
+    assert "health_score" in data
+    intelligence = client.get(
+        "/api/farmer/financial-intelligence?farm_file=multi_sector_farm.json&sectors=dairy,beef,lamb"
+    ).json()
+    assert data["health_score"] == intelligence["health_score"]
 
 
 def test_historical_data_endpoint():

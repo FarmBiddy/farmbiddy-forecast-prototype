@@ -11,10 +11,10 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from forecast_engine.health_score import calculate_health_score
 from services.dashboard_summary import calculate_sector_performance, get_selected_sector_data
 from services.farmer_dashboard_service import resolve_farm_file, resolve_sectors
 from services.financial_intelligence_service import (
-    _health_score,
     _load_forecast_context,
     _plain_summary,
     get_financial_intelligence,
@@ -742,7 +742,7 @@ def _estimate_health_after(result: dict, farm_file: str, sectors: list[str]) -> 
         "feed_cost_ratio": scenario_kpis.get("feed_cost_ratio", 35),
         "monthly_cashflow": scenario_kpis.get("monthly_cashflow", 0),
     }
-    return _health_score(forecast, farm).get("score")
+    return calculate_health_score(forecast, farm).get("score")
 
 
 def _format_euro(value: float | int | None) -> str:

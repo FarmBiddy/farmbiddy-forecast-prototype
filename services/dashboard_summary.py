@@ -12,6 +12,7 @@ from typing import Any
 
 from forecast_engine.alerts import generate_alerts
 from forecast_engine.costs import calculate_costs
+from forecast_engine.health_score import calculate_health_score
 from forecast_engine.profit import calculate_profit
 from forecast_engine.revenue import calculate_revenue
 from models.multi_sector_farm import SECTOR_LABELS, VALID_SECTORS, build_debt_register
@@ -102,7 +103,10 @@ def _status_colour(status: str) -> str:
         "Fair": "amber",
         "Watch": "amber",
         "Tight": "red",
+        "Weak": "red",
+        "Negative": "red",
         "High": "red",
+        "Moderate": "amber",
         "Low": "green",
         "Medium": "amber",
     }
@@ -201,33 +205,41 @@ def calculate_financial_health_snapshot(
     kpis_block: dict,
     risk_level: str,
 ) -> list[dict]:
-    """Compact coloured health indicators for the executive dashboard."""
-    margin = float(forecast_summary.get("profit_margin") or 0)
-    revenue = float(forecast_summary.get("annual_revenue") or 0)
-    monthly_cf = float(kpis_block.get("monthly_cashflow") or 0)
-    opening = float(farm.get("opening_cash_balance") or 0)
+    """Compact coloured health indicators for the executive dashboard.
 
+    Profitability, cash flow, leverage, and overall health all come from
+    the single canonical `calculate_health_score` formula (Phase 7) so this
+    snapshot can never disagree with Farm Intelligence or the advisor.
+    Liquidity and working capital have no equivalent in that formula and
+    stay locally computed.
+    """
+    opening = float(farm.get("opening_cash_balance") or 0)
     debtors = float(farm.get("debtors") or 0)
     creditors = float(farm.get("creditors") or 0)
-    debt = _debt_outstanding(farm)
-
-    leverage_ratio = (debt / revenue) if revenue else 0
     working_capital = debtors - creditors
 
-    liquidity = "Good" if opening >= 20000 else ("Fair" if opening >= 10000 else "Tight")
-    profitability = _margin_status(margin)
-    leverage = "Good" if leverage_ratio < 0.5 else ("Fair" if leverage_ratio < 1.0 else "High")
-    cash_flow = "Good" if monthly_cf >= 2000 else ("Fair" if monthly_cf >= 0 else "Tight")
-    wc_status = "Good" if working_capital >= 0 else "Tight"
+    health = calculate_health_score({
+        "profit_margin": forecast_summary.get("profit_margin"),
+        "risk_level": risk_level,
+        "feed_cost_ratio": kpis_block.get("feed_cost_ratio"),
+        "monthly_cashflow": kpis_block.get("monthly_cashflow"),
+        "annual_revenue": forecast_summary.get("annual_revenue"),
+        "annual_costs": forecast_summary.get("annual_costs"),
+    }, farm)
 
-    risk_score = {"Low": 78, "Medium": 58, "High": 35}.get(risk_level or "", 65)
-    overall = "Good" if risk_score >= 70 else ("Fair" if risk_score >= 50 else "Watch")
+    liquidity = "Good" if opening >= 20000 else ("Fair" if opening >= 10000 else "Tight")
+    wc_status = "Good" if working_capital >= 0 else "Tight"
+    overall = (
+        "Good" if health["label"] in ("Excellent", "Good")
+        else "Fair" if health["label"] == "Fair"
+        else "Watch"
+    )
 
     indicators = [
         ("liquidity", "Liquidity", liquidity),
-        ("profitability", "Profitability", profitability),
-        ("leverage", "Leverage", leverage),
-        ("cash_flow", "Cash Flow", cash_flow),
+        ("profitability", "Profitability", health["profitability"]),
+        ("leverage", "Leverage", health["debt_pressure"]),
+        ("cash_flow", "Cash Flow", health["cashflow"]),
         ("working_capital", "Working Capital", wc_status),
         ("overall_health", "Overall Health", overall),
     ]
@@ -356,6 +368,14 @@ def build_executive_dashboard(
         "health_snapshot": calculate_financial_health_snapshot(
             summary, farm_enriched, kpis_block, forecast.get("risk_level", "Low"),
         ),
+        "health_score": calculate_health_score({
+            "profit_margin": summary.get("profit_margin"),
+            "risk_level": forecast.get("risk_level", "Low"),
+            "feed_cost_ratio": kpis_block.get("feed_cost_ratio"),
+            "monthly_cashflow": kpis_block.get("monthly_cashflow"),
+            "annual_revenue": summary.get("annual_revenue"),
+            "annual_costs": summary.get("annual_costs"),
+        }, farm_enriched),
         "sector_performance": calculate_sector_performance(filtered_raw),
         "alerts": generate_dashboard_alerts(
             farm, summary, kpis_block,

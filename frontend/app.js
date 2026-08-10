@@ -275,6 +275,51 @@ function renderHealthSnapshot(indicators) {
     </div>`).join("");
 }
 
+function renderHealthScoreDetail(health) {
+  const box = $("health-score-detail");
+  if (!box) return;
+  if (!health || health.score == null) {
+    box.innerHTML = `<p class="muted">Score breakdown appears after analysis.</p>`;
+    return;
+  }
+  const rows = [
+    ["Profitability", health.profitability],
+    ["Cashflow", health.cashflow],
+    ["Feed pressure", health.feed_pressure],
+    ["Debt pressure", health.debt_pressure],
+    ["Risk level", health.risk_level],
+  ];
+  const goodOnes = rows.filter(([, v]) => v === "Good" || v === "Low").map(([label]) => label);
+  const attentionOnes = rows.filter(([, v]) => v === "Weak" || v === "Negative" || v === "High" || v === "Needs attention").map(([label]) => label);
+
+  box.innerHTML = `
+    <div class="health-detail-toggle-row">
+      <button type="button" id="health-detail-toggle" class="link-btn">What's affecting this score? ▾</button>
+    </div>
+    <div id="health-detail-body" class="health-detail-body hidden">
+      <div class="health-detail-score">${health.score}/100 — ${health.label}</div>
+      <table class="data-table health-detail-table">
+        <tbody>
+          ${rows.map(([label, value]) => `<tr><td>${label}</td><td>${value ?? "—"}</td></tr>`).join("")}
+        </tbody>
+      </table>
+      <p class="muted">
+        ${goodOnes.length ? `Performing well: ${goodOnes.join(", ")}. ` : ""}
+        ${attentionOnes.length ? `Needs attention: ${attentionOnes.join(", ")}. ` : ""}
+        ${!goodOnes.length && !attentionOnes.length ? "All factors are within a moderate range." : ""}
+      </p>
+      <p class="muted">Based on profit margin, risk level, feed cost ratio, monthly cashflow, opening cash balance, and loan repayments from your current analysis.</p>
+    </div>`;
+
+  $("health-detail-toggle")?.addEventListener("click", () => {
+    const body = $("health-detail-body");
+    const btn = $("health-detail-toggle");
+    const expanded = !body.classList.contains("hidden");
+    body.classList.toggle("hidden");
+    if (btn) btn.textContent = expanded ? "What's affecting this score? ▾" : "What's affecting this score? ▴";
+  });
+}
+
 function renderSectorTable(rows) {
   const box = $("sector-performance-table");
   if (!box) return;
@@ -499,6 +544,7 @@ function renderExecutiveDashboard(data) {
   renderOverviewHeader(data.overview_header);
   renderKpis(data.executive_kpis || data.kpis);
   renderHealthSnapshot(data.health_snapshot);
+  renderHealthScoreDetail(data.health_score);
   renderSectorTable(data.sector_performance);
   renderExecutiveAlerts(data.alerts);
   renderExecutiveAlerts(data.alerts, "alerts-full");
