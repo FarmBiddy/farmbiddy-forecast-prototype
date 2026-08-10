@@ -4,5 +4,6 @@
   "farm_display_name": "Knockrow Mixed Farm",
   "milk_processor": "Lakeland Dairies",
   "owner_name": "Patrick O'Sullivan",
-  "location": "County Tipperary, Ireland"
+  "location": "County Tipperary, Ireland",
+  "is_sample_data": true
 }

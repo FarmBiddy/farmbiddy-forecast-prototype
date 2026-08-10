@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from forecast_engine.formatting import format_currency, format_percent
 from forecast_engine.health_score import calculate_health_score
 from services.dashboard_summary import calculate_sector_performance, get_selected_sector_data
 from services.farmer_dashboard_service import resolve_farm_file, resolve_sectors
@@ -441,39 +442,39 @@ def _format_profitability_answer(
 
     if worst and worst.get("profit", 0) < 0:
         summary = (
-            f"The weakest area is {worst['label']}, losing about €{abs(worst['profit']):,.0f} "
-            f"over the last 12 months with a {worst['margin_pct']:.1f}% margin."
+            f"The weakest area is {worst['label']}, losing about {format_currency(abs(worst['profit']))} "
+            f"over the last 12 months with a {format_percent(worst['margin_pct'])} margin."
         )
         recommendation = f"Focus first on improving costs or income in {worst['label']}."
     elif profit < 0:
         summary = (
             f"On current figures {_sector_scope_label(selected)} may lose about "
-            f"€{abs(profit):,.0f} per year — review costs and income urgently."
+            f"{format_currency(abs(profit))} per year — review costs and income urgently."
         )
         recommendation = "Focus on the largest cost lines and cashflow before new spending."
     elif "improve" in question_norm:
         summary = (
-            f"The farm is profitable at about €{profit:,.0f} per year, but there is still room to improve margins "
-            f"({margin:.1f}% today)."
+            f"The farm is profitable at about {format_currency(profit)} per year, but there is still room to improve margins "
+            f"({format_percent(margin)} today)."
         )
         if weaknesses:
             summary += f" The main pressure area is {weaknesses[0]}."
         recommendation = _first_recommendation(intel)
     else:
         summary = (
-            f"The farm is forecast to make about €{profit:,.0f} profit per year "
-            f"with a {margin:.1f}% margin on {_sector_scope_label(selected)}."
+            f"The farm is forecast to make about {format_currency(profit)} profit per year "
+            f"with a {format_percent(margin)} margin on {_sector_scope_label(selected)}."
         )
         recommendation = "Protect margin by monitoring feed and keeping reserves for seasonal dips."
 
     key_points = [
-        f"Annual profit: €{profit:,.0f}.",
-        f"Profit margin: {margin:.1f}%.",
-        f"Monthly cashflow: €{monthly_cf:,.0f}.",
+        f"Annual profit: {format_currency(profit)}.",
+        f"Profit margin: {format_percent(margin)}.",
+        f"Monthly cashflow: {format_currency(monthly_cf)}.",
     ]
     if worst:
         key_points.append(
-            f"{worst['label']}: €{worst['profit']:,.0f} profit, {worst['margin_pct']:.1f}% margin."
+            f"{worst['label']}: {format_currency(worst['profit'])} profit, {format_percent(worst['margin_pct'])} margin."
         )
     elif weaknesses:
         key_points.append(f"Pressure area: {weaknesses[0]}.")
@@ -489,17 +490,17 @@ def _format_sector_comparison_answer(
     best = max(rows, key=lambda row: row.get("profit", 0))
     worst = min(rows, key=lambda row: row.get("profit", 0))
     summary = (
-        f"{best['label']} is performing best with about €{best['profit']:,.0f} profit "
-        f"and a {best['margin_pct']:.1f}% margin over the last 12 months."
+        f"{best['label']} is performing best with about {format_currency(best['profit'])} profit "
+        f"and a {format_percent(best['margin_pct'])} margin over the last 12 months."
     )
     if len(rows) > 1 and worst["sector"] != best["sector"]:
         summary += (
-            f" {worst['label']} is the weakest at €{worst['profit']:,.0f} profit "
-            f"({worst['margin_pct']:.1f}% margin)."
+            f" {worst['label']} is the weakest at {format_currency(worst['profit'])} profit "
+            f"({format_percent(worst['margin_pct'])} margin)."
         )
 
     key_points = [
-        f"{row['label']}: €{row['profit']:,.0f} profit, {row['margin_pct']:.1f}% margin ({row['status']})"
+        f"{row['label']}: {format_currency(row['profit'])} profit, {format_percent(row['margin_pct'])} margin ({row['status']})"
         for row in rows
     ]
     recommendation = (
@@ -518,7 +519,7 @@ def _format_cashflow_answer(ctx: dict[str, Any], selected: list[str]) -> tuple[s
     opening = intel["profile"].get("opening_cash_balance", 0) or 0
 
     summary = (
-        f"Average monthly cashflow is about €{monthly_cf:,.0f} on {_sector_scope_label(selected)}."
+        f"Average monthly cashflow is about {format_currency(monthly_cf)} on {_sector_scope_label(selected)}."
     )
     if insights.get("negative_months"):
         summary += (
@@ -528,18 +529,18 @@ def _format_cashflow_answer(ctx: dict[str, Any], selected: list[str]) -> tuple[s
     elif insights.get("min_month"):
         summary += (
             f" The tightest month looks like {insights['min_month']} "
-            f"(about €{insights['min_balance']:,.0f} running balance)."
+            f"(about {format_currency(insights['min_balance'])} running balance)."
         )
 
     key_points = [
-        f"Opening cash: €{opening:,.0f}.",
-        f"Average monthly cashflow: €{monthly_cf:,.0f}.",
+        f"Opening cash: {format_currency(opening)}.",
+        f"Average monthly cashflow: {format_currency(monthly_cf)}.",
         f"Cashflow status: {intel['health_score'].get('cashflow', '—')}.",
     ]
     if insights.get("min_month"):
-        key_points.append(f"Lowest balance: {insights['min_month']} (€{insights['min_balance']:,.0f}).")
+        key_points.append(f"Lowest balance: {insights['min_month']} ({format_currency(insights['min_balance'])}).")
     if insights.get("end_balance") is not None:
-        key_points.append(f"Year-end running balance: €{insights['end_balance']:,.0f}.")
+        key_points.append(f"Year-end running balance: {format_currency(insights['end_balance'])}.")
     if insights.get("negative_months"):
         key_points.append(f"Months below zero: {', '.join(insights['negative_months'])}.")
 
@@ -566,7 +567,7 @@ def _format_funding_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
             "management before major purchases."
         )
         if insights.get("min_month") and min_balance is not None and min_balance < 0:
-            summary += f" The lowest point looks like {insights['min_month']} (about €{min_balance:,.0f})."
+            summary += f" The lowest point looks like {insights['min_month']} (about {format_currency(min_balance)})."
         recommendation = "Speak to your bank or adviser about short-term cash support before new debt."
     elif debt_pressure == "High":
         summary = (
@@ -583,12 +584,12 @@ def _format_funding_answer(ctx: dict[str, Any]) -> tuple[str, list[str], str]:
 
     key_points = [
         f"Debt pressure: {debt_pressure}.",
-        f"Monthly cashflow: €{monthly_cf:,.0f}.",
-        f"Cash reserves: €{opening:,.0f}.",
+        f"Monthly cashflow: {format_currency(monthly_cf)}.",
+        f"Cash reserves: {format_currency(opening)}.",
         "Funding need applies to the whole farm.",
     ]
     if insights.get("min_month"):
-        key_points.append(f"Tightest month: {insights['min_month']} (€{insights['min_balance']:,.0f}).")
+        key_points.append(f"Tightest month: {insights['min_month']} ({format_currency(insights['min_balance'])}).")
 
     return summary, key_points[:5], recommendation
 
@@ -604,7 +605,7 @@ def _format_general_answer(ctx: dict[str, Any], question: str = "") -> tuple[str
         forecast = intel["forecast_summary"]
         summary = (
             f"In simple terms, your farm scores {health.get('score', '—')}/100 for financial health. "
-            f"You are forecast to make about €{forecast.get('annual_profit', 0):,.0f} profit per year "
+            f"You are forecast to make about {format_currency(forecast.get('annual_profit', 0))} profit per year "
             f"with {forecast.get('risk_level', 'Medium')} overall risk."
         )
         key_points = [

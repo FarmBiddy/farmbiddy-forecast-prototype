@@ -13,6 +13,8 @@ from typing import Any
 
 from forecast_engine.alerts import generate_alerts
 from forecast_engine.costs import calculate_costs
+from forecast_engine.data_quality import build_data_quality_warnings
+from forecast_engine.formatting import format_currency, format_percent
 from forecast_engine.health_score import calculate_health_score
 from forecast_engine.profit import calculate_profit
 from forecast_engine.revenue import calculate_revenue
@@ -219,35 +221,35 @@ def calculate_dashboard_kpis(
         {
             "id": "revenue",
             "title": "Revenue",
-            "value": f"€{revenue:,.0f}",
+            "value": format_currency(revenue),
             "subtitle": "Trailing 12 months (annualised)",
             "trend": "up" if revenue > 0 else "neutral",
         },
         {
             "id": "operating_profit",
             "title": "Operating Profit",
-            "value": f"€{profit:,.0f}",
+            "value": format_currency(profit),
             "subtitle": "After operating costs",
             "trend": "up" if profit > 0 else "down",
         },
         {
             "id": "cash_available",
             "title": "Cash Available",
-            "value": f"€{cash:,.0f}",
+            "value": format_currency(cash),
             "subtitle": "Projected year-end balance",
             "trend": "up" if cash > 0 else "down",
         },
         {
             "id": "debt_outstanding",
             "title": "Debt Outstanding",
-            "value": f"€{debt:,.0f}",
+            "value": format_currency(debt),
             "subtitle": "Estimated outstanding balance across all loans",
             "trend": "neutral",
         },
         {
             "id": "profit_margin",
             "title": "Profit Margin",
-            "value": f"{margin:.1f}%",
+            "value": format_percent(margin),
             "subtitle": _margin_status(margin),
             "trend": "up" if margin >= 15 else ("neutral" if margin >= 8 else "down"),
         },
@@ -435,6 +437,17 @@ def build_overview_chart_data(filtered: dict, months: int = 24) -> list[dict]:
     return combined
 
 
+def _latest_period(filtered: dict) -> str | None:
+    """Most recent "YYYY-MM" period found across all sectors' monthly entries."""
+    periods = [
+        entry.get("period")
+        for sector_data in (filtered.get("sectors") or {}).values()
+        for entry in (sector_data.get("monthly") or [])
+        if entry.get("period")
+    ]
+    return max(periods) if periods else None
+
+
 def build_executive_dashboard(
     farm_file: str,
     selected_sectors: list[str],
@@ -483,6 +496,12 @@ def build_executive_dashboard(
         "overview_chart": build_overview_chart_data(filtered_raw),
         "forecast_summary": summary,
         "debt_register": debt_register,
+        "data_quality_warnings": build_data_quality_warnings(
+            farm_enriched, profile, summary,
+            monthly_forecast=monthly_forecast,
+            debt_register=debt_register,
+            latest_period=_latest_period(filtered_raw),
+        ),
     }
 
 

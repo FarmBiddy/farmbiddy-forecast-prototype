@@ -19,6 +19,7 @@ from forecast_engine.profit import calculate_profit
 from forecast_engine.risk_level import calculate_risk_level
 from forecast_engine.alerts import generate_alerts
 from forecast_engine.cashflow import calculate_monthly_cashflow
+from forecast_engine.formatting import format_currency, format_percent
 from forecast_engine.health_score import calculate_health_score
 from models.api_models import ForecastOutputs, SandboxOutputs
 from services.forecast_service import (
@@ -219,6 +220,7 @@ def get_farmer_profile(
         "land_by_sector": land_by_sector,
         "owner_name": owner_name,
         "last_updated": datetime.now().strftime("%Y-%m-%d"),
+        "is_sample_data": bool(config.get("is_sample_data", False)) if farm_file == config.get("active_farm_file") else False,
         "selected_sectors": selected,
         "farm_type": farm.get("farm_type", "Mixed"),
         "sector_profile": sector_profile,
@@ -266,15 +268,15 @@ def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
         {
             "id": "cash",
             "title": "Cash Available",
-            "value": f"€{cash:,.0f}",
-            "subtitle": f"+ €{max(monthly_cf, 0):,.0f} this month",
+            "value": format_currency(cash),
+            "subtitle": f"+ {format_currency(max(monthly_cf, 0))} this month",
             "trend": "up" if monthly_cf >= 0 else "down",
         },
         {
             "id": "profit",
             "title": "Expected Monthly Profit",
-            "value": f"€{monthly:,.0f}",
-            "subtitle": f"Annual €{summary.get('annual_profit', 0):,.0f}",
+            "value": format_currency(monthly),
+            "subtitle": f"Annual {format_currency(summary.get('annual_profit', 0))}",
             "trend": "up" if monthly > 0 else "down",
         },
         {
@@ -287,7 +289,7 @@ def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
         {
             "id": "feed",
             "title": "Feed Cost %",
-            "value": f"{feed_pct:.0f}%",
+            "value": format_percent(feed_pct, decimals=0),
             "subtitle": "Good" if feed_pct < 35 else "High",
             "trend": "neutral",
         },
@@ -296,7 +298,7 @@ def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
         cards.insert(1, {
             "id": "milk_price",
             "title": "Milk Price",
-            "value": f"€{farm.get('milk_price', 0.42):.2f} / L",
+            "value": f"{format_currency(farm.get('milk_price', 0.42), decimals=2)} / L",
             "subtitle": "Dairy sector",
             "trend": "neutral",
         })
@@ -306,7 +308,7 @@ def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
         cards.append({
             "id": "beef_price",
             "title": "Beef Sale Price",
-            "value": f"€{beef.get('avg_sale_price_per_head', 0):,.0f} / head",
+            "value": f"{format_currency(beef.get('avg_sale_price_per_head', 0))} / head",
             "subtitle": f"{beef.get('cattle_on_farm', 0)} cattle on farm",
             "trend": "neutral",
         })
@@ -315,7 +317,7 @@ def _build_kpis(forecast: dict, farm: dict) -> List[dict]:
         cards.append({
             "id": "lamb_price",
             "title": "Lamb Price",
-            "value": f"€{lamb.get('avg_lamb_price_per_kg', 0):.2f} / kg",
+            "value": f"{format_currency(lamb.get('avg_lamb_price_per_kg', 0), decimals=2)} / kg",
             "subtitle": f"{lamb.get('ewes', 0)} ewes",
             "trend": "neutral",
         })
@@ -405,13 +407,13 @@ def _fallback_kpis(farm: dict) -> List[dict]:
     cash = farm.get("opening_cash_balance", 10000) + monthly
 
     cards = [
-        {"id": "cash", "title": "Cash Available", "value": f"€{cash:,.0f}", "subtitle": f"+ €{max(monthly_cf, 0):,.0f} this month", "trend": "up"},
-        {"id": "profit", "title": "Expected Monthly Profit", "value": f"€{monthly:,.0f}", "subtitle": f"Annual €{profit:,.0f}", "trend": "up"},
+        {"id": "cash", "title": "Cash Available", "value": format_currency(cash), "subtitle": f"+ {format_currency(max(monthly_cf, 0))} this month", "trend": "up"},
+        {"id": "profit", "title": "Expected Monthly Profit", "value": format_currency(monthly), "subtitle": f"Annual {format_currency(profit)}", "trend": "up"},
         {"id": "risk", "title": "Risk Level", "value": risk, "subtitle": "Stable" if risk == "Low" else "Monitor", "trend": "neutral"},
-        {"id": "feed", "title": "Feed Cost %", "value": f"{feed_ratio:.0f}%", "subtitle": "Good" if feed_ratio < 35 else "High", "trend": "neutral"},
+        {"id": "feed", "title": "Feed Cost %", "value": format_percent(feed_ratio, decimals=0), "subtitle": "Good" if feed_ratio < 35 else "High", "trend": "neutral"},
     ]
     if visibility.get("milk_price", False):
-        cards.insert(1, {"id": "milk_price", "title": "Milk Price", "value": f"€{farm.get('milk_price', 0.42):.2f} / L", "subtitle": "Dairy sector", "trend": "neutral"})
+        cards.insert(1, {"id": "milk_price", "title": "Milk Price", "value": f"{format_currency(farm.get('milk_price', 0.42), decimals=2)} / L", "subtitle": "Dairy sector", "trend": "neutral"})
     return cards
 
 

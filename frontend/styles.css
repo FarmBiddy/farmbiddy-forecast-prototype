@@ -570,6 +570,30 @@ body {
 .alert-message { margin-top: 0.3rem; }
 .alert-detail { margin-top: 0.3rem; font-size: 0.82rem; }
 
+/* Data-quality warning banners (Phase 9 / UX item 12) */
+.dq-warnings { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.dq-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  flex-wrap: wrap;
+}
+.dq-area {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+.dq-message { flex: 1; }
+.dq-high { background: #fdecea; border-left: 3px solid #b3261e; color: #7a1a12; }
+.dq-medium { background: #fffbeb; border-left: 3px solid #f59e0b; color: #7a5405; }
+.dq-low { background: #eef2f7; border-left: 3px solid #64748b; color: #3f4d5e; }
+
 /* Health */
 .health-block { text-align: center; }
 .health-score { font-size: 2.5rem; font-weight: 700; color: var(--green); }

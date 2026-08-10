@@ -95,7 +95,7 @@ function renderSidebar(profile) {
   const sectors = sectorSummaryLabel();
   if (state.selectedSectors.includes("dairy") && profile.milking_cows) {
     $("sf-herd").textContent = `${profile.milking_cows} Milking Cows`;
-    $("sf-milk").textContent = `Milk Price: €${Number(profile.milk_price || 0).toFixed(2)}/L`;
+    $("sf-milk").textContent = `Milk Price: ${formatCurrency(profile.milk_price, { decimals: 2 })}/L`;
     $("sf-processor").textContent = `Processor: ${profile.milk_processor || "—"}`;
   } else {
     $("sf-herd").textContent = `Sectors: ${sectors}`;
@@ -120,6 +120,34 @@ function formatNum(n) {
   return Number(n).toLocaleString();
 }
 
+/**
+ * Shared currency formatter (Phase 9 / UX items 11-12).
+ * Always shows negative values as "-€1,234" (sign before the symbol),
+ * never "€-1,234", and defaults to whole euros unless `decimals` is set
+ * (e.g. milk/lamb prices per litre/kg use 2-3 decimals).
+ */
+function formatCurrency(value, { decimals = 0 } = {}) {
+  const num = Number(value);
+  if (value == null || value === "" || !Number.isFinite(num)) return "—";
+  const sign = num < 0 ? "-" : "";
+  const abs = Math.abs(num);
+  return `${sign}€${abs.toLocaleString("en-IE", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+}
+
+/** Shared percentage formatter — one decimal place everywhere by default. */
+function formatPercent(value, { decimals = 1 } = {}) {
+  const num = Number(value);
+  if (value == null || value === "" || !Number.isFinite(num)) return "—";
+  return `${num.toFixed(decimals)}%`;
+}
+
+/** Class name for consistent positive/negative colouring on change-style figures. */
+function signClass(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num === 0) return "";
+  return num > 0 ? "positive" : "negative";
+}
+
 function renderProfileDetail(profile) {
   const box = $("farm-profile-detail");
   if (!box || !profile) return;
@@ -135,7 +163,7 @@ function renderProfileDetail(profile) {
     profileItem("Farm size", profile.total_hectares != null ? `${profile.total_hectares} ha` : "—"),
     profileItem("Sectors", sectorSummaryLabel()),
     profileItem("Farm type", profile.farm_type || "Mixed"),
-    profileItem("Cash opening", `€${formatNum(profile.opening_cash_balance)}`),
+    profileItem("Cash opening", formatCurrency(profile.opening_cash_balance)),
   ].join("");
 
   let dairy = "";
@@ -145,12 +173,12 @@ function renderProfileDetail(profile) {
       profileItem("Milking cows", d.milking_cows != null ? `${d.milking_cows} cows` : "—"),
       profileItem("Litres per cow", d.litres_per_cow != null ? `${formatNum(d.litres_per_cow)} L/yr` : "—"),
       profileItem("Annual milk litres", d.annual_milk_litres != null ? `${formatNum(d.annual_milk_litres)} L` : "—"),
-      profileItem("Milk price", d.milk_price != null ? `€${Number(d.milk_price).toFixed(3)}/L` : "—"),
+      profileItem("Milk price", d.milk_price != null ? `${formatCurrency(d.milk_price, { decimals: 3 })}/L` : "—"),
       profileItem("Processor", d.processor),
       profileItem("Dry cows", d.dry_cows),
       profileItem("Replacement heifers", d.replacement_heifers),
       profileItem("Calves", d.calves),
-      profileItem("Milk solids bonus", d.milk_solids_bonus_per_litre != null ? `€${Number(d.milk_solids_bonus_per_litre).toFixed(3)}/L` : "—"),
+      profileItem("Milk solids bonus", d.milk_solids_bonus_per_litre != null ? `${formatCurrency(d.milk_solids_bonus_per_litre, { decimals: 3 })}/L` : "—"),
     ].join("");
   }
 
@@ -160,7 +188,7 @@ function renderProfileDetail(profile) {
     beef = [
       profileItem("Cattle on farm", b.cattle_on_farm),
       profileItem("Finishing units", b.finishing_units),
-      profileItem("Beef sale price", b.avg_sale_price_per_head != null ? `€${formatNum(b.avg_sale_price_per_head)}/head` : "—"),
+      profileItem("Beef sale price", b.avg_sale_price_per_head != null ? `${formatCurrency(b.avg_sale_price_per_head)}/head` : "—"),
     ].join("");
   }
 
@@ -170,7 +198,7 @@ function renderProfileDetail(profile) {
     lamb = [
       profileItem("Ewes", l.ewes),
       profileItem("Lambs on farm", l.lambs_on_farm),
-      profileItem("Lamb price", l.avg_lamb_price_per_kg != null ? `€${Number(l.avg_lamb_price_per_kg).toFixed(2)}/kg` : "—"),
+      profileItem("Lamb price", l.avg_lamb_price_per_kg != null ? `${formatCurrency(l.avg_lamb_price_per_kg, { decimals: 2 })}/kg` : "—"),
       profileItem("Lambs sold (12 mo)", l.lambs_sold_trailing_12),
     ].join("");
   }
@@ -337,9 +365,9 @@ function renderSectorTable(rows) {
         ${rows.map((r) => `
           <tr>
             <td><strong>${r.label}</strong></td>
-            <td>€${Number(r.revenue || 0).toLocaleString()}</td>
-            <td>€${Number(r.profit || 0).toLocaleString()}</td>
-            <td>${r.margin_pct}%</td>
+            <td>${formatCurrency(r.revenue)}</td>
+            <td class="${signClass(r.profit)}">${formatCurrency(r.profit)}</td>
+            <td>${formatPercent(r.margin_pct)}</td>
             <td class="${statusClass(r.status)}">${r.status}</td>
           </tr>`).join("")}
       </tbody>
@@ -369,20 +397,41 @@ function renderDebtRegister(loans) {
         ${loans.map((l) => `
           <tr>
             <td><strong>${l.lender}</strong></td>
-            <td>€${Number(l.outstanding_balance || 0).toLocaleString()}</td>
-            <td>${Number(l.rate || 0).toFixed(2)}%</td>
+            <td>${formatCurrency(l.outstanding_balance)}</td>
+            <td>${formatPercent(l.rate, { decimals: 2 })}</td>
             <td>${l.years_remaining} yrs</td>
-            <td>€${Number(l.monthly_repayment || 0).toLocaleString()}/mo</td>
+            <td>${formatCurrency(l.monthly_repayment)}/mo</td>
             <td>${l.maturity || "—"}</td>
           </tr>`).join("")}
       </tbody>
     </table>`;
 }
 
+/**
+ * Data-quality warning banners (Phase 9 / UX item 12). Each warning names the
+ * affected area so it reads like "near the figure it affects" even though
+ * today's dashboard renders them together above the KPI row.
+ */
+function renderDataQualityWarnings(warnings) {
+  const box = $("data-quality-warnings");
+  if (!box) return;
+  if (!warnings?.length) {
+    box.innerHTML = "";
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  box.innerHTML = warnings.map((w) => `
+    <div class="dq-banner dq-${w.severity || "medium"}">
+      <span class="dq-area">${w.area || "Data quality"}</span>
+      <span class="dq-message">${w.message}</span>
+    </div>`).join("");
+}
+
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatChartEuro(value) {
-  return `€${Number(value || 0).toLocaleString("en-IE", { maximumFractionDigits: 0 })}`;
+  return formatCurrency(value);
 }
 
 function formatOverviewMonthLabel(d) {
@@ -552,6 +601,7 @@ function renderExecutiveAlerts(alerts, listId = "alerts-list") {
 function renderExecutiveDashboard(data) {
   $("dashboard-empty")?.classList.add("hidden");
   $("dashboard-results")?.classList.remove("hidden");
+  renderDataQualityWarnings(data.data_quality_warnings);
   renderOverviewHeader(data.overview_header);
   renderKpis(data.executive_kpis || data.kpis);
   renderHealthSnapshot(data.health_snapshot);
@@ -578,7 +628,7 @@ function renderScenarios(snapshots) {
   box.innerHTML = (snapshots || []).map((s) => `
     <div class="scenario-item">
       <strong>${s.label}</strong>
-      Annual Profit: €${Number(s.annual_profit || 0).toLocaleString()} (${s.profit_impact || ""})
+      Annual Profit: <span class="${signClass(s.annual_profit)}">${formatCurrency(s.annual_profit)}</span> (${s.profit_impact || ""})
       <br><span class="muted">Risk: ${s.risk_level}</span>
     </div>`).join("");
 }
@@ -592,9 +642,9 @@ function renderForecastResults(data) {
   if ($("forecast-interpretation")) $("forecast-interpretation").textContent = data.interpretation || "";
   const s = data.forecast_summary || {};
   renderMetricCards([
-    { label: "Annual Revenue", value: `€${Number(s.annual_revenue || 0).toLocaleString()}` },
-    { label: "Annual Profit", value: `€${Number(s.annual_profit || 0).toLocaleString()}` },
-    { label: "Profit Margin", value: `${s.profit_margin || 0}%` },
+    { label: "Annual Revenue", value: formatCurrency(s.annual_revenue) },
+    { label: "Annual Profit", value: formatCurrency(s.annual_profit) },
+    { label: "Profit Margin", value: formatPercent(s.profit_margin) },
     { label: "Risk Level", value: data.risk_level || "—" },
   ], "forecast-kpis");
   renderBarChart("forecast-cashflow-chart", data.cashflow_chart_data, ["cash_in", "cash_out"]);
@@ -606,15 +656,15 @@ function renderForecastResults(data) {
 function renderMonteCarlo(monte) {
   const box = $("monte-carlo-panel");
   if (!box || !monte) return;
-  const expected = Number(monte.expected_profit || 0);
-  const low = Number(monte.worst_case ?? monte.confidence_range?.[0] ?? 0);
-  const high = Number(monte.best_case ?? monte.confidence_range?.[1] ?? 0);
-  const lossPct = ((monte.probability_of_loss || 0) * 100).toFixed(1);
+  const expected = monte.expected_profit || 0;
+  const low = monte.worst_case ?? monte.confidence_range?.[0] ?? 0;
+  const high = monte.best_case ?? monte.confidence_range?.[1] ?? 0;
+  const lossPct = (monte.probability_of_loss || 0) * 100;
   box.innerHTML = `
     <ul class="profit-outlook-list">
-      <li>Expected profit is €${expected.toLocaleString()}</li>
-      <li>It can range between €${low.toLocaleString()} and €${high.toLocaleString()}</li>
-      <li>Probability of making a loss is ${lossPct}%.</li>
+      <li>Expected profit is ${formatCurrency(expected)}</li>
+      <li>It can range between ${formatCurrency(low)} and ${formatCurrency(high)}</li>
+      <li>Probability of making a loss is ${formatPercent(lossPct)}.</li>
     </ul>
     ${monte.interpretation ? `<p class="muted profit-outlook-tip">${monte.interpretation}</p>` : ""}`;
 }
@@ -647,18 +697,18 @@ function renderSandboxResults(data) {
   if ($("sandbox-summary")) $("sandbox-summary").textContent = data.summary || "";
   const c = data.comparison || {};
   renderMetricCards([
-    { label: "Profit (base)", value: `€${Number(c.profit_base || 0).toLocaleString()}` },
-    { label: "Profit (scenario)", value: `€${Number(c.profit_scenario || 0).toLocaleString()}` },
-    { label: "Difference", value: `€${Number(c.profit_difference || 0).toLocaleString()}`, sub: c.profit_difference >= 0 ? "Better" : "Worse" },
+    { label: "Profit (base)", value: formatCurrency(c.profit_base) },
+    { label: "Profit (scenario)", value: formatCurrency(c.profit_scenario) },
+    { label: "Difference", value: formatCurrency(c.profit_difference), sub: c.profit_difference >= 0 ? "Better" : "Worse" },
     { label: "Risk change", value: `${c.risk_base} → ${c.risk_scenario}` },
   ], "sandbox-comparison");
   const table = $("sandbox-table");
   if (table) {
     table.innerHTML = `<table class="data-table"><tbody>
-      <tr><td>Revenue</td><td>€${Number(c.revenue_base).toLocaleString()}</td><td>€${Number(c.revenue_scenario).toLocaleString()}</td><td>€${Number(c.revenue_difference).toLocaleString()}</td></tr>
-      <tr><td>Monthly profit</td><td>€${Number(c.monthly_profit_base).toLocaleString()}</td><td>€${Number(c.monthly_profit_scenario).toLocaleString()}</td><td>—</td></tr>
-      <tr><td>Monthly cashflow</td><td>€${Number(c.monthly_cashflow_base).toLocaleString()}</td><td>€${Number(c.monthly_cashflow_scenario).toLocaleString()}</td><td>—</td></tr>
-      <tr><td>Lowest cash</td><td>€${Number(c.min_cash_base).toLocaleString()}</td><td>€${Number(c.min_cash_scenario).toLocaleString()}</td><td>—</td></tr>
+      <tr><td>Revenue</td><td>${formatCurrency(c.revenue_base)}</td><td>${formatCurrency(c.revenue_scenario)}</td><td class="${signClass(c.revenue_difference)}">${formatCurrency(c.revenue_difference)}</td></tr>
+      <tr><td>Monthly profit</td><td>${formatCurrency(c.monthly_profit_base)}</td><td>${formatCurrency(c.monthly_profit_scenario)}</td><td>—</td></tr>
+      <tr><td>Monthly cashflow</td><td>${formatCurrency(c.monthly_cashflow_base)}</td><td>${formatCurrency(c.monthly_cashflow_scenario)}</td><td>—</td></tr>
+      <tr><td>Lowest cash</td><td>${formatCurrency(c.min_cash_base)}</td><td>${formatCurrency(c.min_cash_scenario)}</td><td>—</td></tr>
     </tbody></table>`;
   }
   renderRecommendations(data.recommendations, "sandbox-recommendations");
@@ -758,8 +808,8 @@ function renderReportPreview(data, downloadUrl) {
   const h = data.health_score || {};
   if ($("report-preview-kpis")) {
     $("report-preview-kpis").innerHTML = `
-      <div class="kpi-card"><span class="kpi-label">Cash Available</span><span class="kpi-value">€${Number(k.cash_available || 0).toLocaleString()}</span></div>
-      <div class="kpi-card"><span class="kpi-label">Annual Profit</span><span class="kpi-value">€${Number(k.annual_profit || 0).toLocaleString()}</span></div>
+      <div class="kpi-card"><span class="kpi-label">Cash Available</span><span class="kpi-value">${formatCurrency(k.cash_available)}</span></div>
+      <div class="kpi-card"><span class="kpi-label">Annual Profit</span><span class="kpi-value">${formatCurrency(k.annual_profit)}</span></div>
       <div class="kpi-card"><span class="kpi-label">Risk Level</span><span class="kpi-value">${k.risk_level || "—"}</span></div>
       <div class="kpi-card"><span class="kpi-label">Health Score</span><span class="kpi-value">${h.score ?? k.health_score ?? "—"}/100</span></div>`;
   }
@@ -972,12 +1022,12 @@ function formatFiMetrics(metrics) {
     items.push({ label: "Health score", value: `${metrics.health_score}/100` });
   }
   if (metrics.profit_change != null) {
-    items.push({ label: "Profit change", value: `€${Number(metrics.profit_change).toLocaleString("en-IE")}` });
+    items.push({ label: "Profit change", value: formatCurrency(metrics.profit_change) });
   }
   if (metrics.cashflow_change != null) {
     items.push({
       label: "Cashflow",
-      value: `€${Number(metrics.cashflow_change).toLocaleString("en-IE")}/mo`,
+      value: `${formatCurrency(metrics.cashflow_change)}/mo`,
     });
   }
   if (metrics.risk_level) {
@@ -1239,9 +1289,9 @@ function renderHistoricalData(data) {
               ${rows.map((r) => `
                 <tr>
                   <td>${r.period}</td>
-                  <td>€${Number(r.revenue || 0).toLocaleString()}</td>
-                  <td>€${Number(r.costs || 0).toLocaleString()}</td>
-                  <td>€${Number((r.revenue || 0) - (r.costs || 0)).toLocaleString()}</td>
+                  <td>${formatCurrency(r.revenue)}</td>
+                  <td>${formatCurrency(r.costs)}</td>
+                  <td class="${signClass((r.revenue || 0) - (r.costs || 0))}">${formatCurrency((r.revenue || 0) - (r.costs || 0))}</td>
                 </tr>`).join("")}
             </tbody>
           </table>
@@ -1251,7 +1301,7 @@ function renderHistoricalData(data) {
 
   let html = renderTable(data.combined_monthly, "Combined (selected sectors)");
   (data.sectors || []).forEach((s) => {
-    html += renderTable(s.monthly, `${s.label} — totals: €${Number(s.totals?.revenue || 0).toLocaleString()} revenue`);
+    html += renderTable(s.monthly, `${s.label} — totals: ${formatCurrency(s.totals?.revenue)} revenue`);
   });
   box.innerHTML = html || `<p class="muted">No historical data available.</p>`;
 }
@@ -1416,7 +1466,7 @@ function renderCashflowActionsResults(data) {
   const summary = $("cashflow-actions-summary");
   if (summary) {
     summary.classList.remove("hidden");
-    summary.textContent = `Current lowest cash balance: €${Number(data.base_lowest_balance || 0).toLocaleString()} `
+    summary.textContent = `Current lowest cash balance: ${formatCurrency(data.base_lowest_balance)} `
       + `(${data.base_deficit_months || 0} month${data.base_deficit_months === 1 ? "" : "s"} in deficit over the next 12 months).`;
   }
   const table = $("cashflow-actions-table");
@@ -1424,9 +1474,9 @@ function renderCashflowActionsResults(data) {
   const rows = (data.results || []).map((r) => `
     <tr>
       <td><strong>${r.label}</strong><br><span class="muted">${r.description}</span></td>
-      <td>€${Number(r.lowest_balance_scenario || 0).toLocaleString()}</td>
+      <td>${formatCurrency(r.lowest_balance_scenario)}</td>
       <td>${r.deficit_months_scenario}</td>
-      <td class="${r.improvement > 0 ? "positive" : r.improvement < 0 ? "negative" : ""}">€${Number(r.improvement || 0).toLocaleString()}</td>
+      <td class="${signClass(r.improvement)}">${formatCurrency(r.improvement)}</td>
     </tr>`).join("");
   table.innerHTML = `
     <table class="data-table">
@@ -1486,7 +1536,7 @@ async function testOneCashflowAction() {
       box.innerHTML = `
         <strong>${data.label}</strong><br>
         ${data.description}<br><br>
-        Lowest balance: €${Number(data.lowest_balance_base || 0).toLocaleString()} → €${Number(data.lowest_balance_scenario || 0).toLocaleString()}<br>
+        Lowest balance: ${formatCurrency(data.lowest_balance_base)} → ${formatCurrency(data.lowest_balance_scenario)}<br>
         Deficit months: ${data.deficit_months_base} → ${data.deficit_months_scenario}`;
     }
     showStatus("Action tested.", "success");

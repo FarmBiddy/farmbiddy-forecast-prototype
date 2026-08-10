@@ -66,6 +66,14 @@ def test_run_analysis_all_sectors():
     for alert in data["alerts"]:
         assert set(("what", "when", "cause", "review")) <= set(alert.keys())
         assert alert["what"] and alert["when"] and alert["cause"] and alert["review"]
+    # Phase 9: the sample dataset is stale (last month is well over 2 months
+    # old) and flagged as sample data, so both warnings should surface.
+    assert "data_quality_warnings" in data
+    warning_types = {w["type"] for w in data["data_quality_warnings"]}
+    assert "outdated_data" in warning_types
+    assert "sample_data" in warning_types
+    for warning in data["data_quality_warnings"]:
+        assert set(("type", "area", "severity", "message")) <= set(warning.keys())
 
 
 def test_historical_data_endpoint():

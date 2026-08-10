@@ -36,6 +36,7 @@ from config.paths import REPORTS_DIR, ensure_output_dirs
 from forecast_engine.alerts import generate_alerts
 from forecast_engine.cashflow import calculate_monthly_cashflow, generate_monthly_forecast
 from forecast_engine.costs import calculate_costs
+from forecast_engine.formatting import format_currency, format_percent
 from forecast_engine.monte_carlo import run_monte_carlo
 from forecast_engine.profit import calculate_profit
 from forecast_engine.revenue import calculate_revenue
@@ -270,13 +271,13 @@ def _enhanced_actions(intel: dict, forecast: dict, farm: dict) -> list[dict]:
         priority = "High" if any(w in title.lower() for w in ("cash", "debt", "urgent", "loss")) else "Medium"
         benefit = ""
         if "feed" in title.lower():
-            benefit = f"€{int(farm.get('feed', 0) * 0.05):,} annually"
+            benefit = f"{format_currency(farm.get('feed', 0) * 0.05)} annually"
         elif "debt" in title.lower() or "loan" in title.lower():
-            benefit = f"€{int(farm.get('loan_repayments', 0) * 0.08):,} interest savings potential"
+            benefit = f"{format_currency(farm.get('loan_repayments', 0) * 0.08)} interest savings potential"
         elif "cash" in title.lower():
-            benefit = f"€{int(max(forecast.get('annual_profit', 0) * 0.05, 5000)):,} buffer target"
+            benefit = f"{format_currency(max(forecast.get('annual_profit', 0) * 0.05, 5000))} buffer target"
         else:
-            benefit = f"€{int(max(forecast.get('annual_profit', 0) * 0.03, 3000)):,} estimated impact"
+            benefit = f"{format_currency(max(forecast.get('annual_profit', 0) * 0.03, 3000))} estimated impact"
         actions.append({
             "priority": priority,
             "recommendation": title,
@@ -287,10 +288,10 @@ def _enhanced_actions(intel: dict, forecast: dict, farm: dict) -> list[dict]:
 
     if len(actions) < 5:
         defaults = [
-            ("Review feed supplier contracts before winter.", "Feed prices may rise seasonally.", f"€{int(farm.get('feed', 0) * 0.05):,} annually"),
+            ("Review feed supplier contracts before winter.", "Feed prices may rise seasonally.", f"{format_currency(farm.get('feed', 0) * 0.05)} annually"),
             ("Update financial records monthly.", "Better records improve decision speed.", "Reduced admin cost and fewer surprises"),
             ("Run a new forecast after major changes.", "Keeps plans aligned with reality.", "Better timing for investments"),
-            ("Review labour efficiency per cow.", "Labour is a major fixed cost.", f"€{int(farm.get('labour', 0) * 0.04):,} potential savings"),
+            ("Review labour efficiency per cow.", "Labour is a major fixed cost.", f"{format_currency(farm.get('labour', 0) * 0.04)} potential savings"),
         ]
         for rec, reason, benefit in defaults:
             if len(actions) >= 5:
@@ -332,7 +333,7 @@ def _advisor_page(intel: dict, forecast: dict, health: dict) -> str:
         "CURRENT FINANCIAL POSITION\n\n",
         intel.get("plain_summary", ""),
         "\n\nFORECAST OUTLOOK\n\n",
-        f"Annual profit is forecast at €{profit:,.0f} with a farm health score of "
+        f"Annual profit is forecast at {format_currency(profit)} with a farm health score of "
         f"{health.get('score', '—')}/100. Risk level is {forecast.get('risk_level', 'Medium')}. ",
         _executive_narrative(forecast, health, intel),
         "\n\nMAIN OPPORTUNITIES\n\n",
@@ -363,15 +364,15 @@ def _risk_dashboard(forecast: dict, farm: dict, health: dict) -> list[dict]:
         row("Liquidity", health.get("cashflow", "Tight"),
             "Based on average monthly cashflow and opening balance."),
         row("Profitability", health.get("profitability", "Fair"),
-            f"Profit margin is {margin:.1f}% on current assumptions."),
+            f"Profit margin is {format_percent(margin)} on current assumptions."),
         row("Debt", "High" if loan_pct > 15 else "Moderate" if loan_pct > 10 else "Low",
-            f"Loan repayments are {loan_pct:.1f}% of revenue."),
+            f"Loan repayments are {format_percent(loan_pct)} of revenue."),
         row("Cashflow", "Negative" if monthly_cf < 0 else "Good" if monthly_cf >= 2000 else "Tight",
-            f"Average monthly cashflow is €{monthly_cf:,.0f}."),
+            f"Average monthly cashflow is {format_currency(monthly_cf)}."),
         row("Milk Price Exposure", forecast.get("risk_level", "Medium"),
             "Income is sensitive to milk price changes — test scenarios regularly."),
         row("Feed Dependency", health.get("feed_pressure", "Moderate"),
-            f"Feed represents {feed_pct:.0f}% of revenue."),
+            f"Feed represents {format_percent(feed_pct, decimals=0)} of revenue."),
         row("Operational Efficiency", "Good" if margin >= 12 else "Fair" if margin >= 8 else "Weak",
             "Measured by margin and cost control across the enterprise."),
         row("Expansion Risk", "Low" if health.get("score", 0) >= 75 else "Medium" if health.get("score", 0) >= 55 else "High",
@@ -745,8 +746,8 @@ def _page_executive(data: dict, st: dict) -> list:
     k = data["kpis"]
     h = data["health_score"]
     cards = _kpi_cards([
-        ("Cash Available", f"€{k['cash_available']:,.0f}", NAVY),
-        ("Expected Annual Profit", f"€{k['annual_profit']:,.0f}", GREEN),
+        ("Cash Available", format_currency(k['cash_available']), NAVY),
+        ("Expected Annual Profit", format_currency(k['annual_profit']), GREEN),
         ("Risk Level", k["risk_level"], _risk_light(k["risk_level"])),
         ("Farm Health Score", f"{h.get('score', k['health_score'])}/100", GREEN),
     ])
@@ -769,10 +770,10 @@ def _page_farm(data: dict, st: dict) -> list:
         ("Milking Cows", str(f.get("milking_cows", "—"))),
         ("Milk Yield", f"{litres:,.0f} L/cow/year ({total_litres:,} L total)"),
         ("Milk Processor", p.get("milk_processor", "—")),
-        ("Milk Price", f"€{f.get('milk_price', 0):.2f} / L"),
+        ("Milk Price", f"{format_currency(f.get('milk_price', 0), decimals=2)} / L"),
         ("Employees", "Estimate from labour budget" if f.get("labour") else "—"),
         ("Land Area", p.get("location", "See farm records")),
-        ("Operating Costs", f"€{data['forecast_summary'].get('annual_costs', 0):,.0f} / year"),
+        ("Operating Costs", f"{format_currency(data['forecast_summary'].get('annual_costs', 0))} / year"),
     ]
     table = Table([[Paragraph(f"<b>{a}</b>", st["body"]), Paragraph(str(b), st["body"])] for a, b in rows], colWidths=[5 * cm, 11 * cm])
     table.setStyle(TableStyle([
@@ -792,16 +793,16 @@ def _page_snapshot(data: dict, st: dict) -> list:
         c = GREEN if (pct is None or pct < 35) else AMBER if pct < 45 else RED
         return (label, val, c)
     cards = _kpi_cards([
-        card("Revenue", f"€{k['revenue']:,.0f}"),
-        card("Operating Costs", f"€{k['operating_costs']:,.0f}"),
-        card("Net Profit", f"€{k['net_profit']:,.0f}"),
-        card("Cash Available", f"€{k['cash_available']:,.0f}"),
-        card("Debt (annual)", f"€{k['debt']:,.0f}"),
-        card("Feed Cost %", f"{k['feed_pct']:.1f}%", k["feed_pct"]),
-        card("Labour Cost %", f"{k['labour_pct']:.1f}%", k["labour_pct"]),
-        card("Vet Cost %", f"{k['vet_pct']:.1f}%", k["vet_pct"]),
-        card("Electricity %", f"{k['electricity_pct']:.1f}%", k["electricity_pct"] or 0),
-        card("Fuel Cost %", f"{k['fuel_pct']:.1f}%", k["fuel_pct"] or 0),
+        card("Revenue", format_currency(k['revenue'])),
+        card("Operating Costs", format_currency(k['operating_costs'])),
+        card("Net Profit", format_currency(k['net_profit'])),
+        card("Cash Available", format_currency(k['cash_available'])),
+        card("Debt (annual)", format_currency(k['debt'])),
+        card("Feed Cost %", format_percent(k['feed_pct']), k["feed_pct"]),
+        card("Labour Cost %", format_percent(k['labour_pct']), k["labour_pct"]),
+        card("Vet Cost %", format_percent(k['vet_pct']), k["vet_pct"]),
+        card("Electricity %", format_percent(k['electricity_pct']), k["electricity_pct"] or 0),
+        card("Fuel Cost %", format_percent(k['fuel_pct']), k["fuel_pct"] or 0),
     ], cols=2)
     return [Paragraph("Financial Snapshot", st["title"]), cards, PageBreak()]
 
@@ -814,7 +815,7 @@ def _page_profitability(data: dict, st: dict, charts: dict) -> list:
     if charts.get("cost_breakdown"):
         story += [Image(charts["cost_breakdown"], width=14 * cm, height=6 * cm), Spacer(1, 0.3 * cm)]
     story.append(Paragraph(
-        f"Revenue and costs track across the year with a profit margin of {margin:.1f}%. "
+        f"Revenue and costs track across the year with a profit margin of {format_percent(margin)}. "
         "When the cost line approaches revenue, margin tightens — feed and labour typically "
         "drive the largest movements.",
         st["body"],
@@ -853,7 +854,7 @@ def _page_forecast(data: dict, st: dict, charts: dict) -> list:
     story.append(Spacer(1, 0.3 * cm))
     for s in fs:
         story.append(Paragraph(
-            f"<b>{s.get('name')}</b>: Revenue €{s.get('revenue', 0):,.0f}, Profit €{s.get('profit', 0):,.0f}",
+            f"<b>{s.get('name')}</b>: Revenue {format_currency(s.get('revenue', 0))}, Profit {format_currency(s.get('profit', 0))}",
             st["body"],
         ))
     story.append(Spacer(1, 0.3 * cm))
@@ -873,10 +874,10 @@ def _page_monte(data: dict, st: dict, charts: dict) -> list:
         story.append(Image(charts["monte"], width=14 * cm, height=6 * cm))
         story.append(Spacer(1, 0.3 * cm))
         story.append(Paragraph(
-            f"Confidence interval: €{m.get('confidence_low', 0):,.0f} to €{m.get('confidence_high', 0):,.0f}. "
-            f"Probability of profit: {m.get('probability_of_profit', 0) * 100:.0f}%. "
-            f"Probability of loss: {m.get('probability_of_loss', 0) * 100:.0f}%. "
-            f"Probability of cash shortage: {m.get('probability_of_cash_shortage', 0) * 100:.0f}%.",
+            f"Confidence interval: {format_currency(m.get('confidence_low', 0))} to {format_currency(m.get('confidence_high', 0))}. "
+            f"Probability of profit: {format_percent(m.get('probability_of_profit', 0) * 100, decimals=0)}. "
+            f"Probability of loss: {format_percent(m.get('probability_of_loss', 0) * 100, decimals=0)}. "
+            f"Probability of cash shortage: {format_percent(m.get('probability_of_cash_shortage', 0) * 100, decimals=0)}.",
             st["body"],
         ))
         story.append(Spacer(1, 0.2 * cm))
@@ -892,9 +893,9 @@ def _page_scenarios(data: dict, st: dict, charts: dict) -> list:
     for s in data.get("scenarios", []):
         rows.append([
             s["scenario"],
-            f"€{s['revenue']:,.0f}",
-            f"€{s['profit']:,.0f}",
-            f"€{s['cashflow']:,.0f}",
+            format_currency(s['revenue']),
+            format_currency(s['profit']),
+            format_currency(s['cashflow']),
             s["risk_level"],
         ])
     table = Table(rows, colWidths=[4.5 * cm, 2.8 * cm, 2.8 * cm, 2.8 * cm, 2 * cm])

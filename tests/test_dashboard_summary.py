@@ -58,6 +58,19 @@ def test_calculate_dashboard_kpis_prefers_debt_register():
     assert cards[3]["value"] == "€110,000"
 
 
+def test_latest_period_finds_most_recent_across_sectors():
+    from services.dashboard_summary import _latest_period
+
+    filtered = {
+        "sectors": {
+            "dairy": {"monthly": [{"period": "2024-01"}, {"period": "2025-12"}]},
+            "beef": {"monthly": [{"period": "2024-06"}]},
+        }
+    }
+    assert _latest_period(filtered) == "2025-12"
+    assert _latest_period({"sectors": {}}) is None
+
+
 def test_sum_outstanding_debt():
     register = [{"outstanding_balance": 1000}, {"outstanding_balance": 2500.5}]
     assert sum_outstanding_debt(register) == 3500.5
