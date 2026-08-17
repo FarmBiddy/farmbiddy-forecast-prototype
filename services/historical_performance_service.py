@@ -153,7 +153,11 @@ def _build_comparison(
                 "year": year,
                 "previous_year": previous_year,
                 "basis": "no_overlap",
-                "note": f"{year} and {previous_year} have no overlapping months of actuals to compare.",
+                "note": (
+                    f"There aren't enough matching months in {year} and {previous_year} "
+                    "to compare yet. Once both years have figures for the same months, "
+                    "this comparison will appear."
+                ),
             }
         current_values = _sum_rows([r for r in current_rows if r["month"] in shared_months])
         previous_values = _sum_rows([r for r in previous_rows if r["month"] in shared_months])

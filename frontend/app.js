@@ -51,8 +51,19 @@ function sectorsBody(extra = {}) {
 async function api(path, options = {}) {
   const res = await fetch(API + path, options);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(farmerFacingError(res.status, data.detail));
   return data;
+}
+
+function farmerFacingError(status, detail) {
+  if (status === 403) return "You don't have access to that farm.";
+  if (status === 404) return "That information wasn't found. Try refreshing, or check Farm Data.";
+  if (status === 422) return "Some of the details entered aren't valid. Check the form and try again.";
+  if (status >= 500) return "Something went wrong on our side. Please try again in a moment.";
+  if (typeof detail === "string" && detail.length < 180 && !detail.includes("Traceback") && !detail.includes("sqlalchemy")) {
+    return detail;
+  }
+  return "Something went wrong. Please try again.";
 }
 
 function setGreeting() {
@@ -93,6 +104,10 @@ function sectorSummaryLabel() {
 function renderSidebar(profile) {
   if (!profile) return;
   $("sf-farm-name").textContent = profile.farm_name || "My Farm";
+  const sampleBadge = $("sf-sample-badge");
+  if (sampleBadge) {
+    sampleBadge.classList.toggle("hidden", !profile.is_sample_data);
+  }
   const sectors = sectorSummaryLabel();
   if (state.selectedSectors.includes("dairy") && profile.milking_cows) {
     $("sf-herd").textContent = `${profile.milking_cows} Milking Cows`;
@@ -388,7 +403,7 @@ function renderLoansSummary(summary) {
   const warningBox = $("loans-low-cash-warning");
   if (!box) return;
   if (!summary || !summary.loan_count) {
-    box.innerHTML = `<p class="muted">No outstanding loans on record.</p>`;
+    box.innerHTML = `<p class="muted">No loans recorded for this farm yet. If you entered repayments during Farm Setup they still appear in your budget.</p>`;
     warningBox?.classList.add("hidden");
     return;
   }
@@ -923,7 +938,7 @@ function renderMonteCarlo(monte) {
     <ul class="profit-outlook-list">
       <li>Expected profit is ${formatCurrency(expected)}</li>
       <li>It can range between ${formatCurrency(low)} and ${formatCurrency(high)}</li>
-      <li>Probability of making a loss is ${formatPercent(lossPct)}.</li>
+      <li>Chance of a loss is ${formatPercent(lossPct)}.</li>
     </ul>
     ${monte.interpretation ? `<p class="muted profit-outlook-tip">${monte.interpretation}</p>` : ""}`;
 }
@@ -1820,7 +1835,7 @@ function renderCbCategoryRow(row) {
           <span>${row.label}</span>
           <button type="button" class="btn-link cb-set-budget-btn" data-record-type="${row.record_type}" data-category="${row.category_id}">Set a budget</button>
         </div>
-        <p class="muted small">No budget set yet.</p>
+        <p class="muted small">No budget set for this category yet. Set one to see whether you are ahead or behind.</p>
       </div>`;
   }
   return `
