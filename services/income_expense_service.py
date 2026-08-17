@@ -134,6 +134,60 @@ def _dataset_category_breakdown(filtered_raw: dict, months: int = 12) -> tuple[l
     return income_rows, expense_rows
 
 
+def dataset_monthly_category_totals(filtered_raw: dict, months: int = 24) -> dict[tuple, float]:
+    """Per (year, month, record_type, category) actual totals from the
+    dataset's own structured line items only (no manual records) - the
+    same category vocabulary and mappings as `_dataset_category_breakdown`,
+    but kept at monthly granularity so P0.3's category Budget vs Actual can
+    compare against the same monthly budget records it stores.
+    """
+    totals: dict[tuple, float] = defaultdict(float)
+
+    for sector_data in (filtered_raw.get("sectors") or {}).values():
+        monthly = (sector_data.get("monthly") or [])[-months:]
+        for entry in monthly:
+            year = int(entry.get("year") or 0)
+            month = int(entry.get("month") or 0)
+            for key, value in (entry.get("revenue") or {}).items():
+                if key == "total" or not value:
+                    continue
+                category = RAW_REVENUE_TO_CATEGORY.get(key, "other_income")
+                totals[(year, month, "income", category)] += float(value)
+            for key, value in (entry.get("costs") or {}).items():
+                if key == "total" or not value:
+                    continue
+                category = RAW_COST_TO_CATEGORY.get(key, "other_expense")
+                totals[(year, month, "expense", category)] += float(value)
+
+    combined, _ = get_sector_monthly_history(filtered_raw, months=months)
+    scheme = filtered_raw.get("scheme_payments") or {}
+    scheme_months = scheme.get("scheme_payment_months") or {}
+    for row in combined:
+        year, month = row["year"], row["month"]
+        for key in ("biss", "acres", "other_grants"):
+            if scheme_months.get(key) == month:
+                amount = float(scheme.get(key) or 0)
+                if amount:
+                    totals[(year, month, "income", "grants_schemes")] += amount
+
+    farm_summary = filtered_raw.get("farm_summary") or {}
+    loan_monthly = _loan_monthly_total(farm_summary)
+    if loan_monthly:
+        for row in combined:
+            totals[(row["year"], row["month"], "expense", "loan_repayments")] += loan_monthly
+
+    return {key: round(value, 2) for key, value in totals.items()}
+
+
+def window_months(filtered_raw: dict, months: int = 12) -> list[tuple[int, int]]:
+    """The (year, month) tuples this farm actually has actual data for, in
+    the trailing `months` window - the shared definition of "the window"
+    for both dataset and manual-record monthly aggregation.
+    """
+    combined, _ = get_sector_monthly_history(filtered_raw, months=months)
+    return [(row["year"], row["month"]) for row in combined]
+
+
 def build_income_expense_summary(
     farm_file: str,
     sectors: list[str],

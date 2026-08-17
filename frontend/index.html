@@ -161,6 +161,63 @@
             <div id="cashflow-budget-summary" class="interpretation-box hidden"></div>
             <div id="cashflow-budget-table" class="table-wrap"></div>
           </div>
+
+          <div class="card">
+            <div class="card-title-row">
+              <h3>Budget by Category</h3>
+              <button type="button" class="btn-secondary" id="cb-add-budget-btn">+ Set a Category Budget</button>
+            </div>
+            <p class="muted">Which categories are driving your budget position — e.g. "Feed €120 above budget".</p>
+            <div id="cb-loading" class="muted">Loading category budgets…</div>
+            <div id="cb-content" class="hidden">
+              <div class="interpretation-box" id="cb-overall-summary"></div>
+
+              <form id="cb-budget-form" class="ie-entry-form hidden">
+                <input type="hidden" id="cb-budget-id" value="" />
+                <div class="ie-form-row">
+                  <label>Type
+                    <select id="cb-record-type">
+                      <option value="expense">Expense</option>
+                      <option value="income">Income</option>
+                    </select>
+                  </label>
+                  <label>Category
+                    <select id="cb-category" required></select>
+                  </label>
+                  <label>Applies to
+                    <select id="cb-period-mode">
+                      <option value="monthly">One month</option>
+                      <option value="annual">Whole year (split evenly)</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="ie-form-row">
+                  <label id="cb-month-field">Month
+                    <input type="month" id="cb-month" />
+                  </label>
+                  <label id="cb-year-field" class="hidden">Year
+                    <input type="number" id="cb-year" min="2000" max="2100" step="1" />
+                  </label>
+                  <label>Amount (€)
+                    <input type="number" id="cb-amount" min="0" step="0.01" required />
+                  </label>
+                </div>
+                <div class="ie-form-actions">
+                  <button type="submit" class="btn-run">Save Budget</button>
+                  <button type="button" class="btn-secondary" id="cb-cancel-budget-btn">Cancel</button>
+                </div>
+              </form>
+
+              <div id="cb-top-contributors"></div>
+
+              <details class="card overview-detail-toggle">
+                <summary>See all categories</summary>
+                <div id="cb-all-categories"></div>
+                <h4 class="cb-unbudgeted-heading">Not budgeted yet</h4>
+                <div id="cb-unbudgeted-categories"></div>
+              </details>
+            </div>
+          </div>
         </div>
 
         <div class="subtab-panel hidden" data-subtab-panel="cashflow-income-expenses">

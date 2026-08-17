@@ -646,6 +646,19 @@ body {
   text-decoration: underline;
 }
 
+/* Category Budget vs Actual (P0.3) */
+p.small,
+span.small { font-size: 0.8rem; }
+.ie-category-list .ie-category-row {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.ie-category-list .ie-category-row:last-child { border-bottom: none; padding-bottom: 0; }
+.cb-unbudgeted-heading { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--muted); }
+#cb-top-contributors,
+#cb-all-categories,
+#cb-unbudgeted-categories { display: flex; flex-direction: column; gap: 0.65rem; }
+
 @media (max-width: 1200px) {
   .ie-summary-row { grid-template-columns: 1fr 1fr; }
 }

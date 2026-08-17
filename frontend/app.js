@@ -1473,7 +1473,7 @@ const DEFAULT_SUBTAB = {
 
 const SUBTAB_LOADERS = {
   "cashflow-forecast": () => ensureAdvancedForecast(),
-  "cashflow-budget": () => loadCashflowBudget(),
+  "cashflow-budget": () => { loadCashflowBudget(); loadCategoryBudgets(); },
   "cashflow-income-expenses": () => loadIncomeExpenses(),
   "fp-historical": () => loadHistoricalData(),
   "ap-recommendations": () => loadFinancialIntelligence(),
@@ -1675,6 +1675,163 @@ async function loadCashflowBudget() {
       $("cashflow-budget-loading").classList.remove("hidden");
       $("cashflow-budget-loading").textContent = `Could not load: ${err.message}`;
     }
+    showStatus(err.message, "error");
+  }
+}
+
+async function ensureCategoryChoicesLoaded() {
+  if (state.incomeExpenses) return;
+  try {
+    state.incomeExpenses = await api(`/farmer/income-expenses${sectorsQuery()}`);
+  } catch (err) {
+    // Non-fatal: the category dropdown just stays empty until this loads.
+  }
+}
+
+function cbStatusClass(status) {
+  if (status === "above_budget" || status === "behind") return "negative";
+  if (status === "below_budget" || status === "ahead") return "positive";
+  return "muted";
+}
+
+function renderCbCategoryRow(row) {
+  if (row.status === "no_budget_set") {
+    return `
+      <div class="ie-category-row">
+        <div class="ie-category-row-label">
+          <span>${row.label}</span>
+          <button type="button" class="btn-link cb-set-budget-btn" data-record-type="${row.record_type}" data-category="${row.category_id}">Set a budget</button>
+        </div>
+        <p class="muted small">No budget set yet.</p>
+      </div>`;
+  }
+  return `
+    <div class="ie-category-row">
+      <div class="ie-category-row-label">
+        <span>${row.label}</span>
+        <strong class="${cbStatusClass(row.status)}">${row.summary}</strong>
+      </div>
+      <p class="muted small">
+        Budget ${formatCurrency(row.budget_total)} · Actual ${formatCurrency(row.actual_total)}
+        (${row.months_with_budget}/${row.months_in_window} months budgeted)
+      </p>
+    </div>`;
+}
+
+function renderCbCategoryList(containerId, rows, emptyMessage) {
+  const box = $(containerId);
+  if (!box) return;
+  if (!rows?.length) {
+    box.innerHTML = `<p class="muted">${emptyMessage}</p>`;
+    return;
+  }
+  box.innerHTML = rows.map(renderCbCategoryRow).join("");
+  box.querySelectorAll(".cb-set-budget-btn").forEach((btn) => {
+    btn.addEventListener("click", () => openCbBudgetForm({ record_type: btn.dataset.recordType, category: btn.dataset.category }));
+  });
+}
+
+function renderCategoryBudgets(data) {
+  $("cb-loading")?.classList.add("hidden");
+  $("cb-content")?.classList.remove("hidden");
+
+  const summaryBox = $("cb-overall-summary");
+  if (summaryBox) {
+    summaryBox.innerHTML = `<strong class="${cbStatusClass(data.overall_status)}">${data.overall_summary}</strong>`;
+  }
+
+  renderCbCategoryList("cb-top-contributors", data.top_contributors, "No categories are meaningfully over or under budget right now.");
+  renderCbCategoryList("cb-all-categories", data.categories, "No category budgets have been set yet.");
+  renderCbCategoryList("cb-unbudgeted-categories", data.unbudgeted_categories, "Every category with activity already has a budget.");
+}
+
+async function loadCategoryBudgets() {
+  $("cb-loading")?.classList.remove("hidden");
+  $("cb-content")?.classList.add("hidden");
+  try {
+    await ensureCategoryChoicesLoaded();
+    const data = await api(`/farmer/category-budget-vs-actual${sectorsQuery()}`);
+    state.categoryBudgets = data;
+    renderCategoryBudgets(data);
+  } catch (err) {
+    if ($("cb-loading")) $("cb-loading").textContent = `Could not load: ${err.message}`;
+    showStatus(err.message, "error");
+  }
+}
+
+function cbUpdatePeriodFields() {
+  const mode = $("cb-period-mode")?.value;
+  $("cb-month-field")?.classList.toggle("hidden", mode !== "monthly");
+  $("cb-year-field")?.classList.toggle("hidden", mode !== "annual");
+}
+
+function openCbBudgetForm(prefill = {}) {
+  const form = $("cb-budget-form");
+  if (!form) return;
+  form.classList.remove("hidden");
+  $("cb-add-budget-btn")?.classList.add("hidden");
+
+  $("cb-budget-id").value = "";
+  $("cb-record-type").value = prefill.record_type || "expense";
+  $("cb-category").innerHTML = ieCategoryOptions($("cb-record-type").value);
+  if (prefill.category) $("cb-category").value = prefill.category;
+  $("cb-period-mode").value = "monthly";
+  const today = new Date();
+  $("cb-month").value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  $("cb-year").value = today.getFullYear();
+  $("cb-amount").value = "";
+  cbUpdatePeriodFields();
+  form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeCbBudgetForm() {
+  $("cb-budget-form")?.classList.add("hidden");
+  $("cb-add-budget-btn")?.classList.remove("hidden");
+  $("cb-budget-form")?.reset();
+}
+
+async function submitCbBudgetForm(e) {
+  e.preventDefault();
+  const recordType = $("cb-record-type").value;
+  const category = $("cb-category").value;
+  const amount = parseFloat($("cb-amount").value);
+  const mode = $("cb-period-mode").value;
+
+  if (!category || !(amount >= 0)) {
+    showStatus("Please choose a category and enter an amount of 0 or more.", "error");
+    return;
+  }
+
+  try {
+    if (mode === "annual") {
+      const year = parseInt($("cb-year").value, 10);
+      if (!year) {
+        showStatus("Please enter a year.", "error");
+        return;
+      }
+      await api(`/farmer/category-budgets/annual${sectorsQuery()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record_type: recordType, category, year, annual_amount: amount, sector: null, notes: null }),
+      });
+      showStatus("Annual budget saved and split evenly across the 12 months.", "success");
+    } else {
+      const monthValue = $("cb-month").value;
+      if (!monthValue) {
+        showStatus("Please choose a month.", "error");
+        return;
+      }
+      const [year, month] = monthValue.split("-").map(Number);
+      await api(`/farmer/category-budgets/monthly${sectorsQuery()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record_type: recordType, category, year, month, amount, sector: null, notes: null }),
+      });
+      showStatus("Budget saved.", "success");
+    }
+    closeCbBudgetForm();
+    await loadCategoryBudgets();
+  } catch (err) {
     showStatus(err.message, "error");
   }
 }
@@ -1974,7 +2131,7 @@ async function onSectorChange(changedInput) {
     if (state.activeSubtab === "ap-ask") clearFiChat(true);
     if (state.activeSubtab === "cashflow-forecast" || state.view === "advanced-analysis") await ensureAdvancedForecast();
     if (state.activeSubtab === "fp-historical") await loadHistoricalData();
-    if (state.activeSubtab === "cashflow-budget") await loadCashflowBudget();
+    if (state.activeSubtab === "cashflow-budget") { await loadCashflowBudget(); await loadCategoryBudgets(); }
     if (state.activeSubtab === "ap-reports") $("report-preview")?.classList.add("hidden");
     showStatus(`Analyzing: ${sectorSummaryLabel()}`, "success");
   } catch (err) {
@@ -2161,6 +2318,12 @@ function setupNav() {
   $("ie-cancel-entry-btn")?.addEventListener("click", closeIeEntryForm);
   $("ie-entry-form")?.addEventListener("submit", submitIeEntryForm);
   $("ie-entry-type")?.addEventListener("change", populateIeCategorySelect);
+
+  $("cb-add-budget-btn")?.addEventListener("click", () => openCbBudgetForm());
+  $("cb-cancel-budget-btn")?.addEventListener("click", closeCbBudgetForm);
+  $("cb-budget-form")?.addEventListener("submit", submitCbBudgetForm);
+  $("cb-record-type")?.addEventListener("change", () => { $("cb-category").innerHTML = ieCategoryOptions($("cb-record-type").value); });
+  $("cb-period-mode")?.addEventListener("change", cbUpdatePeriodFields);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

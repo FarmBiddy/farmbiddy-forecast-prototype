@@ -57,6 +57,15 @@ from models.financial_record import (
     FinancialRecordUpdate,
     IncomeExpenseSummaryResponse,
 )
+from models.category_budget import (
+    CategoryBudgetAnnualCreate,
+    CategoryBudgetDeleteResponse,
+    CategoryBudgetListResponse,
+    CategoryBudgetMonthlyCreate,
+    CategoryBudgetResponse,
+    CategoryBudgetUpdate,
+    CategoryBudgetVsActualResponse,
+)
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
 from services.financial_intelligence_service import ask_farm_advisor, get_financial_intelligence
@@ -94,6 +103,15 @@ from services.financial_record_service import (
     list_financial_records,
     update_financial_record,
 )
+from services.category_budget_service import (
+    CategoryBudgetNotFoundError,
+    delete_category_budget,
+    list_category_budgets,
+    set_annual_budget,
+    set_monthly_budget,
+    update_category_budget,
+)
+from services.category_variance_service import build_category_budget_vs_actual
 
 router = APIRouter()
 
@@ -316,6 +334,136 @@ def farmer_delete_financial_record(
         return FinancialRecordDeleteResponse(success=True, deleted_id=record_id)
     except FinancialRecordNotFoundError as error:
         raise HTTPException(status_code=404, detail=f"Financial record not found: {error}") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/category-budgets",
+    response_model=CategoryBudgetListResponse,
+    tags=["Farmer Edition"],
+    summary="List category-level budgets (P0.3)",
+)
+def farmer_list_category_budgets(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+    record_type: Optional[str] = Query(default=None, description="income or expense"),
+    category: Optional[str] = Query(default=None),
+    year: Optional[int] = Query(default=None),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        budgets = list_category_budgets(
+            farm_file,
+            sectors=_parse_sectors_query(sectors),
+            record_type=record_type,
+            category=category,
+            year=year,
+        )
+        return CategoryBudgetListResponse(success=True, farm_file=farm_file, budgets=budgets, count=len(budgets))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/category-budget-vs-actual",
+    response_model=CategoryBudgetVsActualResponse,
+    tags=["Farmer Edition"],
+    summary="Category-level Budget vs Actual: which categories are ahead/behind (P0.3)",
+)
+def farmer_category_budget_vs_actual(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        payload = build_category_budget_vs_actual(farm_file, _parse_sectors_query(sectors) or [])
+        return CategoryBudgetVsActualResponse(**payload)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/category-budgets/monthly",
+    response_model=CategoryBudgetResponse,
+    tags=["Farmer Edition"],
+    summary="Set (or replace) one category's budget for one month",
+)
+def farmer_set_monthly_category_budget(
+    budget: CategoryBudgetMonthlyCreate,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        created = set_monthly_budget(farm_file, budget.model_dump())
+        return CategoryBudgetResponse(success=True, budgets=[created])
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/category-budgets/annual",
+    response_model=CategoryBudgetResponse,
+    tags=["Farmer Edition"],
+    summary="Set one category's annual budget, split evenly across 12 months",
+)
+def farmer_set_annual_category_budget(
+    budget: CategoryBudgetAnnualCreate,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        created = set_annual_budget(farm_file, budget.model_dump())
+        return CategoryBudgetResponse(success=True, budgets=created)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.put(
+    "/farmer/category-budgets/{budget_id}",
+    response_model=CategoryBudgetResponse,
+    tags=["Farmer Edition"],
+    summary="Edit a category budget's amount/notes",
+)
+def farmer_update_category_budget(
+    budget_id: str,
+    changes: CategoryBudgetUpdate,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        updated = update_category_budget(farm_file, budget_id, changes.model_dump(exclude_unset=True))
+        return CategoryBudgetResponse(success=True, budgets=[updated])
+    except CategoryBudgetNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Category budget not found: {error}") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.delete(
+    "/farmer/category-budgets/{budget_id}",
+    response_model=CategoryBudgetDeleteResponse,
+    tags=["Farmer Edition"],
+    summary="Delete a category budget",
+)
+def farmer_delete_category_budget(
+    budget_id: str,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        delete_category_budget(farm_file, budget_id)
+        return CategoryBudgetDeleteResponse(success=True, deleted_id=budget_id)
+    except CategoryBudgetNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Category budget not found: {error}") from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 

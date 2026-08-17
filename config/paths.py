@@ -33,6 +33,11 @@ FARM_EVENTS_DIR = os.path.join(STORAGE_ROOT, "farm_events")
 # entirely separate from DATASETS_DIR so manual entry can never corrupt or
 # reshape the read-only, Git-committed canonical farm dataset.
 FINANCIAL_RECORDS_DIR = os.path.join(FARM_EVENTS_DIR, "financial_records")
+# Farmer-entered category-level budgets (P0.3), e.g. "Feed: EUR400/month".
+# Kept as its own file/model, distinct from both FINANCIAL_RECORDS_DIR
+# (Actuals) and the dataset's whole-farm `cash_flow_budget` entries, so
+# Budget and Actual can never be silently merged into one number.
+CATEGORY_BUDGETS_DIR = os.path.join(FARM_EVENTS_DIR, "category_budgets")
 DAILY_UPDATES_PATH = os.path.join(STORAGE_ROOT, "daily_updates.json")
 INGESTION_REPORT_PATH = os.path.join(HISTORY_DIR, "ingestion_report.json")
 
@@ -53,5 +58,6 @@ def ensure_output_dirs():
         PENDING_UPLOADS_DIR,
         FARM_EVENTS_DIR,
         FINANCIAL_RECORDS_DIR,
+        CATEGORY_BUDGETS_DIR,
     ):
         os.makedirs(folder, exist_ok=True)

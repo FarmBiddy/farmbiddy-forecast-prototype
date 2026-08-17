@@ -238,6 +238,23 @@ def aggregate_by_category(records: list[dict], record_type: str) -> list[dict]:
     return rows
 
 
+def monthly_category_totals(records: list[dict]) -> dict[tuple, float]:
+    """Per (year, month, record_type, category) totals from manual records,
+    keyed the same way as `income_expense_service.dataset_monthly_category_totals`
+    so the two can be summed into one Actuals view for P0.3.
+    """
+    totals: dict[tuple, float] = defaultdict(float)
+    for record in records:
+        date = record.get("date") or ""
+        try:
+            year, month = int(date[0:4]), int(date[5:7])
+        except (ValueError, IndexError):
+            continue
+        key = (year, month, record.get("record_type"), record.get("category"))
+        totals[key] += float(record.get("amount") or 0)
+    return {key: round(value, 2) for key, value in totals.items()}
+
+
 def manual_totals(records: list[dict]) -> tuple[float, float]:
     income = sum(float(r.get("amount") or 0) for r in records if r.get("record_type") == "income")
     expense = sum(float(r.get("amount") or 0) for r in records if r.get("record_type") == "expense")
