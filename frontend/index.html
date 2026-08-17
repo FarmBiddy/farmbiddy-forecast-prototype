@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20" />
+  <link rel="stylesheet" href="/assets/styles.css?v=21" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -595,11 +595,32 @@
 
           <p class="muted whatif-presets-label">Common questions — click one to see the impact straight away:</p>
           <div class="whatif-presets" id="whatif-presets">
-            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="milk_down">Milk price drops 10c/L</button>
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="milk_down">Milk price falls 5c/L</button>
             <button type="button" class="btn-secondary whatif-preset-btn" data-preset="milk_up">Milk price rises 5c/L</button>
-            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="feed_up">Feed costs rise 15%</button>
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="feed_up">Feed costs rise 10%</button>
             <button type="button" class="btn-secondary whatif-preset-btn" data-preset="fert_up">Fertiliser costs rise 20%</button>
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="labour_up">Labour costs rise 10%</button>
             <button type="button" class="btn-secondary whatif-preset-btn" data-preset="fuel_up">Fuel costs rise 25%</button>
+          </div>
+
+          <p class="muted whatif-presets-label">Bigger decisions — enter an amount to see the impact:</p>
+          <div class="whatif-amount-presets">
+            <div class="whatif-amount-preset">
+              <label for="whatif-machinery-cost">Buy machinery — cost (€)</label>
+              <div class="whatif-amount-row">
+                <input type="number" step="500" min="0" id="whatif-machinery-cost" class="input-field" placeholder="e.g. 15000" />
+                <button type="button" class="btn-secondary" id="whatif-machinery-btn">See the Impact</button>
+              </div>
+              <p class="muted whatif-amount-hint">Assumes it's paid from cash on hand today.</p>
+            </div>
+            <div class="whatif-amount-preset">
+              <label for="whatif-loan-repayment">Change borrowing — new total annual repayments (€/year)</label>
+              <div class="whatif-amount-row">
+                <input type="number" step="100" min="0" id="whatif-loan-repayment" class="input-field" placeholder="e.g. 12000" />
+                <button type="button" class="btn-secondary" id="whatif-loan-btn">See the Impact</button>
+              </div>
+              <p class="muted whatif-amount-hint">Replaces your current total loan repayments for this scenario only.</p>
+            </div>
           </div>
 
           <details class="card overview-detail-toggle">
@@ -618,6 +639,7 @@
                 <label>Milking cows<input type="number" step="1" id="sb-cows" class="input-field" /></label>
                 <label>Litres per cow<input type="number" step="50" id="sb-litres" class="input-field" /></label>
                 <label>Opening cash (€)<input type="number" step="500" id="sb-cash" class="input-field" /></label>
+                <label>One-off purchase, e.g. machinery (€)<input type="number" step="500" min="0" id="sb-capital-purchase" class="input-field" /></label>
               </div>
               <button type="button" id="run-sandbox-btn" class="btn-run">See the Impact</button>
             </div>
@@ -626,6 +648,7 @@
         <div id="sandbox-results" class="hidden">
           <div id="whatif-active-label" class="whatif-active-label"></div>
           <div class="interpretation-box" id="sandbox-summary"></div>
+          <div id="whatif-funding-note" class="whatif-funding-note hidden"></div>
           <span id="sandbox-period"></span>
           <div class="metric-grid" id="sandbox-comparison"></div>
           <div class="grid-row grid-2-1">
@@ -679,6 +702,6 @@
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=15"></script>
+  <script src="/assets/app.js?v=16"></script>
 </body>
 </html>

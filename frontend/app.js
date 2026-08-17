@@ -957,19 +957,38 @@ function renderSandboxResults(data) {
   const c = data.comparison || {};
   const sandboxPeriodSlot = $("sandbox-period");
   if (sandboxPeriodSlot) sandboxPeriodSlot.innerHTML = periodBadgeHtml(c.period);
+
+  const fundingNote = $("whatif-funding-note");
+  if (fundingNote) {
+    if (c.additional_funding_pressure) {
+      const when = c.min_cash_month_scenario ? ` around month ${c.min_cash_month_scenario}` : "";
+      fundingNote.textContent = `⚠ This scenario would put you into a cash shortage${when} that you don't have today — talk to your lender before committing to it.`;
+      fundingNote.className = "whatif-funding-note whatif-funding-note--warn";
+    } else if ((c.deficit_months_scenario || 0) > 0) {
+      fundingNote.textContent = `This scenario still has ${c.deficit_months_scenario} month(s) of tight cash, same as your current plan.`;
+      fundingNote.className = "whatif-funding-note";
+    } else {
+      fundingNote.textContent = "";
+      fundingNote.className = "whatif-funding-note hidden";
+    }
+  }
+
   renderMetricCards([
-    { label: "Profit (base)", value: formatCurrency(c.profit_base) },
-    { label: "Profit (scenario)", value: formatCurrency(c.profit_scenario) },
-    { label: "Difference", value: formatCurrency(c.profit_difference), sub: c.profit_difference >= 0 ? "Better" : "Worse" },
-    { label: "Risk change", value: `${c.risk_base} → ${c.risk_scenario}` },
+    { label: "Income change", value: formatCurrency(c.revenue_difference), sub: c.revenue_difference >= 0 ? "Higher" : "Lower" },
+    { label: "Profit change", value: formatCurrency(c.profit_difference), sub: c.profit_difference >= 0 ? "Better" : "Worse" },
+    { label: "Lowest cash point", value: formatCurrency(c.min_cash_scenario), sub: c.min_cash_month_scenario ? `Around month ${c.min_cash_month_scenario}` : "" },
+    { label: "Year-end cash", value: formatCurrency(c.year_end_cash_scenario) },
   ], "sandbox-comparison");
   const table = $("sandbox-table");
   if (table) {
-    table.innerHTML = `<table class="data-table"><tbody>
-      <tr><td>Revenue</td><td>${formatCurrency(c.revenue_base)}</td><td>${formatCurrency(c.revenue_scenario)}</td><td class="${signClass(c.revenue_difference)}">${formatCurrency(c.revenue_difference)}</td></tr>
-      <tr><td>Monthly profit</td><td>${formatCurrency(c.monthly_profit_base)}</td><td>${formatCurrency(c.monthly_profit_scenario)}</td><td>—</td></tr>
-      <tr><td>Monthly cashflow</td><td>${formatCurrency(c.monthly_cashflow_base)}</td><td>${formatCurrency(c.monthly_cashflow_scenario)}</td><td>—</td></tr>
-      <tr><td>Lowest cash</td><td>${formatCurrency(c.min_cash_base)}</td><td>${formatCurrency(c.min_cash_scenario)}</td><td>—</td></tr>
+    table.innerHTML = `<table class="data-table"><thead><tr><th>Figure</th><th>Now</th><th>Scenario</th><th>Change</th></tr></thead><tbody>
+      <tr><td>Income</td><td>${formatCurrency(c.revenue_base)}</td><td>${formatCurrency(c.revenue_scenario)}</td><td class="${signClass(c.revenue_difference)}">${formatCurrency(c.revenue_difference)}</td></tr>
+      <tr><td>Farm profit</td><td>${formatCurrency(c.profit_base)}</td><td>${formatCurrency(c.profit_scenario)}</td><td class="${signClass(c.profit_difference)}">${formatCurrency(c.profit_difference)}</td></tr>
+      <tr><td>Monthly cash movement</td><td>${formatCurrency(c.monthly_cashflow_base)}</td><td>${formatCurrency(c.monthly_cashflow_scenario)}</td><td>—</td></tr>
+      <tr><td>Lowest cash point</td><td>${formatCurrency(c.min_cash_base)}</td><td>${formatCurrency(c.min_cash_scenario)}</td><td>—</td></tr>
+      <tr><td>Year-end cash</td><td>${formatCurrency(c.year_end_cash_base)}</td><td>${formatCurrency(c.year_end_cash_scenario)}</td><td>—</td></tr>
+      <tr><td>Months cash runs short</td><td>${c.deficit_months_base ?? 0}</td><td>${c.deficit_months_scenario ?? 0}</td><td>—</td></tr>
+      <tr><td>Risk level</td><td>${c.risk_base}</td><td>${c.risk_scenario}</td><td>—</td></tr>
     </tbody></table>`;
   }
   renderRecommendations(data.recommendations, "sandbox-recommendations");
@@ -991,6 +1010,7 @@ function getSandboxInputs() {
     milking_cows: intVal("sb-cows"),
     litres_per_cow: val("sb-litres"),
     opening_cash_balance: val("sb-cash"),
+    capital_purchase_amount: val("sb-capital-purchase"),
   };
 }
 
@@ -2592,10 +2612,11 @@ async function runAdvancedForecast(showMsg = true) {
 }
 
 const WHATIF_PRESETS = {
-  milk_down: { label: "Milk price drops 10c/L", inputs: { milk_price_cents_change: -10 } },
+  milk_down: { label: "Milk price falls 5c/L", inputs: { milk_price_cents_change: -5 } },
   milk_up: { label: "Milk price rises 5c/L", inputs: { milk_price_cents_change: 5 } },
-  feed_up: { label: "Feed costs rise 15%", inputs: { feed_pct_change: 15 } },
+  feed_up: { label: "Feed costs rise 10%", inputs: { feed_pct_change: 10 } },
   fert_up: { label: "Fertiliser costs rise 20%", inputs: { fertiliser_pct_change: 20 } },
+  labour_up: { label: "Labour costs rise 10%", inputs: { labour_pct_change: 10 } },
   fuel_up: { label: "Fuel costs rise 25%", inputs: { fuel_pct_change: 25 } },
 };
 
@@ -2628,6 +2649,28 @@ function runWhatIfPreset(presetKey, btn) {
   if (!preset) return;
   document.querySelectorAll(".whatif-preset-btn").forEach((b) => b.classList.toggle("active", b === btn));
   runSandbox(preset.inputs, preset.label);
+}
+
+function runWhatIfMachineryPurchase() {
+  const input = $("whatif-machinery-cost");
+  const amount = parseFloat(input?.value);
+  if (!amount || amount <= 0) {
+    showStatus("Enter a machinery cost greater than €0 first.", "error");
+    return;
+  }
+  document.querySelectorAll(".whatif-preset-btn").forEach((b) => b.classList.remove("active"));
+  runSandbox({ capital_purchase_amount: amount }, `Buy machinery for ${formatCurrency(amount)}`);
+}
+
+function runWhatIfChangeBorrowing() {
+  const input = $("whatif-loan-repayment");
+  const amount = parseFloat(input?.value);
+  if (amount === undefined || amount === null || Number.isNaN(amount) || amount < 0) {
+    showStatus("Enter a new annual repayment amount first.", "error");
+    return;
+  }
+  document.querySelectorAll(".whatif-preset-btn").forEach((b) => b.classList.remove("active"));
+  runSandbox({ loan_repayments: amount }, `Annual loan repayments of ${formatCurrency(amount)}`);
 }
 
 function renderCashflowActionsResults(data) {
@@ -2724,6 +2767,8 @@ function setupNav() {
   });
   setupSubtabs();
   $("run-sandbox-btn")?.addEventListener("click", () => runSandbox());
+  $("whatif-machinery-btn")?.addEventListener("click", () => runWhatIfMachineryPurchase());
+  $("whatif-loan-btn")?.addEventListener("click", () => runWhatIfChangeBorrowing());
   document.querySelectorAll(".whatif-preset-btn").forEach((btn) => {
     btn.addEventListener("click", () => runWhatIfPreset(btn.dataset.preset, btn));
   });

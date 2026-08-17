@@ -1023,6 +1023,45 @@ span.small { font-size: 0.8rem; }
   margin-bottom: 0.4rem;
 }
 
+.whatif-amount-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+.whatif-amount-preset label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.whatif-amount-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.whatif-amount-row .input-field { flex: 1; min-width: 0; }
+.whatif-amount-row button { margin-top: 0; white-space: nowrap; }
+.whatif-amount-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+}
+
+.whatif-funding-note {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+.whatif-funding-note--warn {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+  font-weight: 600;
+}
+
 .sandbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1371,4 +1410,7 @@ span.small { font-size: 0.8rem; }
   .grid-4 { grid-template-columns: 1fr; }
   .subtabs { gap: 0.3rem; }
   .subtab-btn { flex: 1 1 auto; text-align: center; }
+  .whatif-amount-presets { grid-template-columns: 1fr; }
+  .whatif-amount-row { flex-direction: column; }
+  .whatif-amount-row button { min-height: 44px; }
 }
