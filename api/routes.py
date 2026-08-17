@@ -73,6 +73,11 @@ from models.document import (
     DocumentResponse,
     DocumentUpdate,
 )
+from models.onboarding import (
+    OnboardingRequest,
+    OnboardingResponse,
+    OnboardingStatusResponse,
+)
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
 from services.financial_intelligence_service import ask_farm_advisor, get_financial_intelligence
@@ -126,6 +131,7 @@ from services.document_service import (
     list_documents,
     update_document,
 )
+from services.onboarding_service import complete_onboarding, get_onboarding_status
 
 router = APIRouter()
 
@@ -438,6 +444,42 @@ def farmer_delete_document(
         raise HTTPException(status_code=404, detail=f"Document not found: {error}") from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/onboarding",
+    response_model=OnboardingStatusResponse,
+    tags=["Farmer Edition"],
+    summary="Farm Setup status: whether onboarding is complete, and vocab for the wizard (P1.3)",
+)
+def farmer_onboarding_status(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        return OnboardingStatusResponse(**get_onboarding_status(farm_file))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/onboarding",
+    response_model=OnboardingResponse,
+    tags=["Farmer Edition"],
+    summary="Complete (or redo) Simple Farm Setup: farm type, main income/costs, loans, current cash (P1.3)",
+)
+def farmer_complete_onboarding(
+    onboarding: OnboardingRequest,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        summary = complete_onboarding(farm_file, onboarding.model_dump())
+        return OnboardingResponse(success=True, summary=summary)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.get(

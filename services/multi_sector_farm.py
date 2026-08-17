@@ -341,8 +341,15 @@ def list_sectors_for_selector(farm: dict, selected: list[str] | None = None) -> 
     return result
 
 
-def to_legacy_farm_dict(aggregated: dict, farm: dict) -> dict:
-    """Produce a flat dict compatible with forecast_engine calculators."""
+def to_legacy_farm_dict(aggregated: dict, farm: dict, farm_file: str | None = None) -> dict:
+    """Produce a flat dict compatible with forecast_engine calculators.
+
+    When `farm_file` is given, Simple Onboarding overrides (P1.3) for
+    `farm_type` and `opening_cash_balance` are applied on top of the
+    dataset-derived values here - the one place every downstream KPI, cash
+    position, health score, and alert already reads `opening_cash_balance`
+    from - rather than editing the canonical dataset file.
+    """
     scheme = farm.get("scheme_payments") or {}
     summary = farm.get("farm_summary") or {}
     costs = aggregated.get("cost_totals") or {}
@@ -386,6 +393,18 @@ def to_legacy_farm_dict(aggregated: dict, farm: dict) -> dict:
     }
     for field in LEGACY_COST_FIELDS:
         legacy.setdefault(field, 0)
+
+    if farm_file:
+        from services.onboarding_service import get_onboarding_overrides
+
+        overrides = get_onboarding_overrides(farm_file)
+        if overrides.get("current_cash") is not None:
+            legacy["opening_cash_balance"] = float(overrides["current_cash"])
+        if overrides.get("farm_type"):
+            from models.onboarding import FARM_TYPE_LABELS
+
+            legacy["farm_type"] = FARM_TYPE_LABELS.get(overrides["farm_type"], legacy["farm_type"])
+
     return legacy
 
 
@@ -399,4 +418,4 @@ def load_farm_for_analysis(
     selected = normalize_sectors(sectors, raw)
     filtered = filter_farm_by_sectors(raw, selected)
     aggregated = aggregate_sector_financials(filtered)
-    return to_legacy_farm_dict(aggregated, raw)
+    return to_legacy_farm_dict(aggregated, raw, farm_file=farm_file)

@@ -42,6 +42,11 @@ CATEGORY_BUDGETS_DIR = os.path.join(FARM_EVENTS_DIR, "category_budgets")
 # real-world paper/PDF trail; its financial effect (if any) is a linked
 # FinancialRecord in FINANCIAL_RECORDS_DIR - see services/document_service.py.
 DOCUMENTS_DIR = os.path.join(FARM_EVENTS_DIR, "documents")
+# Farmer-declared Simple Onboarding overrides (P1.3): farm type and current
+# cash, applied on top of the canonical dataset in
+# services/multi_sector_farm.py's to_legacy_farm_dict rather than editing
+# the dataset file itself.
+ONBOARDING_DIR = os.path.join(FARM_EVENTS_DIR, "onboarding")
 DAILY_UPDATES_PATH = os.path.join(STORAGE_ROOT, "daily_updates.json")
 INGESTION_REPORT_PATH = os.path.join(HISTORY_DIR, "ingestion_report.json")
 
@@ -64,5 +69,6 @@ def ensure_output_dirs():
         FINANCIAL_RECORDS_DIR,
         CATEGORY_BUDGETS_DIR,
         DOCUMENTS_DIR,
+        ONBOARDING_DIR,
     ):
         os.makedirs(folder, exist_ok=True)

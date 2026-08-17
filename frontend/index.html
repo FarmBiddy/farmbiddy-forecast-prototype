@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=18" />
+  <link rel="stylesheet" href="/assets/styles.css?v=19" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -603,9 +603,48 @@
 
       <section class="view hidden" id="view-settings">
         <div class="card"><h3>Settings</h3><p class="muted">Active farm: <strong id="settings-farm">Knockrow Mixed Farm</strong> (multi_sector_farm.json). Sector selection controls all analysis.</p></div>
+
+        <div class="card" id="onboarding-card">
+          <h3>Farm Setup</h3>
+          <p class="muted">A quick one-time setup so FarmBiddy has something useful to show you straight away. You can come back and redo this at any time.</p>
+          <div id="onboarding-status-line" class="muted onb-status-line"></div>
+
+          <form id="onboarding-form" class="ie-entry-form">
+            <div class="ie-form-row">
+              <label class="ie-form-wide">What type of farm is this?
+                <select id="onb-farm-type" required></select>
+              </label>
+            </div>
+
+            <h4>Main income this year</h4>
+            <p class="muted">Roughly how much do you expect from each? Leave any blank that don't apply.</p>
+            <div id="onb-income-items" class="onb-item-list"></div>
+
+            <h4>Main costs this year</h4>
+            <p class="muted">Roughly how much do you expect for each?</p>
+            <div id="onb-cost-items" class="onb-item-list"></div>
+
+            <h4>Loans / repayments</h4>
+            <p class="muted">Add any loan repayments you make. These are combined into one "Loan Repayments" budget.</p>
+            <div id="onb-loan-items"></div>
+            <button type="button" id="onb-add-loan" class="btn-secondary">+ Add another loan</button>
+
+            <h4>Cash on hand</h4>
+            <div class="ie-form-row">
+              <label>How much cash do you have available today? (optional)
+                <input type="number" id="onb-current-cash" step="0.01" min="0" placeholder="e.g. 15000" />
+              </label>
+            </div>
+
+            <div class="ie-form-actions">
+              <button type="submit" class="btn-run">Save Farm Setup</button>
+            </div>
+          </form>
+          <div id="onboarding-result" class="hidden"></div>
+        </div>
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=10"></script>
+  <script src="/assets/app.js?v=11"></script>
 </body>
 </html>

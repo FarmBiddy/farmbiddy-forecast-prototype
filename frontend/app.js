@@ -1512,6 +1512,7 @@ async function navigate(view) {
   state.activeSubtab = defaultSubtab;
   if (defaultSubtab) await runSubtabLoader(defaultSubtab);
   if (view === "advanced-analysis") await ensureAdvancedForecast();
+  if (view === "settings") await loadOnboarding();
 }
 
 function renderFinancialIntelligence(data) {
@@ -2202,6 +2203,157 @@ async function deleteDocRecord(id) {
   }
 }
 
+// -----------------------------------------------------------------------
+// Simple Farm Setup / Onboarding (P1.3)
+// -----------------------------------------------------------------------
+
+let onbLoanRowCount = 0;
+
+async function loadOnboarding() {
+  try {
+    const data = await api(`/farmer/onboarding${sectorsQuery()}`);
+    state.onboarding = data;
+    renderOnboardingForm(data);
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+function renderOnboardingForm(data) {
+  const farmTypeSelect = $("onb-farm-type");
+  if (farmTypeSelect) {
+    farmTypeSelect.innerHTML = (data.farm_types || [])
+      .map((t) => `<option value="${t.id}">${t.label}</option>`)
+      .join("");
+    if (data.farm_type) farmTypeSelect.value = data.farm_type;
+  }
+
+  const incomeBox = $("onb-income-items");
+  if (incomeBox) {
+    incomeBox.innerHTML = (data.income_category_choices || [])
+      .map((c) => `
+        <div class="onb-item-row">
+          <label for="onb-income-${c.id}">${c.label} (€/year)</label>
+          <input type="number" id="onb-income-${c.id}" data-onb-income="${c.id}" min="0" step="0.01" placeholder="0" />
+        </div>`)
+      .join("");
+  }
+
+  const costBox = $("onb-cost-items");
+  if (costBox) {
+    costBox.innerHTML = (data.expense_category_choices || [])
+      .map((c) => `
+        <div class="onb-item-row">
+          <label for="onb-cost-${c.id}">${c.label} (€/year)</label>
+          <input type="number" id="onb-cost-${c.id}" data-onb-cost="${c.id}" min="0" step="0.01" placeholder="0" />
+        </div>`)
+      .join("");
+  }
+
+  if ($("onb-current-cash")) $("onb-current-cash").value = data.current_cash ?? "";
+
+  const loanBox = $("onb-loan-items");
+  if (loanBox) {
+    loanBox.innerHTML = "";
+    onbLoanRowCount = 0;
+    addOnboardingLoanRow();
+  }
+
+  const statusLine = $("onboarding-status-line");
+  if (statusLine) {
+    statusLine.textContent = data.completed
+      ? `Farm Setup completed${data.farm_type_label ? ` — ${data.farm_type_label}` : ""}${data.loan_repayments_annual ? `, loan repayments ${formatCurrency(data.loan_repayments_annual)}/year` : ""}. You can update it below at any time.`
+      : "Not set up yet — fill this in to get your first useful forecast.";
+  }
+
+  $("onboarding-result")?.classList.add("hidden");
+}
+
+function addOnboardingLoanRow() {
+  const loanBox = $("onb-loan-items");
+  if (!loanBox) return;
+  const idx = onbLoanRowCount++;
+  const row = document.createElement("div");
+  row.className = "onb-loan-row";
+  row.dataset.loanRow = String(idx);
+  row.innerHTML = `
+    <label>Lender (optional)
+      <input type="text" data-loan-lender maxlength="120" placeholder="e.g. AIB" />
+    </label>
+    <label>Monthly repayment (€)
+      <input type="number" data-loan-monthly min="0" step="0.01" placeholder="0" />
+    </label>
+    <label>Outstanding balance (optional, €)
+      <input type="number" data-loan-balance min="0" step="0.01" placeholder="0" />
+    </label>
+    <button type="button" class="btn-link onb-remove-loan-btn">Remove</button>`;
+  row.querySelector(".onb-remove-loan-btn").addEventListener("click", () => row.remove());
+  loanBox.appendChild(row);
+}
+
+function collectOnboardingPayload() {
+  const incomeItems = [...document.querySelectorAll("[data-onb-income]")]
+    .map((input) => ({ category: input.dataset.onbIncome, annual_amount: parseFloat(input.value) || 0 }))
+    .filter((item) => item.annual_amount > 0);
+
+  const costItems = [...document.querySelectorAll("[data-onb-cost]")]
+    .map((input) => ({ category: input.dataset.onbCost, annual_amount: parseFloat(input.value) || 0 }))
+    .filter((item) => item.annual_amount > 0);
+
+  const loanItems = [...document.querySelectorAll("[data-loan-row]")]
+    .map((row) => ({
+      lender: row.querySelector("[data-loan-lender]")?.value.trim() || null,
+      monthly_repayment: parseFloat(row.querySelector("[data-loan-monthly]")?.value) || 0,
+      outstanding_balance: row.querySelector("[data-loan-balance]")?.value
+        ? parseFloat(row.querySelector("[data-loan-balance]").value)
+        : null,
+    }))
+    .filter((item) => item.monthly_repayment > 0);
+
+  const currentCashRaw = $("onb-current-cash")?.value;
+  const currentCash = currentCashRaw !== "" && currentCashRaw != null ? parseFloat(currentCashRaw) : null;
+
+  return {
+    farm_type: $("onb-farm-type")?.value,
+    income_items: incomeItems,
+    cost_items: costItems,
+    loan_items: loanItems,
+    current_cash: currentCash,
+  };
+}
+
+async function submitOnboardingForm(e) {
+  e.preventDefault();
+  const payload = collectOnboardingPayload();
+  if (!payload.farm_type) {
+    showStatus("Please choose a farm type.", "error");
+    return;
+  }
+  try {
+    const data = await api(`/farmer/onboarding${sectorsQuery()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const s = data.summary;
+    const resultBox = $("onboarding-result");
+    if (resultBox) {
+      resultBox.classList.remove("hidden");
+      resultBox.innerHTML = `
+        <p><strong>Farm Setup saved.</strong></p>
+        <p>${s.income_budgets_set} income budget(s) and ${s.cost_budgets_set} cost budget(s) set for ${s.year}, totalling ${formatCurrency(s.total_annual_income_budgeted)} income and ${formatCurrency(s.total_annual_cost_budgeted)} costs (naive net: ${formatCurrency(s.naive_annual_net)}).</p>
+        ${s.current_cash_set ? `<p>Current cash on hand set to ${formatCurrency(s.current_cash)}.</p>` : ""}
+      `;
+    }
+    showStatus("Farm Setup saved.", "success");
+    await loadOnboarding();
+    await refreshFarmData();
+    if (state.analysis) await runAnalysis(false);
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
 async function loadHistoricalData() {
   $("historical-loading")?.classList.remove("hidden");
   $("historical-content")?.classList.add("hidden");
@@ -2490,6 +2642,9 @@ function setupNav() {
   $("doc-record-type")?.addEventListener("change", populateDocCategorySelect);
   $("doc-payment-status")?.addEventListener("change", docUpdatePaymentDateVisibility);
   $("doc-type")?.addEventListener("change", () => { if (!$("doc-id").value) docApplyTypeDefaults(); });
+
+  $("onb-add-loan")?.addEventListener("click", addOnboardingLoanRow);
+  $("onboarding-form")?.addEventListener("submit", submitOnboardingForm);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
