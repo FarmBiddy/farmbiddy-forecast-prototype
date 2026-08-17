@@ -16,10 +16,20 @@ from forecast_engine.costs import calculate_costs
 from forecast_engine.data_quality import build_data_quality_warnings
 from forecast_engine.formatting import format_currency, format_percent
 from forecast_engine.health_score import calculate_health_score
-from forecast_engine.period_labels import forecast_window, point_in_time, trailing_12_months
+from forecast_engine.period_labels import (
+    forecast_window,
+    historical_month,
+    point_in_time,
+    trailing_12_months,
+)
 from forecast_engine.profit import calculate_profit
 from forecast_engine.revenue import calculate_revenue
-from models.multi_sector_farm import SECTOR_LABELS, VALID_SECTORS, build_debt_register
+from models.multi_sector_farm import (
+    SECTOR_LABELS,
+    VALID_SECTORS,
+    build_debt_register,
+    compute_household_month,
+)
 from services.multi_sector_farm import (
     aggregate_sector_financials,
     filter_farm_by_sectors,
@@ -448,12 +458,187 @@ def build_overview_chart_data(filtered: dict, months: int = 24) -> list[dict]:
     return combined
 
 
+def _loan_monthly_total(farm_summary: dict) -> float:
+    loans = (farm_summary or {}).get("loans") or []
+    return sum(float(loan.get("monthly_repayment") or 0) for loan in loans)
+
+
+def _scheme_payment_for_month(farm: dict, month: int) -> float:
+    """Scheme income landing in this calendar month, applied every year.
+
+    Scheme payments (BISS/ACRES/other grants) are stored as annual totals
+    with a single payment month, the same way `_build_monthly_forecast`
+    (services/multi_sector_farm.py) treats them for the forward projection -
+    reused here so historical actuals aren't understated.
+    """
+    scheme = (farm or {}).get("scheme_payments") or {}
+    scheme_months = scheme.get("scheme_payment_months") or {}
+    total = 0.0
+    for key in ("biss", "acres", "other_grants"):
+        if scheme_months.get(key) == month:
+            total += float(scheme.get(key) or 0)
+    return total
+
+
+def get_budget_entries(farm: dict) -> list[dict]:
+    """Raw `cash_flow_budget` entries from the dataset, oldest first."""
+    entries = farm.get("cash_flow_budget") or []
+    return sorted(entries, key=lambda e: (e.get("year", 0), e.get("month", 0)))
+
+
+def compute_actual_cash_flow(filtered_raw: dict, farm_summary: dict, months: int = 24) -> dict[tuple, dict]:
+    """Actual farm+household cash in/out per (year, month), keyed by period tuple.
+
+    Mirrors the `combined_cashflow` definition from
+    `services/multi_sector_farm.py`: sector revenue/costs plus scheme income
+    and household income/outgoings for that calendar month, minus loan
+    repayments. This is the single source of truth for "actual" cash flow,
+    reused by cashflow_budget_service (Budget vs Actual) and the Overview's
+    current-period/cash-position figures, so none of them can disagree.
+    """
+    household = (farm_summary or {}).get("household") or {}
+    loan_monthly = _loan_monthly_total(farm_summary)
+    combined, _ = get_sector_monthly_history(filtered_raw, months=months)
+
+    actual: dict[tuple, dict] = {}
+    for row in combined:
+        year, month = row["year"], row["month"]
+        hh = compute_household_month(household, month)
+        scheme_income = _scheme_payment_for_month(filtered_raw, month)
+        cash_in = round(row["revenue"] + scheme_income + hh["income"], 2)
+        cash_out = round(row["costs"] + loan_monthly + hh["outgoings"], 2)
+        actual[(year, month)] = {
+            "year": year,
+            "month": month,
+            "period": row.get("period") or f"{year}-{month:02d}",
+            "actual_cash_in": cash_in,
+            "actual_cash_out": cash_out,
+            "actual_net": round(cash_in - cash_out, 2),
+        }
+    return actual
+
+
+def build_current_period_summary(filtered_raw: dict | None) -> dict | None:
+    """Income / Costs / Difference for the most recent actual month (Home Dashboard).
+
+    Uses the same farm+household-aware actual cash-flow definition as
+    Budget vs Actual, so "this period" on the Overview can never disagree
+    with that page. Returns None when there is no actual data yet.
+    """
+    if not filtered_raw:
+        return None
+    farm_summary = filtered_raw.get("farm_summary") or {}
+    actual_by_period = compute_actual_cash_flow(filtered_raw, farm_summary, months=1)
+    if not actual_by_period:
+        return None
+    latest = actual_by_period[max(actual_by_period.keys())]
+    return {
+        "period": historical_month(latest["period"]),
+        "income": format_currency(latest["actual_cash_in"]),
+        "costs": format_currency(latest["actual_cash_out"]),
+        "difference": format_currency(latest["actual_net"]),
+        "is_deficit": latest["actual_net"] < 0,
+    }
+
+
+_FORECAST_MONTH_NAMES = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
+
+
+def build_cash_position_series(
+    filtered_raw: dict | None,
+    farm_enriched: dict,
+    monthly_forecast: list[dict],
+    history_months: int = 6,
+) -> dict | None:
+    """Monthly cash-position series for the Overview's primary chart.
+
+    History (Actual): a reconstructed month-end cash balance for the last
+    `history_months`, computed backwards from `opening_cash_balance` (the
+    farm's real, current cash position) using each month's real actual net
+    cash flow (`compute_actual_cash_flow`). The dataset does not store a
+    historical running-balance series, so this is a derivation from real
+    monthly cash-flow figures anchored at a known real balance — not an
+    invented number.
+
+    Forecast: reuses the running balance already computed by
+    `monthly_forecast` (the same series shown on Cash Flow > Forecast), so
+    this chart can never disagree with that page. Forecast months are
+    labelled by calendar month name only (the engine models a typical
+    12-month pattern, not specific future dates), and are kept in a
+    separate `forecast` list so the UI can render them as a clearly
+    distinct, non-contiguous segment rather than implying they are the
+    calendar months immediately following the last actual month.
+
+    Budget: the matching `cash_flow_budget` net figure is attached to each
+    historical month only where a budget entry actually exists for it.
+    """
+    if not filtered_raw:
+        return None
+
+    farm_summary = filtered_raw.get("farm_summary") or {}
+    actual_by_period = compute_actual_cash_flow(filtered_raw, farm_summary, months=max(history_months, 1))
+    budget_net_by_period = {
+        (entry.get("year"), entry.get("month")): round(
+            float(entry.get("expected_cash_in") or 0) - float(entry.get("expected_cash_out") or 0), 2,
+        )
+        for entry in get_budget_entries(filtered_raw)
+    }
+
+    history_sorted = sorted(actual_by_period.values(), key=lambda e: (e["year"], e["month"]))[-history_months:]
+
+    opening = float(farm_enriched.get("opening_cash_balance") or 0)
+    running = opening
+    history: list[dict] = []
+    for entry in reversed(history_sorted):
+        history.append({
+            "period": entry["period"],
+            "label": historical_month(entry["period"])["label"],
+            "series": "actual",
+            "closing_balance": round(running, 2),
+            "net_cashflow": entry["actual_net"],
+            "budget_net": budget_net_by_period.get((entry["year"], entry["month"])),
+        })
+        running -= entry["actual_net"]
+    history.reverse()
+
+    forecast: list[dict] = []
+    for point in monthly_forecast or []:
+        balance = point.get("combined_running_balance", point.get("running_balance"))
+        net = point.get("combined_cashflow", point.get("cashflow"))
+        month_no = point.get("month")
+        label = (
+            _FORECAST_MONTH_NAMES[int(month_no) - 1]
+            if isinstance(month_no, int) and 1 <= month_no <= 12
+            else f"Month {month_no}"
+        )
+        forecast.append({
+            "period": f"forecast-{month_no}",
+            "label": label,
+            "series": "forecast",
+            "closing_balance": round(float(balance), 2) if balance is not None else None,
+            "net_cashflow": round(float(net), 2) if net is not None else None,
+            "budget_net": None,
+        })
+
+    return {
+        "current_balance": round(opening, 2),
+        "history": history,
+        "forecast": forecast,
+        "has_budget_reference": any(pt.get("budget_net") is not None for pt in history),
+    }
+
+
 def build_overview_summary(
     farm: dict,
     monthly_forecast: list[dict],
     alerts: list[dict],
+    forecast_summary: dict | None = None,
+    filtered_raw: dict | None = None,
 ) -> dict:
-    """The six headline figures for the reworked Overview page (UX items 1/9):
+    """The headline figures for the reworked Overview page (UX items 1/9):
     position, trajectory, concern, and next step, all in one place, so a
     farmer never has to hunt across sections just to answer "how am I doing
     and what should I do about it?"
@@ -467,6 +652,15 @@ def build_overview_summary(
     top_alert = (alerts or [{}])[0]
     no_critical = top_alert.get("severity") == "info"
 
+    current_period = build_current_period_summary(filtered_raw)
+    cash_position = build_cash_position_series(filtered_raw, farm, monthly_forecast)
+    annual_profit = (forecast_summary or {}).get("annual_profit")
+    expected_annual_farm_profit = {
+        "value": format_currency(annual_profit) if annual_profit is not None else "—",
+        "is_deficit": bool(annual_profit is not None and annual_profit < 0),
+        "period": trailing_12_months(),
+    }
+
     if not monthly_forecast:
         return {
             "current_cash_position": {"value": format_currency(opening), "period": point_in_time()},
@@ -474,6 +668,9 @@ def build_overview_summary(
             "projected_annual_cashflow": {"value": format_currency(0), "period": forecast_window()},
             "main_financial_concern": "Not enough data yet — run an analysis to see this farm's outlook.",
             "recommended_next_action": "Complete the farm data and run an analysis.",
+            "current_period": current_period,
+            "expected_annual_farm_profit": expected_annual_farm_profit,
+            "cash_position": cash_position,
         }
 
     worst = min(
@@ -509,6 +706,9 @@ def build_overview_summary(
             "No action needed — recheck after your next analysis run."
             if no_critical else top_alert.get("review") or "Review the alert in the Action Plan section."
         ),
+        "current_period": current_period,
+        "expected_annual_farm_profit": expected_annual_farm_profit,
+        "cash_position": cash_position,
     }
 
 
@@ -554,7 +754,10 @@ def build_executive_dashboard(
 
     return {
         "overview_header": build_overview_header(profile, selected_sectors, generated_at),
-        "overview_summary": build_overview_summary(farm_enriched, monthly_forecast, alerts),
+        "overview_summary": build_overview_summary(
+            farm_enriched, monthly_forecast, alerts,
+            forecast_summary=summary, filtered_raw=filtered_raw,
+        ),
         "executive_kpis": calculate_dashboard_kpis(
             summary, farm_enriched, monthly_forecast, forecast.get("risk_level", "Low"),
         ),

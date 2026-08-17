@@ -600,6 +600,148 @@ function renderOverviewChart(data) {
   });
 }
 
+function renderCashPositionChart(cashPosition) {
+  const el = $("cash-position-chart");
+  if (!el) return;
+  const history = cashPosition?.history || [];
+  const forecast = cashPosition?.forecast || [];
+  const points = [...history, ...forecast];
+
+  if (!points.length) {
+    el.innerHTML = `<p class="muted">Not enough data yet — run an analysis to see your cash position.</p>`;
+    return;
+  }
+
+  el._lastCashPositionData = cashPosition;
+  if (!el._resizeObs) {
+    el._resizeObs = new ResizeObserver(() => {
+      if (el._lastCashPositionData) renderCashPositionChart(el._lastCashPositionData);
+    });
+    el._resizeObs.observe(el);
+  }
+
+  const width = Math.max(el.clientWidth || 0, 640);
+  const height = 300;
+  const padL = 76;
+  const padR = 24;
+  const padT = 34;
+  const padB = 40;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+
+  const values = points.map((p) => Number(p.closing_balance) || 0);
+  let minVal = Math.min(0, ...values);
+  let maxVal = Math.max(0, ...values);
+  if (minVal === maxVal) { minVal -= 1; maxVal += 1; }
+  const pad = (maxVal - minVal) * 0.12 || 1;
+  minVal -= pad;
+  maxVal += pad;
+
+  const n = points.length;
+  const xScale = (i) => padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1));
+  const yScale = (v) => padT + plotH - ((v - minVal) / (maxVal - minVal)) * plotH;
+
+  const tickCount = 5;
+  const gridLines = [];
+  const yLabels = [];
+  for (let t = 0; t <= tickCount; t++) {
+    const val = minVal + ((maxVal - minVal) * t) / tickCount;
+    const y = yScale(val);
+    gridLines.push(`<line class="overview-grid-line" x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" />`);
+    yLabels.push(`<text class="overview-axis-y" x="${padL - 8}" y="${y + 4}" text-anchor="end">${formatChartEuro(val)}</text>`);
+  }
+
+  const zeroLine = (minVal < 0 && maxVal > 0)
+    ? `<line class="cash-position-zero-line" x1="${padL}" y1="${yScale(0)}" x2="${width - padR}" y2="${yScale(0)}" />`
+    : "";
+
+  const historyCount = history.length;
+  const boundaryIdx = historyCount > 0 && forecast.length ? historyCount - 1 : -1;
+  const todayMarker = boundaryIdx >= 0 ? `
+    <line class="cash-position-today-line" x1="${xScale(boundaryIdx)}" y1="${padT}" x2="${xScale(boundaryIdx)}" y2="${padT + plotH}" />
+    <text class="cash-position-today-label" x="${xScale(boundaryIdx)}" y="${padT - 12}" text-anchor="middle">Today</text>` : "";
+
+  const pathFrom = (start, end) => {
+    let d = "";
+    for (let i = start; i < end; i++) {
+      const x = xScale(i);
+      const y = yScale(Number(points[i].closing_balance) || 0);
+      d += `${i === start ? "M" : "L"}${x},${y} `;
+    }
+    return d.trim();
+  };
+
+  const actualPath = historyCount > 0 ? pathFrom(0, historyCount) : "";
+  // Forecast path starts at the last actual point so the two lines connect visually.
+  const forecastStart = Math.max(historyCount - 1, 0);
+  const forecastPath = forecast.length > 0 ? pathFrom(forecastStart, n) : "";
+
+  const dots = points.map((p, i) => {
+    const x = xScale(i);
+    const y = yScale(Number(p.closing_balance) || 0);
+    const cls = p.series === "forecast" ? "cash-position-dot cash-position-dot-forecast" : "cash-position-dot cash-position-dot-actual";
+    return `<circle class="${cls}" data-idx="${i}" tabindex="0" cx="${x}" cy="${y}" r="4" />`;
+  }).join("");
+
+  const xLabels = points.map((p, i) => {
+    if (n > 12 && i % 2 !== 0 && i !== n - 1) return "";
+    return `<text class="overview-axis-x" x="${xScale(i)}" y="${height - 12}" text-anchor="middle">${p.label || ""}</text>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="overview-chart-wrap cash-position-wrap">
+      <div class="overview-chart-legend" aria-hidden="true">
+        <span class="overview-legend-item"><i class="overview-legend-swatch cash-position-legend-actual"></i>Actual</span>
+        <span class="overview-legend-item"><i class="overview-legend-swatch cash-position-legend-forecast"></i>Forecast</span>
+      </div>
+      <svg class="overview-chart-svg" width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Monthly cash position, actual and forecast">
+        ${gridLines.join("")}
+        ${yLabels.join("")}
+        <line class="overview-axis-line" x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}" />
+        ${zeroLine}
+        ${todayMarker}
+        <path class="cash-position-path cash-position-path-actual" d="${actualPath}" fill="none" />
+        <path class="cash-position-path cash-position-path-forecast" d="${forecastPath}" fill="none" />
+        ${dots}
+        ${xLabels}
+      </svg>
+      <div class="overview-chart-tooltip hidden" id="cash-position-tooltip"></div>
+    </div>`;
+
+  const tooltip = el.querySelector("#cash-position-tooltip");
+  const showTooltip = (idx, clientX, clientY) => {
+    const p = points[idx];
+    if (!p || !tooltip) return;
+    const rows = [
+      `<div class="overview-tooltip-row"><span>Cash position</span><strong>${formatChartEuro(p.closing_balance)}</strong></div>`,
+      `<div class="overview-tooltip-row"><span>${p.series === "forecast" ? "Expected change" : "Actual change"}</span><strong>${p.net_cashflow != null ? formatChartEuro(p.net_cashflow) : "—"}</strong></div>`,
+    ];
+    if (p.budget_net != null) {
+      rows.push(`<div class="overview-tooltip-row"><span>Budgeted change</span><strong>${formatChartEuro(p.budget_net)}</strong></div>`);
+    }
+    tooltip.innerHTML = `<div class="overview-tooltip-month">${p.label || ""}${p.series === "forecast" ? " (forecast)" : ""}</div>${rows.join("")}`;
+    tooltip.classList.remove("hidden");
+    const wrap = el.querySelector(".overview-chart-wrap");
+    const rect = wrap.getBoundingClientRect();
+    const left = Math.min(Math.max(clientX - rect.left + 12, 8), rect.width - 190);
+    const top = Math.max(clientY - rect.top - 90, 8);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  };
+  const hideTooltip = () => tooltip?.classList.add("hidden");
+
+  el.querySelectorAll(".cash-position-dot").forEach((dot) => {
+    dot.addEventListener("mouseenter", (e) => showTooltip(+dot.dataset.idx, e.clientX, e.clientY));
+    dot.addEventListener("mousemove", (e) => showTooltip(+dot.dataset.idx, e.clientX, e.clientY));
+    dot.addEventListener("mouseleave", hideTooltip);
+    dot.addEventListener("focus", () => {
+      const r = dot.getBoundingClientRect();
+      showTooltip(+dot.dataset.idx, r.left + r.width / 2, r.top);
+    });
+    dot.addEventListener("blur", hideTooltip);
+  });
+}
+
 function renderExecutiveAlerts(alerts, listId = "alerts-list") {
   const list = $(listId);
   if (!list) return;
@@ -637,34 +779,61 @@ function renderOverviewSummary(summary) {
   const cash = summary.current_cash_position || {};
   const lowest = summary.lowest_projected_cash_balance || {};
   const annual = summary.projected_annual_cashflow || {};
+  const profit = summary.expected_annual_farm_profit || {};
 
   box.innerHTML = [
     overviewMetricCard(
-      "Current Cash Position",
+      "Cash Available",
       cash.value ?? "—",
       cash.period?.label || "",
     ),
     overviewMetricCard(
-      "Lowest Projected Cash Balance",
+      "Expected Future Cash (lowest point)",
       `<span class="${lowest.is_deficit ? "negative" : ""}">${lowest.value ?? "—"}</span>`,
       lowest.month_label ? `${lowest.month_label} of the forecast` : "Next 12 months",
     ),
     overviewMetricCard(
-      "Projected Annual Cashflow",
+      "Expected Cash Over the Year",
       `<span class="${annual.is_deficit ? "negative" : "positive"}">${annual.value ?? "—"}</span>`,
       annual.is_deficit ? "Projected deficit" : "Projected surplus",
     ),
     overviewMetricCard(
-      "Main Financial Concern",
+      "Expected Annual Farm Profit",
+      `<span class="${profit.is_deficit ? "negative" : "positive"}">${profit.value ?? "—"}</span>`,
+      "Trailing 12 months, annualised",
+    ),
+    overviewMetricCard(
+      "Needs Your Attention",
       summary.main_financial_concern || "—",
       "",
       "overview-metric-wide",
     ),
     overviewMetricCard(
-      "Recommended Next Action",
+      "What To Do Next",
       summary.recommended_next_action || "—",
       "",
       "overview-metric-wide",
+    ),
+  ].join("");
+}
+
+function renderCurrentPeriod(currentPeriod) {
+  const badge = $("current-period-badge");
+  const grid = $("current-period-grid");
+  if (!grid) return;
+  if (!currentPeriod) {
+    if (badge) badge.innerHTML = "";
+    grid.innerHTML = `<p class="muted">Not enough data yet — run an analysis to see this month's figures.</p>`;
+    return;
+  }
+  if (badge) badge.innerHTML = periodBadgeHtml(currentPeriod.period);
+  grid.innerHTML = [
+    overviewMetricCard("Income", currentPeriod.income ?? "—", "Money that came in"),
+    overviewMetricCard("Costs", currentPeriod.costs ?? "—", "Money that went out"),
+    overviewMetricCard(
+      "Difference",
+      `<span class="${currentPeriod.is_deficit ? "negative" : "positive"}">${currentPeriod.difference ?? "—"}</span>`,
+      currentPeriod.is_deficit ? "Spent more than came in" : "Money left over this month",
     ),
   ].join("");
 }
@@ -674,7 +843,9 @@ function renderExecutiveDashboard(data) {
   $("dashboard-results")?.classList.remove("hidden");
   renderDataQualityWarnings(data.data_quality_warnings);
   renderOverviewHeader(data.overview_header);
+  renderCurrentPeriod(data.overview_summary?.current_period);
   renderOverviewSummary(data.overview_summary);
+  renderCashPositionChart(data.overview_summary?.cash_position);
   renderKpis(data.executive_kpis || data.kpis);
   renderHealthSnapshot(data.health_snapshot);
   renderHealthScoreDetail(data.health_score);
@@ -1303,6 +1474,7 @@ const DEFAULT_SUBTAB = {
 const SUBTAB_LOADERS = {
   "cashflow-forecast": () => ensureAdvancedForecast(),
   "cashflow-budget": () => loadCashflowBudget(),
+  "cashflow-income-expenses": () => loadIncomeExpenses(),
   "fp-historical": () => loadHistoricalData(),
   "ap-recommendations": () => loadFinancialIntelligence(),
   "ap-ask": () => initFarmIntelligencePage(),
@@ -1503,6 +1675,213 @@ async function loadCashflowBudget() {
       $("cashflow-budget-loading").classList.remove("hidden");
       $("cashflow-budget-loading").textContent = `Could not load: ${err.message}`;
     }
+    showStatus(err.message, "error");
+  }
+}
+
+function ieCategoryOptions(recordType) {
+  const choices = recordType === "income"
+    ? (state.incomeExpenses?.income_category_choices || [])
+    : (state.incomeExpenses?.expense_category_choices || []);
+  return choices.map((c) => `<option value="${c.id}">${c.label}</option>`).join("");
+}
+
+function ieCategoryLabel(recordType, categoryId) {
+  const choices = recordType === "income"
+    ? state.incomeExpenses?.income_category_choices
+    : state.incomeExpenses?.expense_category_choices;
+  return choices?.find((c) => c.id === categoryId)?.label || categoryId;
+}
+
+function renderIeCategoryList(containerId, rows) {
+  const box = $(containerId);
+  if (!box) return;
+  if (!rows?.length) {
+    box.innerHTML = `<p class="muted">No recorded amounts for this period yet.</p>`;
+    return;
+  }
+  const maxTotal = Math.max(...rows.map((r) => Math.abs(r.total || 0)), 1);
+  box.innerHTML = rows.map((r) => `
+    <div class="ie-category-row">
+      <div class="ie-category-row-label">
+        <span>${r.label}</span>
+        <strong>${formatCurrency(r.total)}</strong>
+      </div>
+      <div class="ie-category-bar-track">
+        <div class="ie-category-bar-fill" style="width:${Math.max(4, (Math.abs(r.total || 0) / maxTotal) * 100)}%"></div>
+      </div>
+    </div>`).join("");
+}
+
+function renderIncomeExpensesSummary(data) {
+  $("income-expenses-loading")?.classList.add("hidden");
+  $("income-expenses-content")?.classList.remove("hidden");
+
+  const row = $("ie-summary-row");
+  if (row) {
+    const isDeficit = (data.difference || 0) < 0;
+    row.innerHTML = [
+      overviewMetricCard("Income", formatCurrency(data.income_total), data.period?.label || ""),
+      overviewMetricCard("Costs", formatCurrency(data.expense_total), data.period?.label || ""),
+      overviewMetricCard(
+        "Difference",
+        `<span class="${isDeficit ? "negative" : "positive"}">${formatCurrency(data.difference)}</span>`,
+        isDeficit ? "Costs ahead of income" : "Income ahead of costs",
+      ),
+    ].join("");
+  }
+
+  renderIeCategoryList("ie-income-categories", data.income_categories);
+  renderIeCategoryList("ie-expense-categories", data.expense_categories);
+}
+
+function renderFinancialRecordsList(records) {
+  const box = $("ie-records-list");
+  if (!box) return;
+  if (!records?.length) {
+    box.innerHTML = `<p class="muted">No manual entries yet — add your first one above.</p>`;
+    return;
+  }
+  box.innerHTML = records.map((r) => `
+    <div class="ie-record-row" data-id="${r.id}">
+      <div class="ie-record-main">
+        <span class="ie-record-type ${r.record_type}">${r.record_type === "income" ? "Income" : "Expense"}</span>
+        <span class="ie-record-date">${r.date}</span>
+        <span class="ie-record-category">${ieCategoryLabel(r.record_type, r.category)}</span>
+        <span class="ie-record-desc">${r.description}${r.counterparty ? ` · ${r.counterparty}` : ""}</span>
+      </div>
+      <div class="ie-record-amount ${r.record_type === "income" ? "positive" : "negative"}">${r.record_type === "income" ? "+" : "-"}${formatCurrency(r.amount)}</div>
+      <div class="ie-record-actions">
+        <button type="button" class="btn-link ie-edit-btn" data-id="${r.id}">Edit</button>
+        <button type="button" class="btn-link ie-delete-btn" data-id="${r.id}">Delete</button>
+      </div>
+    </div>`).join("");
+
+  box.querySelectorAll(".ie-edit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const record = records.find((r) => r.id === btn.dataset.id);
+      if (record) openIeEntryForm(record);
+    });
+  });
+  box.querySelectorAll(".ie-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", () => deleteIeRecord(btn.dataset.id));
+  });
+}
+
+async function loadFinancialRecordsList() {
+  try {
+    const data = await api(`/farmer/financial-records${sectorsQuery()}`);
+    state.financialRecords = data.records || [];
+    renderFinancialRecordsList(state.financialRecords);
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+async function loadIncomeExpenses() {
+  $("income-expenses-loading")?.classList.remove("hidden");
+  $("income-expenses-content")?.classList.add("hidden");
+  try {
+    const data = await api(`/farmer/income-expenses${sectorsQuery()}`);
+    state.incomeExpenses = data;
+    renderIncomeExpensesSummary(data);
+    await loadFinancialRecordsList();
+  } catch (err) {
+    if ($("income-expenses-loading")) $("income-expenses-loading").textContent = `Could not load: ${err.message}`;
+    showStatus(err.message, "error");
+  }
+}
+
+function populateIeCategorySelect() {
+  const typeSelect = $("ie-entry-type");
+  const categorySelect = $("ie-entry-category");
+  if (!typeSelect || !categorySelect) return;
+  const previous = categorySelect.value;
+  categorySelect.innerHTML = ieCategoryOptions(typeSelect.value);
+  if ([...categorySelect.options].some((o) => o.value === previous)) categorySelect.value = previous;
+}
+
+function openIeEntryForm(record = null) {
+  const form = $("ie-entry-form");
+  if (!form) return;
+  form.classList.remove("hidden");
+  $("ie-add-entry-btn")?.classList.add("hidden");
+
+  $("ie-entry-id").value = record?.id || "";
+  $("ie-entry-type").value = record?.record_type || "expense";
+  $("ie-entry-type").disabled = !!record;
+  populateIeCategorySelect();
+  if (record?.category) $("ie-entry-category").value = record.category;
+  $("ie-entry-date").value = record?.date || new Date().toISOString().slice(0, 10);
+  $("ie-entry-amount").value = record?.amount ?? "";
+  $("ie-entry-description").value = record?.description || "";
+  $("ie-entry-counterparty").value = record?.counterparty || "";
+  $("ie-entry-notes").value = record?.notes || "";
+  form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeIeEntryForm() {
+  $("ie-entry-form")?.classList.add("hidden");
+  $("ie-add-entry-btn")?.classList.remove("hidden");
+  $("ie-entry-form")?.reset();
+  const typeSelect = $("ie-entry-type");
+  if (typeSelect) typeSelect.disabled = false;
+}
+
+async function submitIeEntryForm(e) {
+  e.preventDefault();
+  const id = $("ie-entry-id")?.value;
+  const recordType = $("ie-entry-type").value;
+  const payload = {
+    record_type: recordType,
+    date: $("ie-entry-date").value,
+    category: $("ie-entry-category").value,
+    amount: parseFloat($("ie-entry-amount").value),
+    description: $("ie-entry-description").value.trim(),
+    counterparty: $("ie-entry-counterparty").value.trim() || null,
+    notes: $("ie-entry-notes").value.trim() || null,
+  };
+  if (!payload.category || !payload.description || !payload.date || !(payload.amount > 0)) {
+    showStatus("Please fill in date, category, description and a positive amount.", "error");
+    return;
+  }
+  try {
+    if (id) {
+      const editPayload = { ...payload };
+      delete editPayload.record_type;
+      await api(`/farmer/financial-records/${id}${sectorsQuery()}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editPayload),
+      });
+      showStatus("Entry updated.", "success");
+    } else {
+      const result = await api(`/farmer/financial-records${sectorsQuery()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      showStatus(
+        result.possible_duplicate
+          ? "Saved — note: a very similar entry already exists. Check Your Entries if this wasn't intentional."
+          : "Entry added.",
+        result.possible_duplicate ? "info" : "success",
+      );
+    }
+    closeIeEntryForm();
+    await loadIncomeExpenses();
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+async function deleteIeRecord(id) {
+  if (!confirm("Delete this entry? This cannot be undone.")) return;
+  try {
+    await api(`/farmer/financial-records/${id}${sectorsQuery()}`, { method: "DELETE" });
+    showStatus("Entry deleted.", "success");
+    await loadIncomeExpenses();
+  } catch (err) {
     showStatus(err.message, "error");
   }
 }
@@ -1777,6 +2156,11 @@ function setupNav() {
   $("report-type")?.addEventListener("change", updateReportSections);
   initReportDate();
   updateReportSections();
+
+  $("ie-add-entry-btn")?.addEventListener("click", () => openIeEntryForm());
+  $("ie-cancel-entry-btn")?.addEventListener("click", closeIeEntryForm);
+  $("ie-entry-form")?.addEventListener("submit", submitIeEntryForm);
+  $("ie-entry-type")?.addEventListener("change", populateIeCategorySelect);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

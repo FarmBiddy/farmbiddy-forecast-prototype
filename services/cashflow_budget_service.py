@@ -5,14 +5,23 @@ Compares the committed `cash_flow_budget` entries in the farm dataset
 against the same farm+household-aware actual cash-flow figure Phase 2
 introduced (`combined_cashflow` in services/multi_sector_farm.py), so
 "actual" always means the same thing on both sides of the comparison.
+
+`compute_actual_cash_flow` and `get_budget_entries` live in
+`services.dashboard_summary` (not here) so the Overview's current-period
+and cash-position figures can share the exact same "actual" definition
+without a circular import between the two modules.
 """
 
 from __future__ import annotations
 
 from forecast_engine.cashflow_classifier import classify_cashflow_entries
 from forecast_engine.period_labels import historical_month
-from models.multi_sector_farm import build_debt_register, compute_household_month
-from services.dashboard_summary import get_selected_sector_data, get_sector_monthly_history
+from models.multi_sector_farm import build_debt_register
+from services.dashboard_summary import (
+    compute_actual_cash_flow,
+    get_budget_entries,
+    get_selected_sector_data,
+)
 from services.multi_sector_farm import aggregate_sector_financials
 
 DEFICIT = "deficit"
@@ -22,64 +31,6 @@ BREAKEVEN = "breakeven"
 AHEAD = "ahead"
 BEHIND = "behind"
 ON_BUDGET = "on_budget"
-
-
-def _loan_monthly_total(farm_summary: dict) -> float:
-    loans = (farm_summary or {}).get("loans") or []
-    return sum(float(loan.get("monthly_repayment") or 0) for loan in loans)
-
-
-def get_budget_entries(farm: dict) -> list[dict]:
-    """Raw `cash_flow_budget` entries from the dataset, oldest first."""
-    entries = farm.get("cash_flow_budget") or []
-    return sorted(entries, key=lambda e: (e.get("year", 0), e.get("month", 0)))
-
-
-def _scheme_payment_for_month(farm: dict, month: int) -> float:
-    """Scheme income landing in this calendar month, applied every year.
-
-    Scheme payments (BISS/ACRES/other grants) are stored as annual totals
-    with a single payment month, the same way `_build_monthly_forecast`
-    (services/multi_sector_farm.py) treats them for the forward projection -
-    reused here so historical actuals aren't understated.
-    """
-    scheme = (farm or {}).get("scheme_payments") or {}
-    scheme_months = scheme.get("scheme_payment_months") or {}
-    total = 0.0
-    for key in ("biss", "acres", "other_grants"):
-        if scheme_months.get(key) == month:
-            total += float(scheme.get(key) or 0)
-    return total
-
-
-def compute_actual_cash_flow(filtered_raw: dict, farm_summary: dict, months: int = 24) -> dict[tuple, dict]:
-    """Actual farm+household cash in/out per (year, month), keyed by period tuple.
-
-    Mirrors the `combined_cashflow` definition from
-    `services/multi_sector_farm.py`: sector revenue/costs plus scheme income
-    and household income/outgoings for that calendar month, minus loan
-    repayments.
-    """
-    household = (farm_summary or {}).get("household") or {}
-    loan_monthly = _loan_monthly_total(farm_summary)
-    combined, _ = get_sector_monthly_history(filtered_raw, months=months)
-
-    actual: dict[tuple, dict] = {}
-    for row in combined:
-        year, month = row["year"], row["month"]
-        hh = compute_household_month(household, month)
-        scheme_income = _scheme_payment_for_month(filtered_raw, month)
-        cash_in = round(row["revenue"] + scheme_income + hh["income"], 2)
-        cash_out = round(row["costs"] + loan_monthly + hh["outgoings"], 2)
-        actual[(year, month)] = {
-            "year": year,
-            "month": month,
-            "period": row.get("period") or f"{year}-{month:02d}",
-            "actual_cash_in": cash_in,
-            "actual_cash_out": cash_out,
-            "actual_net": round(cash_in - cash_out, 2),
-        }
-    return actual
 
 
 def _cause_summary(cash_in_variance: float, cash_out_variance: float, net_variance: float, tolerance: float) -> str:

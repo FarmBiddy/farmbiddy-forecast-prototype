@@ -29,6 +29,10 @@ UPLOADS_DIR = os.path.join(STORAGE_ROOT, "uploads")
 RAW_UPLOADS_DIR = os.path.join(UPLOADS_DIR, "raw")
 PENDING_UPLOADS_DIR = os.path.join(UPLOADS_DIR, "pending")
 FARM_EVENTS_DIR = os.path.join(STORAGE_ROOT, "farm_events")
+# Farmer-entered income/expense/invoice/receipt records (P0.2/P1.2). Kept
+# entirely separate from DATASETS_DIR so manual entry can never corrupt or
+# reshape the read-only, Git-committed canonical farm dataset.
+FINANCIAL_RECORDS_DIR = os.path.join(FARM_EVENTS_DIR, "financial_records")
 DAILY_UPDATES_PATH = os.path.join(STORAGE_ROOT, "daily_updates.json")
 INGESTION_REPORT_PATH = os.path.join(HISTORY_DIR, "ingestion_report.json")
 
@@ -48,5 +52,6 @@ def ensure_output_dirs():
         RAW_UPLOADS_DIR,
         PENDING_UPLOADS_DIR,
         FARM_EVENTS_DIR,
+        FINANCIAL_RECORDS_DIR,
     ):
         os.makedirs(folder, exist_ok=True)

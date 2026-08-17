@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from services.dashboard_summary import (
+    build_cash_position_series,
+    build_current_period_summary,
     build_overview_chart_data,
     build_overview_summary,
     calculate_dashboard_kpis,
     calculate_sector_performance,
+    compute_actual_cash_flow,
     generate_dashboard_alerts,
+    get_budget_entries,
     get_historical_data,
     get_selected_sector_data,
     sector_status_label,
@@ -235,6 +239,116 @@ def test_generate_dashboard_alerts_includes_early_cashflow_warnings():
     assert "Increasing overdraft use" in messages
     assert "Cash-flow warning" in messages
     assert all(a["severity"] in ("high", "medium", "low") for a in alerts)
+
+
+def test_compute_actual_cash_flow_and_budget_entries_available_from_dashboard_summary():
+    """These moved from cashflow_budget_service (P0.1 refactor) so the
+    Overview can reuse the exact same "actual" definition without a
+    circular import; verify they still work from their new home."""
+    filtered = get_selected_sector_data("multi_sector_farm.json", ["dairy", "beef", "lamb"])
+    farm_summary = filtered.get("farm_summary") or {}
+    actual = compute_actual_cash_flow(filtered, farm_summary, months=3)
+    assert len(actual) == 3
+    for entry in actual.values():
+        assert entry["actual_cash_in"] >= 0
+        assert "actual_net" in entry
+    budget_entries = get_budget_entries(filtered)
+    assert len(budget_entries) > 0
+    years_months = [(e["year"], e["month"]) for e in budget_entries]
+    assert years_months == sorted(years_months)
+
+
+def test_build_current_period_summary_returns_latest_actual_month():
+    filtered = get_selected_sector_data("multi_sector_farm.json", ["dairy", "beef", "lamb"])
+    result = build_current_period_summary(filtered)
+    assert result is not None
+    assert result["period"]["period_type"] == "Historical Actual"
+    assert result["income"].startswith("€") or result["income"].startswith("-€")
+    assert result["costs"].startswith("€") or result["costs"].startswith("-€")
+    assert isinstance(result["is_deficit"], bool)
+
+
+def test_build_current_period_summary_none_without_data():
+    assert build_current_period_summary(None) is None
+    assert build_current_period_summary({}) is None
+
+
+def test_build_cash_position_series_history_reconciles_to_opening_balance():
+    filtered = get_selected_sector_data("multi_sector_farm.json", ["dairy", "beef", "lamb"])
+    farm_summary = filtered.get("farm_summary") or {}
+    opening = float(farm_summary.get("opening_cash_balance") or 0)
+    series = build_cash_position_series(filtered, {"opening_cash_balance": opening}, [], history_months=6)
+    assert series is not None
+    history = series["history"]
+    assert len(history) == 6
+    # Most recent historical month's closing balance is today's real opening balance.
+    assert history[-1]["closing_balance"] == round(opening, 2)
+    # Each month's closing balance must reconcile with the previous month's
+    # closing balance plus that month's own real net cash flow (no invented figures).
+    for i in range(1, len(history)):
+        prev_balance = history[i - 1]["closing_balance"]
+        assert round(prev_balance + history[i]["net_cashflow"], 2) == history[i]["closing_balance"]
+    assert series["current_balance"] == round(opening, 2)
+    assert series["forecast"] == []
+
+
+def test_build_cash_position_series_forecast_segment_uses_running_balance():
+    filtered = get_selected_sector_data("multi_sector_farm.json", ["dairy"])
+    monthly_forecast = [
+        {"month": 1, "combined_running_balance": 1000, "combined_cashflow": 200},
+        {"month": 2, "combined_running_balance": 1200, "combined_cashflow": 200},
+    ]
+    series = build_cash_position_series(filtered, {"opening_cash_balance": 800}, monthly_forecast, history_months=3)
+    assert [pt["series"] for pt in series["forecast"]] == ["forecast", "forecast"]
+    assert series["forecast"][0]["closing_balance"] == 1000
+    assert series["forecast"][0]["label"] == "Jan"
+    assert series["forecast"][1]["label"] == "Feb"
+    # Forecast points never carry a budget reference (Actual/Budget/Forecast stay distinguishable).
+    assert all(pt["budget_net"] is None for pt in series["forecast"])
+
+
+def test_build_cash_position_series_none_without_filtered_raw():
+    assert build_cash_position_series(None, {"opening_cash_balance": 100}, []) is None
+
+
+def test_build_overview_summary_includes_current_period_and_cash_position():
+    filtered = get_selected_sector_data("multi_sector_farm.json", ["dairy", "beef", "lamb"])
+    farm_summary = filtered.get("farm_summary") or {}
+    farm = {"opening_cash_balance": farm_summary.get("opening_cash_balance", 0)}
+    monthly_forecast = [
+        {"month": m, "combined_running_balance": 10000 + m * 100, "combined_cashflow": 100}
+        for m in range(1, 13)
+    ]
+    alerts = [{
+        "message": "No critical alerts — farm metrics look stable.",
+        "severity": "info",
+        "what": "No critical alerts",
+        "review": "No action needed — recheck after your next analysis run.",
+    }]
+    summary = build_overview_summary(
+        farm, monthly_forecast, alerts,
+        forecast_summary={"annual_profit": 45000}, filtered_raw=filtered,
+    )
+    assert summary["current_period"] is not None
+    assert summary["expected_annual_farm_profit"]["value"] == "€45,000"
+    assert summary["expected_annual_farm_profit"]["is_deficit"] is False
+    assert summary["cash_position"] is not None
+    assert len(summary["cash_position"]["history"]) == 6
+    assert len(summary["cash_position"]["forecast"]) == 12
+
+
+def test_build_overview_summary_still_works_without_filtered_raw():
+    """Backward compatibility: callers that don't pass filtered_raw/forecast_summary
+    (e.g. existing tests above) must keep getting the original fields untouched."""
+    farm = {"opening_cash_balance": 28500}
+    monthly_forecast = [
+        {"month": m, "combined_running_balance": 10000 + m * 100, "combined_cashflow": 100}
+        for m in range(1, 13)
+    ]
+    summary = build_overview_summary(farm, monthly_forecast, [])
+    assert summary["current_period"] is None
+    assert summary["cash_position"] is None
+    assert summary["expected_annual_farm_profit"]["value"] == "—"
 
 
 def test_get_historical_data():

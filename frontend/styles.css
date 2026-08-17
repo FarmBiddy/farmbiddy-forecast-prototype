@@ -482,6 +482,180 @@ body {
   border-top: 1px solid rgba(248, 250, 252, 0.15);
 }
 
+/* Cash Position chart — the Overview's primary visual (UX item 2):
+   actual (solid, dark) vs forecast (dashed, lighter), with a "Today"
+   divider so future months are never mistaken for history. */
+.cash-position-card h3 { margin-bottom: 0.15rem; }
+.cash-position-chart-area {
+  min-height: 300px;
+  padding: 0;
+  overflow: visible;
+}
+.cash-position-legend-actual { background: var(--green-dark); }
+.cash-position-legend-forecast { background: #94a3b8; }
+
+.cash-position-path {
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.cash-position-path-actual { stroke: var(--green-dark); }
+.cash-position-path-forecast {
+  stroke: #94a3b8;
+  stroke-dasharray: 6 5;
+}
+
+.cash-position-dot { cursor: pointer; }
+.cash-position-dot-actual { fill: var(--green-dark); }
+.cash-position-dot-forecast { fill: #94a3b8; }
+.cash-position-dot:hover,
+.cash-position-dot:focus { r: 6; }
+
+.cash-position-zero-line {
+  stroke: #b3261e;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.55;
+}
+
+.cash-position-today-line {
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.cash-position-today-label {
+  font-size: 10px;
+  fill: #64748b;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+/* Income & Expenses (P0.2) */
+.ie-summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.ie-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.ie-column h4 { margin-bottom: 0.75rem; font-size: 0.95rem; color: var(--text); }
+
+.ie-category-list { display: flex; flex-direction: column; gap: 0.65rem; }
+.ie-category-row-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  margin-bottom: 0.25rem;
+}
+.ie-category-row-label span { color: var(--muted); }
+.ie-category-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.ie-category-bar-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 4px;
+}
+
+.ie-add-entry-btn,
+#ie-add-entry-btn { margin-top: 0; }
+
+.ie-entry-form {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.ie-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+.ie-form-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex: 1 1 150px;
+}
+.ie-form-row label.ie-form-wide { flex: 2 1 280px; }
+.ie-form-row input,
+.ie-form-row select {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: var(--text);
+}
+.ie-form-actions { display: flex; gap: 0.75rem; }
+.ie-form-actions .btn-secondary { margin-top: 0; }
+
+.ie-records-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.ie-record-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.ie-record-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  font-size: 0.88rem;
+}
+.ie-record-type {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+.ie-record-type.income { background: var(--green-light); color: var(--green-dark); }
+.ie-record-type.expense { background: #fef2f2; color: #b3261e; }
+.ie-record-date { color: var(--muted); }
+.ie-record-category { font-weight: 600; }
+.ie-record-desc { color: var(--muted); }
+.ie-record-amount { font-weight: 700; white-space: nowrap; }
+.ie-record-actions { display: flex; gap: 0.75rem; }
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--green-dark);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
+@media (max-width: 1200px) {
+  .ie-summary-row { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 768px) {
+  .ie-summary-row { grid-template-columns: 1fr; }
+  .ie-columns { grid-template-columns: 1fr; }
+  .ie-record-row { flex-direction: column; align-items: flex-start; }
+}
+
 .historical-sector-block {
   margin-bottom: 1.5rem;
 }
@@ -1000,7 +1174,7 @@ body {
 .overview-summary-card h3 { margin-bottom: 0.9rem; }
 .overview-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
 }
 .overview-metric-card {
@@ -1009,7 +1183,16 @@ body {
   border-radius: var(--radius-sm);
   padding: 1rem 1.1rem;
 }
-.overview-metric-wide { grid-column: span 3; }
+.overview-metric-wide { grid-column: span 4; }
+
+/* This Month: the current-period Income / Costs / Difference block (UX item 1) */
+.current-period-card h3 { margin-bottom: 0.25rem; }
+.current-period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
 .overview-metric-label {
   font-size: 0.72rem;
   color: var(--muted);
@@ -1048,6 +1231,7 @@ body {
   .grid-2-1, .grid-3 { grid-template-columns: 1fr; }
   .overview-summary-grid { grid-template-columns: repeat(2, 1fr); }
   .overview-metric-wide { grid-column: span 2; }
+  .current-period-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 768px) {
@@ -1066,6 +1250,7 @@ body {
   .fi-metric-chip { width: 100%; }
   .overview-summary-grid { grid-template-columns: 1fr; }
   .overview-metric-wide { grid-column: span 1; }
+  .current-period-grid { grid-template-columns: 1fr; }
   .subtabs { gap: 0.3rem; }
   .subtab-btn { flex: 1 1 auto; text-align: center; }
 }

@@ -49,6 +49,14 @@ from models.api_models import (
     CashflowActionResponse,
     CashflowActionsTestAllResponse,
 )
+from models.financial_record import (
+    FinancialRecordCreate,
+    FinancialRecordDeleteResponse,
+    FinancialRecordListResponse,
+    FinancialRecordResponse,
+    FinancialRecordUpdate,
+    IncomeExpenseSummaryResponse,
+)
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
 from services.financial_intelligence_service import ask_farm_advisor, get_financial_intelligence
@@ -77,6 +85,14 @@ from services.forecast_service import (
     run_forecast,
     run_multi_farm_analysis,
     run_sandbox_forecast,
+)
+from services.income_expense_service import build_income_expense_summary
+from services.financial_record_service import (
+    FinancialRecordNotFoundError,
+    add_financial_record,
+    delete_financial_record,
+    list_financial_records,
+    update_financial_record,
 )
 
 router = APIRouter()
@@ -189,6 +205,119 @@ def farmer_cashflow_budget(
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/income-expenses",
+    response_model=IncomeExpenseSummaryResponse,
+    tags=["Farmer Edition"],
+    summary="Where money came from and where it went, by category",
+)
+def farmer_income_expenses(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        payload = build_income_expense_summary(farm_file, _parse_sectors_query(sectors))
+        return IncomeExpenseSummaryResponse(**payload)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/financial-records",
+    response_model=FinancialRecordListResponse,
+    tags=["Farmer Edition"],
+    summary="List manually entered income/expense records",
+)
+def farmer_list_financial_records(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+    record_type: Optional[str] = Query(default=None, description="income or expense"),
+    category: Optional[str] = Query(default=None),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        records = list_financial_records(
+            farm_file,
+            sectors=_parse_sectors_query(sectors),
+            record_type=record_type,
+            category=category,
+        )
+        return FinancialRecordListResponse(success=True, farm_file=farm_file, records=records, count=len(records))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/financial-records",
+    response_model=FinancialRecordResponse,
+    tags=["Farmer Edition"],
+    summary="Add a manual income or expense record",
+)
+def farmer_add_financial_record(
+    record: FinancialRecordCreate,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        created, duplicate = add_financial_record(farm_file, record.model_dump())
+        return FinancialRecordResponse(
+            success=True,
+            record=created,
+            possible_duplicate=duplicate is not None,
+            duplicate_of=duplicate.get("id") if duplicate else None,
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.put(
+    "/farmer/financial-records/{record_id}",
+    response_model=FinancialRecordResponse,
+    tags=["Farmer Edition"],
+    summary="Edit a manual income or expense record",
+)
+def farmer_update_financial_record(
+    record_id: str,
+    changes: FinancialRecordUpdate,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        updated = update_financial_record(farm_file, record_id, changes.model_dump(exclude_unset=True))
+        return FinancialRecordResponse(success=True, record=updated)
+    except FinancialRecordNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Financial record not found: {error}") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.delete(
+    "/farmer/financial-records/{record_id}",
+    response_model=FinancialRecordDeleteResponse,
+    tags=["Farmer Edition"],
+    summary="Delete a manual income or expense record",
+)
+def farmer_delete_financial_record(
+    record_id: str,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        delete_financial_record(farm_file, record_id)
+        return FinancialRecordDeleteResponse(success=True, deleted_id=record_id)
+    except FinancialRecordNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Financial record not found: {error}") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.post(

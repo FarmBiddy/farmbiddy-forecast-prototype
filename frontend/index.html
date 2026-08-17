@@ -92,17 +92,32 @@
         <div id="dashboard-results" class="hidden">
           <div id="data-quality-warnings" class="dq-warnings hidden"></div>
 
+          <div class="card current-period-card" id="current-period-card">
+            <div class="card-title-row">
+              <h3>This Month</h3>
+              <span id="current-period-badge"></span>
+            </div>
+            <div class="current-period-grid" id="current-period-grid"></div>
+          </div>
+
           <div class="card overview-summary-card">
             <h3>Your Farm at a Glance</h3>
+            <p class="muted">Everything you need to understand your position in a few seconds.</p>
             <div id="overview-summary" class="overview-summary-grid"></div>
           </div>
 
+          <div class="card chart-card cash-position-card">
+            <h3>Cash Position — Actual &amp; Forecast</h3>
+            <p class="muted">The solid line is what already happened. The lighter dashed line is what's expected ahead.</p>
+            <div id="cash-position-chart" class="chart-area cash-position-chart-area"></div>
+          </div>
+
           <details class="card overview-detail-toggle">
-            <summary>More detail — KPIs, financial health &amp; trend</summary>
+            <summary>More detail — key numbers, financial check &amp; revenue/cost trend</summary>
             <div class="overview-detail-body">
               <div class="kpi-row exec-kpi-row" id="kpi-row"></div>
               <div class="card-inner">
-                <h3>Financial Health Snapshot</h3>
+                <h3>Quick Financial Check</h3>
                 <div id="health-snapshot" class="health-snapshot"></div>
                 <div id="health-score-detail" class="health-score-detail"></div>
               </div>
@@ -123,6 +138,7 @@
           <div class="subtabs" data-subtab-group="cashflow">
             <button type="button" class="subtab-btn active" data-subtab="cashflow-forecast">Forecast</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-budget">Budget vs Actual</button>
+            <button type="button" class="subtab-btn" data-subtab="cashflow-income-expenses">Income &amp; Expenses</button>
           </div>
         </div>
 
@@ -144,6 +160,75 @@
             <div id="cashflow-budget-loading" class="muted">Loading budget comparison…</div>
             <div id="cashflow-budget-summary" class="interpretation-box hidden"></div>
             <div id="cashflow-budget-table" class="table-wrap"></div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="cashflow-income-expenses">
+          <div class="card">
+            <h3>Income &amp; Expenses</h3>
+            <p class="muted">Where your money came from, where it went, and your own quick entries.</p>
+            <div id="income-expenses-loading" class="muted">Loading…</div>
+            <div id="income-expenses-content" class="hidden">
+              <div class="ie-summary-row" id="ie-summary-row"></div>
+              <div class="ie-columns">
+                <div class="ie-column">
+                  <h4>Where money came from</h4>
+                  <div id="ie-income-categories" class="ie-category-list"></div>
+                </div>
+                <div class="ie-column">
+                  <h4>Where money went</h4>
+                  <div id="ie-expense-categories" class="ie-category-list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title-row">
+              <h3>Your Entries</h3>
+              <button type="button" class="btn-secondary" id="ie-add-entry-btn">+ Add an Entry</button>
+            </div>
+            <p class="muted">Quick manual entries for income or expenses — jot down a receipt or payment as it happens.</p>
+
+            <form id="ie-entry-form" class="ie-entry-form hidden">
+              <input type="hidden" id="ie-entry-id" value="" />
+              <div class="ie-form-row">
+                <label>Type
+                  <select id="ie-entry-type">
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                  </select>
+                </label>
+                <label>Date
+                  <input type="date" id="ie-entry-date" required />
+                </label>
+                <label>Category
+                  <select id="ie-entry-category" required></select>
+                </label>
+                <label>Amount (€)
+                  <input type="number" id="ie-entry-amount" min="0.01" step="0.01" required />
+                </label>
+              </div>
+              <div class="ie-form-row">
+                <label class="ie-form-wide">Description
+                  <input type="text" id="ie-entry-description" maxlength="200" required placeholder="e.g. Ration top-up" />
+                </label>
+                <label>Supplier / Source
+                  <input type="text" id="ie-entry-counterparty" maxlength="120" />
+                </label>
+              </div>
+              <div class="ie-form-row">
+                <label class="ie-form-wide">Notes (optional)
+                  <input type="text" id="ie-entry-notes" maxlength="1000" />
+                </label>
+              </div>
+              <div class="ie-form-actions">
+                <button type="submit" class="btn-run">Save Entry</button>
+                <button type="button" class="btn-secondary" id="ie-cancel-entry-btn">Cancel</button>
+              </div>
+            </form>
+
+            <div id="ie-records-list" class="ie-records-list"></div>
           </div>
         </div>
       </section>
