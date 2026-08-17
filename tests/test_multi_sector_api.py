@@ -18,6 +18,16 @@ def test_farmer_sectors_endpoint():
     assert data["selected_sectors"] == ["dairy", "beef", "lamb"]
 
 
+def test_farmer_profile_marks_sample_demo_farm():
+    response = client.get("/api/farmer/profile?farm_file=multi_sector_farm.json")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["farm_name"]
+    assert data["is_sample_data"] is True
+    assert data["sector_profile"]
+    assert data["land_by_sector"]
+
+
 def test_dashboard_with_beef_only():
     response = client.get(
         "/api/farmer/dashboard?farm_file=multi_sector_farm.json&sectors=beef"

@@ -674,7 +674,11 @@ def farmer_delete_category_budget(
     summary="Export one farm's owned financial data as JSON (P3.7 backup/recovery) - membership required",
 )
 def farmer_export_farm_data(
-    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    farm_id: Optional[str] = Query(
+        default=None,
+        alias="farm_file",
+        description="Farm identifier (legacy filename). Membership is checked; one farm cannot export another.",
+    ),
     identity: RequestIdentity = Depends(get_current_identity),
 ):
     """The API-level, access-controlled counterpart to
@@ -694,7 +698,7 @@ def farmer_export_farm_data(
     "/farmer/run-analysis",
     response_model=FarmerAnalysisResponse,
     tags=["Farmer Edition"],
-    summary="Run forecast and populate farmer dashboard",
+    summary="Run forecast and populate farmer dashboard (calculation only — does not create Actuals)",
 )
 def farmer_run_analysis(request: FarmerRunAnalysisRequest = FarmerRunAnalysisRequest()):
     try:

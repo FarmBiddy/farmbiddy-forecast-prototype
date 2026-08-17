@@ -14,6 +14,7 @@ def test_profile_includes_general_metadata():
     assert profile["land_by_sector"]["dairy"] == 72
     assert profile["land_by_sector"]["beef"] == 68
     assert profile["land_by_sector"]["lamb"] == 45
+    assert profile["is_sample_data"] is True
 
 
 def test_profile_sector_blocks_when_all_selected():

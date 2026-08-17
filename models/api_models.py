@@ -300,8 +300,14 @@ class FarmerProfileResponse(BaseModel):
     opening_cash_balance: Optional[float] = None
     milk_processor: Optional[str] = None
     location: Optional[str] = None
+    county: Optional[str] = None
+    herd_number: Optional[str] = None
+    total_hectares: Optional[float] = None
+    land_by_sector: Dict[str, Any] = Field(default_factory=dict)
+    sector_profile: Dict[str, Any] = Field(default_factory=dict)
     owner_name: Optional[str] = None
     last_updated: Optional[str] = None
+    is_sample_data: bool = False
     selected_sectors: List[str] = Field(default_factory=list)
     farm_type: Optional[str] = None
 
