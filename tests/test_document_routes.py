@@ -18,7 +18,11 @@ FARM = "multi_sector_farm.json"
 
 
 @pytest.fixture(autouse=True)
-def isolated_dirs(tmp_path, monkeypatch):
+def isolated_dirs(tmp_path, monkeypatch, isolated_db):
+    # `isolated_db` (tests/conftest.py) keeps this test's identity/farm
+    # resolution (every route here is gated by `enforce_farm_access`) off
+    # the shared dev SQLite file, so it can never lock/interfere with a
+    # concurrently-running pytest process touching that same file.
     monkeypatch.setattr(documents_repo, "DOCUMENTS_DIR", str(tmp_path / "documents"))
     monkeypatch.setattr(records_repo, "FINANCIAL_RECORDS_DIR", str(tmp_path / "records"))
     yield tmp_path

@@ -10,6 +10,7 @@ which one is in use.
 from __future__ import annotations
 
 import os
+import sys
 from contextlib import contextmanager
 from typing import Iterator
 
@@ -64,9 +65,20 @@ def get_db() -> Iterator[Session]:
         yield session
 
 
-if os.environ.get("FARMBIDDY_AUTO_INIT_DB", "1") == "1" and IS_SQLITE:
-    # Local/dev/test convenience: a fresh SQLite file gets its schema created
+_RUNNING_UNDER_PYTEST = "pytest" in sys.modules
+
+if os.environ.get("FARMBIDDY_AUTO_INIT_DB", "1") == "1" and IS_SQLITE and not _RUNNING_UNDER_PYTEST:
+    # Local/dev convenience: a fresh SQLite file gets its schema created
     # automatically on first import, matching the zero-configuration feel of
     # today's JSON storage. Disable with FARMBIDDY_AUTO_INIT_DB=0 (e.g. if a
-    # migration test wants full control over schema creation).
+    # migration step wants full control over schema creation).
+    #
+    # Never auto-touches the shared dev database file under pytest (detected
+    # via `"pytest" in sys.modules`, which is already true by the time this
+    # module is first imported through any conftest/test module - pytest
+    # imports itself before collecting anything). Every test that needs a
+    # database uses the `isolated_db` fixture's own temporary SQLite file
+    # (see tests/conftest.py) instead - this is what makes concurrent test
+    # processes (e.g. two `pytest` runs, or a background test job overlapping
+    # a foreground one) unable to lock each other out of one shared file.
     init_db()

@@ -22,6 +22,9 @@ def isolated_db(tmp_path, monkeypatch):
     session_local = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
     monkeypatch.setattr(db_session, "engine", engine)
     monkeypatch.setattr(db_session, "SessionLocal", session_local)
+
+    from db import orm_models  # noqa: F401  (registers every table on Base.metadata - see db/session.py's init_db)
+
     db_session.Base.metadata.create_all(bind=engine)
     yield engine
     engine.dispose()

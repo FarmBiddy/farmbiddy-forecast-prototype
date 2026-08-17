@@ -17,7 +17,10 @@ FARM = "multi_sector_farm.json"
 
 
 @pytest.fixture(autouse=True)
-def isolated_dirs(tmp_path, monkeypatch):
+def isolated_dirs(tmp_path, monkeypatch, isolated_db):
+    # See tests/test_document_routes.py's isolated_dirs docstring - these
+    # routes are also `enforce_farm_access`-gated, so identity/farm
+    # resolution must not touch the shared dev SQLite file either.
     monkeypatch.setattr(onboarding_repo, "ONBOARDING_DIR", str(tmp_path / "onboarding"))
     monkeypatch.setattr(budgets_repo, "CATEGORY_BUDGETS_DIR", str(tmp_path / "budgets"))
     yield tmp_path
