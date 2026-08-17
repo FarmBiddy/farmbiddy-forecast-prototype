@@ -48,6 +48,7 @@ from services.dashboard_summary import (
 from services.cashflow_budget_service import compare_budget_vs_actual
 from services.category_variance_service import build_category_budget_vs_actual
 from services.attention_service import build_needs_attention
+from services.historical_performance_service import build_year_over_year_comparison
 
 
 DEFAULT_FARM_FILE = MULTI_SECTOR_FILE
@@ -527,6 +528,17 @@ def get_cashflow_budget_comparison(
     farm_file = resolve_farm_file(farm_id)
     selected = resolve_sectors(sectors, farm_id)
     return compare_budget_vs_actual(farm_file, selected)
+
+
+def get_year_over_year_comparison(
+    farm_id: str | None = None,
+    sectors: list[str] | str | None = None,
+) -> dict:
+    """Previous Performance: year-over-year Income/Costs/Farm profit/Cash
+    generated comparison (P1.5)."""
+    farm_file = resolve_farm_file(farm_id)
+    selected = resolve_sectors(sectors, farm_id)
+    return build_year_over_year_comparison(farm_file, selected)
 
 
 def run_advanced_forecast(

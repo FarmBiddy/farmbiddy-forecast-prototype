@@ -1493,7 +1493,7 @@ const SUBTAB_LOADERS = {
   "cashflow-budget": () => { loadCashflowBudget(); loadCategoryBudgets(); },
   "cashflow-income-expenses": () => loadIncomeExpenses(),
   "cashflow-documents": () => loadDocuments(),
-  "fp-historical": () => loadHistoricalData(),
+  "fp-historical": () => { loadHistoricalData(); loadYearOverYear(); },
   "ap-recommendations": () => loadFinancialIntelligence(),
   "ap-ask": () => initFarmIntelligencePage(),
   "ap-reports": () => {
@@ -1622,6 +1622,63 @@ function renderHistoricalData(data) {
     html += renderTable(s.monthly, `${s.label} — totals: ${formatCurrency(s.totals?.revenue)} revenue`);
   });
   box.innerHTML = html || `<p class="muted">No historical data available.</p>`;
+}
+
+function yoyMetricCard(label, metric) {
+  if (!metric) return "";
+  const sign = metric.change > 0 ? "positive" : (metric.change < 0 ? "negative" : "");
+  const changeSign = metric.change > 0 ? "+" : "";
+  const pctText = metric.change_pct != null ? ` (${metric.change_pct > 0 ? "+" : ""}${formatPercent(metric.change_pct)})` : "";
+  return overviewMetricCard(
+    label,
+    formatCurrency(metric.current),
+    `<span class="${sign}">${changeSign}${formatCurrency(metric.change)}${pctText}</span> vs ${formatCurrency(metric.previous)} the year before`,
+  );
+}
+
+function renderYearOverYear(data) {
+  const box = $("yoy-summary");
+  if (!box) return;
+  if (!data?.comparisons?.length) {
+    box.innerHTML = `<p class="muted">Not enough years of recorded data yet for a year-over-year comparison — check back once a second year of actuals is available.</p>`;
+    return;
+  }
+
+  const comparisons = data.comparisons;
+  const latest = comparisons[comparisons.length - 1];
+  const noteHtml = latest.basis === "same_months_partial"
+    ? `<p class="muted">${latest.note}</p>`
+    : (latest.basis === "no_overlap" ? `<p class="muted">${latest.note}</p>` : "");
+
+  const olderRows = comparisons.slice(0, -1).reverse().map((c) => `
+    <li>
+      <strong>${c.year} vs ${c.previous_year}</strong> —
+      Farm Profit ${formatCurrency(c.farm_profit?.current)}
+      (<span class="${c.farm_profit?.change > 0 ? "positive" : (c.farm_profit?.change < 0 ? "negative" : "")}">${c.farm_profit?.change > 0 ? "+" : ""}${formatCurrency(c.farm_profit?.change)}</span> vs ${c.previous_year})
+      ${c.basis === "same_months_partial" ? `<span class="muted"> — ${c.note}</span>` : ""}
+    </li>`).join("");
+
+  box.innerHTML = `
+    <h4>${latest.year} vs ${latest.previous_year}</h4>
+    ${noteHtml}
+    <div class="overview-summary-grid">
+      ${yoyMetricCard("Income", latest.income)}
+      ${yoyMetricCard("Costs", latest.costs)}
+      ${yoyMetricCard("Farm Profit", latest.farm_profit)}
+      ${yoyMetricCard("Cash Generated", latest.cash_generated)}
+    </div>
+    ${olderRows ? `<h4>Earlier comparisons</h4><ul class="profit-outlook-list">${olderRows}</ul>` : ""}`;
+}
+
+async function loadYearOverYear() {
+  const box = $("yoy-summary");
+  if (box) box.innerHTML = `<p class="muted">Loading year-over-year comparison…</p>`;
+  try {
+    const data = await api(`/farmer/year-over-year${sectorsQuery()}`);
+    renderYearOverYear(data);
+  } catch (err) {
+    if (box) box.innerHTML = `<p class="muted">Could not load: ${err.message}</p>`;
+  }
 }
 
 function budgetStatusLabel(status) {

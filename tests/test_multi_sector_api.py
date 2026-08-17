@@ -116,6 +116,23 @@ def test_historical_data_endpoint():
     assert len(data["sectors"]) == 1
 
 
+def test_year_over_year_endpoint():
+    response = client.get(
+        "/api/farmer/year-over-year?farm_file=multi_sector_farm.json&sectors=dairy,beef,lamb"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["selected_sectors"] == ["dairy", "beef", "lamb"]
+    years = {row["year"]: row for row in data["years"]}
+    assert {2024, 2025} <= set(years.keys())
+    for row in years.values():
+        assert set(("year", "months_covered", "is_partial", "income", "costs", "farm_profit", "cash_generated")) <= set(row.keys())
+    comparisons = {c["year"]: c for c in data["comparisons"]}
+    assert 2025 in comparisons
+    assert comparisons[2025]["previous_year"] == 2024
+    assert comparisons[2025]["basis"] == "full_year"
+
+
 def test_cashflow_budget_endpoint():
     response = client.get(
         "/api/farmer/cashflow-budget?farm_file=multi_sector_farm.json&sectors=dairy,beef,lamb"

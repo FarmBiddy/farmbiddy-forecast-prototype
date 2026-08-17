@@ -44,6 +44,7 @@ from models.api_models import (
     FarmerReportPreviewResponse,
     SectorListResponse,
     FarmerHistoricalDataResponse,
+    YearOverYearResponse,
     CashFlowBudgetResponse,
     CashflowActionRequest,
     CashflowActionResponse,
@@ -93,6 +94,7 @@ from services.farmer_dashboard_service import (
     run_monte_carlo_for_farm,
     get_farmer_historical_data,
     get_cashflow_budget_comparison,
+    get_year_over_year_comparison,
     resolve_farm_file,
 )
 from services.scenario_sandbox_service import (
@@ -217,6 +219,26 @@ def farmer_historical_data(
 ):
     try:
         return FarmerHistoricalDataResponse(**get_farmer_historical_data(
+            farm_id, _parse_sectors_query(sectors),
+        ))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/year-over-year",
+    response_model=YearOverYearResponse,
+    tags=["Farmer Edition"],
+    summary="Previous Performance: year-over-year Income/Costs/Farm profit/Cash generated (P1.5)",
+)
+def farmer_year_over_year(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+):
+    try:
+        return YearOverYearResponse(**get_year_over_year_comparison(
             farm_id, _parse_sectors_query(sectors),
         ))
     except FileNotFoundError as error:

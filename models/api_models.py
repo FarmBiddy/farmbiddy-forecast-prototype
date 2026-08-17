@@ -552,6 +552,13 @@ class FarmerHistoricalDataResponse(BaseModel):
     sectors: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class YearOverYearResponse(BaseModel):
+    success: bool
+    selected_sectors: List[str] = Field(default_factory=list)
+    years: List[Dict[str, Any]] = Field(default_factory=list)
+    comparisons: List[Dict[str, Any]] = Field(default_factory=list)
+
+
 class CashFlowBudgetResponse(BaseModel):
     success: bool
     farm_name: str
