@@ -106,6 +106,24 @@ def test_zero_amount_items_are_skipped():
     assert budgets == []
 
 
+def test_completing_onboarding_persists_sectors_onto_the_farm_row_when_db_backed(isolated_db, monkeypatch):
+    """P3.6: onboarding for a brand new farm (no pre-existing dataset) sets
+    real, persisted Farm configuration - not just a read-time override."""
+    monkeypatch.setenv("PERSISTENCE_BACKEND", "db")
+    new_farm = "brand_new_onboarding_farm.json"
+
+    onboarding_svc.complete_onboarding(new_farm, _request(farm_type="dairy"))
+
+    from db.session import session_scope
+    from identity.seed import get_or_create_farm
+
+    with session_scope() as session:
+        farm = get_or_create_farm(session, new_farm)
+        assert farm.sectors == ["dairy"]
+        assert farm.settings["farm_type"] == "dairy"
+        assert farm.settings["farm_type_label"] == "Dairy"
+
+
 def test_status_reflects_completed_onboarding():
     onboarding_svc.complete_onboarding(FARM, _request())
     status = onboarding_svc.get_onboarding_status(FARM)

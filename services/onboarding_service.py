@@ -12,6 +12,7 @@ from __future__ import annotations
 import threading
 from datetime import date, datetime, timezone
 
+from config.settings import backend_for
 from models.financial_record import category_choices
 from models.onboarding import FARM_TYPE_LABELS
 from repositories.onboarding import get_repository
@@ -37,6 +38,27 @@ def _load(farm_file: str) -> dict:
 
 def _save(farm_file: str, data: dict) -> None:
     get_repository().save(farm_file, data)
+
+
+def _persist_farm_profile(farm_file: str, farm_type: str, sectors: list[str]) -> None:
+    """P3.6: Simple Farm Setup also updates the farm's first-class `Farm`
+    row (sectors, farm-type label) - not just the onboarding-overrides
+    record - so a brand new farm created purely through onboarding (no
+    pre-existing sample dataset) ends up with real, persisted farm
+    configuration rather than only a read-time override. A no-op when the
+    onboarding domain is still on the JSON backend (config/settings.py),
+    since there is no Farm row concept there.
+    """
+    if backend_for("ONBOARDING") != "db":
+        return
+    from db.session import session_scope
+    from identity.seed import get_or_create_farm
+
+    with session_scope() as session:
+        farm = get_or_create_farm(session, farm_file)
+        if sectors:
+            farm.sectors = sectors
+        farm.settings = {**(farm.settings or {}), "farm_type": farm_type, "farm_type_label": FARM_TYPE_LABELS.get(farm_type, farm_type.title())}
 
 
 def get_onboarding_overrides(farm_file: str) -> dict:
@@ -132,6 +154,7 @@ def complete_onboarding(farm_file: str, data: dict) -> dict:
             "completed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
         _save(farm_file, stored)
+        _persist_farm_profile(farm_file, farm_type, sectors_for_farm_type(farm_type) or [])
 
         total_income = round(sum(float(i["annual_amount"]) for i in income_items), 2)
         total_cost = round(sum(float(c["annual_amount"]) for c in other_cost_items) + combined_loan_annual, 2)
