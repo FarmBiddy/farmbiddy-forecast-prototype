@@ -1178,12 +1178,27 @@ function invalidateAdvancedForecast() {
 }
 
 async function ensureAdvancedForecast(showMsg = false) {
+  updateWhatIfSectorVisibility();
   const key = sectorCacheKey();
   if (state.advancedForecast && state.advancedForecastKey === key) {
     renderForecastResults(state.advancedForecast);
     return;
   }
   await runAdvancedForecast(showMsg);
+}
+
+function updateWhatIfSectorVisibility() {
+  // Milk price only means anything for a dairy enterprise - hide it for a
+  // farm that hasn't selected dairy rather than showing a preset/field that
+  // can never have a real effect (Multi-Sector Check: sector-specific
+  // functionality should only appear where applicable).
+  const hasDairy = (state.selectedSectors || []).includes("dairy");
+  document.querySelectorAll('[data-preset="milk_down"], [data-preset="milk_up"]').forEach((btn) => {
+    btn.classList.toggle("hidden", !hasDairy);
+  });
+  [$("sb-milk-cents"), $("sb-milk-pct"), $("sb-cows"), $("sb-litres")].forEach((input) => {
+    input?.closest("label")?.classList.toggle("hidden", !hasDairy);
+  });
 }
 
 const FARM_INTELLIGENCE_QUESTIONS = [
