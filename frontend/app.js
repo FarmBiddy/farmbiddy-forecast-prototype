@@ -979,29 +979,29 @@ function getSandboxInputs() {
 
 const REPORT_SECTIONS = {
   full: [
-    "Cover page and executive summary",
+    "Cover page and summary",
     "Farm profile and financial snapshot",
-    "Profitability and cashflow charts",
-    "12-month forecast and Monte Carlo",
-    "Scenario comparison table",
+    "Profitability and cash-flow charts",
+    "12-month forecast and profit outlook (best, likely & worst case)",
+    "What If? comparison table",
     "Financial intelligence and recommendations",
     "Risk dashboard and 90-day action plan",
     "Investment readiness score",
   ],
   executive: [
-    "Cover page and executive summary",
+    "Cover page and summary",
     "Financial intelligence highlights",
     "Top 5 recommended actions",
     "AI farm advisor summary",
   ],
   scenario: [
-    "Executive summary",
-    "Scenario comparison table and charts",
+    "Summary",
+    "What If? comparison table and charts",
     "Risk dashboard",
     "Recommended actions",
   ],
   investment: [
-    "Executive summary and financial snapshot",
+    "Summary and financial snapshot",
     "Investment readiness score",
     "AI advisor summary for banks and investors",
   ],
@@ -1612,8 +1612,8 @@ function budgetStatusLabel(status) {
 }
 
 function classificationLabel(classification) {
-  if (classification === "long_term") return "Long-term / structural";
-  if (classification === "short_term") return "Short-term";
+  if (classification === "long_term") return "Ongoing issue";
+  if (classification === "short_term") return "One-off / short-term";
   return "—";
 }
 
@@ -1643,9 +1643,9 @@ function renderCashflowBudgetTable(data) {
           <th>Month</th>
           <th>Actual Net</th>
           <th>Budgeted Net</th>
-          <th>Variance</th>
-          <th>Budget Status</th>
-          <th>Classification</th>
+          <th>Difference</th>
+          <th>vs Budget</th>
+          <th>Shortfall Type</th>
           <th>Why</th>
         </tr>
       </thead>

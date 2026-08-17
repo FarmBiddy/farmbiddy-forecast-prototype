@@ -1245,12 +1245,19 @@ span.small { font-size: 0.8rem; }
   .overview-summary-grid { grid-template-columns: repeat(2, 1fr); }
   .overview-metric-wide { grid-column: span 2; }
   .current-period-grid { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 768px) {
   .sidebar { width: 100%; position: relative; min-width: unset; }
   .main-wrap { margin-left: 0; width: 100%; padding: 1rem; }
   .app { flex-direction: column; }
+  /* Larger tap targets for the two workflows used on every visit: switching
+     main sections and switching sub-tabs within a section. */
+  .nav-link { padding: 0.85rem 0.9rem; min-height: 44px; display: flex; align-items: center; }
+  .subtab-btn { padding: 0.65rem 1rem; min-height: 40px; }
+  .btn-run, .btn-secondary { min-height: 44px; }
+  .ie-add-entry-btn, #ie-add-entry-btn, #cb-add-budget-btn { min-height: 44px; }
   .kpi-row, .exec-kpi-row { grid-template-columns: 1fr 1fr; }
   .health-snapshot { grid-template-columns: 1fr 1fr; }
   .fi-chat { max-height: 360px; min-height: 200px; }
@@ -1264,6 +1271,7 @@ span.small { font-size: 0.8rem; }
   .overview-summary-grid { grid-template-columns: 1fr; }
   .overview-metric-wide { grid-column: span 1; }
   .current-period-grid { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: 1fr; }
   .subtabs { gap: 0.3rem; }
   .subtab-btn { flex: 1 1 auto; text-align: center; }
 }
