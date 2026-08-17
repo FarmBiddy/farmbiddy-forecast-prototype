@@ -13,6 +13,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+      - key: PERSISTENCE_BACKEND
+        value: db
+      - key: IDENTITY_PROVIDER
+        value: dev
+      - key: FARMBIDDY_SEED_DEMO
+        value: "1"
 
 # ---------------------------------------------------------------------------
 # OPTIONAL — persistent storage (Render Starter plan or higher, ~$7/month)
