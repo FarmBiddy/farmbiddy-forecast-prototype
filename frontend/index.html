@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FarmBiddy Farmer Edition</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=19" />
+  <link rel="stylesheet" href="/assets/styles.css?v=20" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
@@ -591,23 +591,39 @@
         <div class="card">
           <h3>What If?</h3>
           <p class="muted">Try changing a few numbers and see what it would do to your profit, cash flow, and risk — nothing here is saved to your farm's real figures.</p>
-          <div class="sandbox-grid" id="sandbox-form">
-            <label>Milk price change (cents/L)<input type="number" step="0.5" id="sb-milk-cents" class="input-field" placeholder="e.g. 5" /></label>
-            <label>Milk price change (%)<input type="number" step="1" id="sb-milk-pct" class="input-field" placeholder="e.g. -10" /></label>
-            <label>Feed cost change (%)<input type="number" step="1" id="sb-feed-pct" class="input-field" /></label>
-            <label>Fertiliser change (%)<input type="number" step="1" id="sb-fert-pct" class="input-field" /></label>
-            <label>Labour change (%)<input type="number" step="1" id="sb-labour-pct" class="input-field" /></label>
-            <label>Vet change (%)<input type="number" step="1" id="sb-vet-pct" class="input-field" /></label>
-            <label>Fuel change (%)<input type="number" step="1" id="sb-fuel-pct" class="input-field" /></label>
-            <label>Electricity change (%)<input type="number" step="1" id="sb-elec-pct" class="input-field" /></label>
-            <label>Loan repayments (€/year)<input type="number" step="100" id="sb-loans" class="input-field" /></label>
-            <label>Milking cows<input type="number" step="1" id="sb-cows" class="input-field" /></label>
-            <label>Litres per cow<input type="number" step="50" id="sb-litres" class="input-field" /></label>
-            <label>Opening cash (€)<input type="number" step="500" id="sb-cash" class="input-field" /></label>
+
+          <p class="muted whatif-presets-label">Common questions — click one to see the impact straight away:</p>
+          <div class="whatif-presets" id="whatif-presets">
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="milk_down">Milk price drops 10c/L</button>
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="milk_up">Milk price rises 5c/L</button>
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="feed_up">Feed costs rise 15%</button>
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="fert_up">Fertiliser costs rise 20%</button>
+            <button type="button" class="btn-secondary whatif-preset-btn" data-preset="fuel_up">Fuel costs rise 25%</button>
           </div>
-          <button type="button" id="run-sandbox-btn" class="btn-run">See the Impact</button>
+
+          <details class="card overview-detail-toggle">
+            <summary>Customise your own scenario</summary>
+            <div class="overview-detail-body">
+              <div class="sandbox-grid" id="sandbox-form">
+                <label>Milk price change (cents/L)<input type="number" step="0.5" id="sb-milk-cents" class="input-field" placeholder="e.g. 5" /></label>
+                <label>Milk price change (%)<input type="number" step="1" id="sb-milk-pct" class="input-field" placeholder="e.g. -10" /></label>
+                <label>Feed cost change (%)<input type="number" step="1" id="sb-feed-pct" class="input-field" /></label>
+                <label>Fertiliser change (%)<input type="number" step="1" id="sb-fert-pct" class="input-field" /></label>
+                <label>Labour change (%)<input type="number" step="1" id="sb-labour-pct" class="input-field" /></label>
+                <label>Vet change (%)<input type="number" step="1" id="sb-vet-pct" class="input-field" /></label>
+                <label>Fuel change (%)<input type="number" step="1" id="sb-fuel-pct" class="input-field" /></label>
+                <label>Electricity change (%)<input type="number" step="1" id="sb-elec-pct" class="input-field" /></label>
+                <label>Loan repayments (€/year)<input type="number" step="100" id="sb-loans" class="input-field" /></label>
+                <label>Milking cows<input type="number" step="1" id="sb-cows" class="input-field" /></label>
+                <label>Litres per cow<input type="number" step="50" id="sb-litres" class="input-field" /></label>
+                <label>Opening cash (€)<input type="number" step="500" id="sb-cash" class="input-field" /></label>
+              </div>
+              <button type="button" id="run-sandbox-btn" class="btn-run">See the Impact</button>
+            </div>
+          </details>
         </div>
         <div id="sandbox-results" class="hidden">
+          <div id="whatif-active-label" class="whatif-active-label"></div>
           <div class="interpretation-box" id="sandbox-summary"></div>
           <span id="sandbox-period"></span>
           <div class="metric-grid" id="sandbox-comparison"></div>
@@ -662,6 +678,6 @@
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=13"></script>
+  <script src="/assets/app.js?v=14"></script>
 </body>
 </html>

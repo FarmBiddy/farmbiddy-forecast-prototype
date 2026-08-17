@@ -2584,16 +2584,29 @@ async function runAdvancedForecast(showMsg = true) {
   }
 }
 
-async function runSandbox() {
+const WHATIF_PRESETS = {
+  milk_down: { label: "Milk price drops 10c/L", inputs: { milk_price_cents_change: -10 } },
+  milk_up: { label: "Milk price rises 5c/L", inputs: { milk_price_cents_change: 5 } },
+  feed_up: { label: "Feed costs rise 15%", inputs: { feed_pct_change: 15 } },
+  fert_up: { label: "Fertiliser costs rise 20%", inputs: { fertiliser_pct_change: 20 } },
+  fuel_up: { label: "Fuel costs rise 25%", inputs: { fuel_pct_change: 25 } },
+};
+
+async function runSandbox(overrideInputs = null, label = "Custom scenario") {
   const btn = $("run-sandbox-btn");
   if (btn) btn.disabled = true;
+  if (!overrideInputs) {
+    document.querySelectorAll(".whatif-preset-btn").forEach((b) => b.classList.remove("active"));
+  }
   showStatus("Running scenario…", "info");
   try {
+    const inputs = overrideInputs || getSandboxInputs();
     const data = await api("/farmer/scenario-sandbox", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: sectorsBody(getSandboxInputs()),
+      body: sectorsBody(inputs),
     });
+    if ($("whatif-active-label")) $("whatif-active-label").textContent = label;
     renderSandboxResults(data);
     showStatus("Scenario complete.", "success");
   } catch (err) {
@@ -2601,6 +2614,13 @@ async function runSandbox() {
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+function runWhatIfPreset(presetKey, btn) {
+  const preset = WHATIF_PRESETS[presetKey];
+  if (!preset) return;
+  document.querySelectorAll(".whatif-preset-btn").forEach((b) => b.classList.toggle("active", b === btn));
+  runSandbox(preset.inputs, preset.label);
 }
 
 function renderCashflowActionsResults(data) {
@@ -2696,7 +2716,10 @@ function setupNav() {
     });
   });
   setupSubtabs();
-  $("run-sandbox-btn")?.addEventListener("click", runSandbox);
+  $("run-sandbox-btn")?.addEventListener("click", () => runSandbox());
+  document.querySelectorAll(".whatif-preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => runWhatIfPreset(btn.dataset.preset, btn));
+  });
   $("test-all-actions-btn")?.addEventListener("click", testAllCashflowActions);
   $("test-one-action-btn")?.addEventListener("click", testOneCashflowAction);
   $("sector-select")?.querySelectorAll("input[data-sector]").forEach((input) => {

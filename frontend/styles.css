@@ -1001,6 +1001,28 @@ span.small { font-size: 0.8rem; }
   height: 1rem;
 }
 
+.whatif-presets-label { margin-bottom: 0.5rem; }
+.whatif-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+.whatif-preset-btn { margin-top: 0; }
+.whatif-preset-btn.active {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+.whatif-active-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.4rem;
+}
+
 .sandbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
