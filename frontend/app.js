@@ -1736,7 +1736,7 @@ function renderCashflowBudgetTable(data) {
   const table = $("cashflow-budget-table");
   if (!table) return;
   if (!entries.length) {
-    table.innerHTML = `<p class="muted">No overlapping budget and actual months found.</p>`;
+    table.innerHTML = `<p class="muted">No months with both a budget and an actual figure to compare yet.</p>`;
     return;
   }
   table.innerHTML = `
