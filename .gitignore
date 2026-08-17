@@ -38,6 +38,9 @@ outputs/daily_updates.json
 outputs/*.db
 outputs/*.db-journal
 
+# P3.7: local backup/export artefacts (operator-generated, not source)
+outputs/backups/
+
 # IDE / editor
 .cursor/
 .vscode/
