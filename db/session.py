@@ -14,13 +14,36 @@ import sys
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from config.settings import DATABASE_URL, IS_SQLITE
 
+
+def enable_sqlite_foreign_keys(target_engine: Engine) -> None:
+    """SQLite does not enforce `FOREIGN KEY` constraints unless a session
+    explicitly turns it on (`PRAGMA foreign_keys = ON`) - unlike PostgreSQL,
+    where they are always enforced. Without this, a bug that inserts, say,
+    a `financial_records` row with a `farm_id` that does not exist would
+    silently succeed in SQLite (dev/test) and only be caught in production
+    (Postgres) - exactly the kind of accidental SQLite-only behaviour the
+    architecture is supposed to avoid. Applied to every new DBAPI
+    connection this engine opens; a no-op for non-SQLite engines.
+    """
+    if not str(target_engine.url).startswith("sqlite"):
+        return
+
+    @event.listens_for(target_engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
 _connect_args = {"check_same_thread": False} if IS_SQLITE else {}
 engine = create_engine(DATABASE_URL, connect_args=_connect_args, future=True)
+enable_sqlite_foreign_keys(engine)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
 
 

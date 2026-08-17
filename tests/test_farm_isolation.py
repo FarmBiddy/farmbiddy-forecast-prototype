@@ -140,18 +140,30 @@ def test_ownerless_farm_is_adopted_by_first_toucher(isolated_db):
     """A freshly created farm (e.g. via onboarding, P3.6) has no owner yet -
     the first identity to touch it becomes its owner, so "create your farm"
     needs no separate manual membership step."""
-    identity = RequestIdentity(user_id="new-user-1", display_name="New Farmer", is_dev_placeholder=False)
+    from db.orm_models import User
+    from db.session import session_scope
+
+    # A real `User` row, not a fabricated id: `farm_memberships.user_id` is
+    # a NOT NULL foreign key to `users.id`, enforced for real once SQLite
+    # foreign-key checking is turned on (see db.session.enable_sqlite_foreign_keys) -
+    # exactly like it always has been on PostgreSQL.
+    with session_scope() as session:
+        user = User(display_name="New Farmer", is_dev_placeholder="false")
+        session.add(user)
+        session.flush()
+        user_id = user.id
+
+    identity = RequestIdentity(user_id=user_id, display_name="New Farmer", is_dev_placeholder=False)
     new_farm_file = "brand_new_farm.json"
 
     enforce_farm_access(identity, new_farm_file, write=True)  # must not raise
 
     from db.orm_models import FarmMembership
-    from db.session import session_scope
     with session_scope() as session:
         farm = get_or_create_farm(session, new_farm_file)
         membership = (
             session.query(FarmMembership)
-            .filter(FarmMembership.user_id == "new-user-1", FarmMembership.farm_id == farm.id)
+            .filter(FarmMembership.user_id == user_id, FarmMembership.farm_id == farm.id)
             .one_or_none()
         )
         assert membership is not None
@@ -274,6 +286,23 @@ def test_api_denies_cross_farm_read_and_write(two_farms_two_owners):
             json={"record_type": "expense", "category": "feed", "year": 2026, "month": 1, "amount": 50.0},
         )
         assert cross_budget.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_current_identity, None)
+
+
+def test_api_denies_cross_farm_data_export(two_farms_two_owners):
+    """P3.7 backup/export must never let one farm export another farm's
+    data merely by supplying a different farm_file - it goes through the
+    exact same enforce_farm_access gate as every other farm-owned route."""
+    ctx = two_farms_two_owners
+    app.dependency_overrides[get_current_identity] = lambda: ctx["identity_a"]
+    try:
+        own_export = client.get("/farmer/farm-data/export", params={"farm_file": FARM_A})
+        assert own_export.status_code == 200
+        assert own_export.json()["farm_file"] == FARM_A
+
+        cross_export = client.get("/farmer/farm-data/export", params={"farm_file": FARM_B})
+        assert cross_export.status_code == 403
     finally:
         app.dependency_overrides.pop(get_current_identity, None)
 

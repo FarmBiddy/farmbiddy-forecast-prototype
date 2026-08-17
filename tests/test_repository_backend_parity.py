@@ -93,6 +93,8 @@ class TestFinancialRecordsParity:
         assert duplicate is not None and duplicate["id"] == record["id"]
 
         assert len(list_financial_records(FARM)) == 2
+        assert len(list_financial_records(FARM, record_type="income")) == 2
+        assert len(list_financial_records(FARM, category="does_not_exist")) == 0
         assert get_financial_record(FARM, record["id"])["amount"] == pytest.approx(1000.0)
 
         updated = update_financial_record(FARM, record["id"], {"amount": 1250.0})
@@ -139,6 +141,35 @@ class TestDocumentsParity:
         assert document["linked_financial_record_id"]
         assert len(list_financial_records(FARM)) == 1
 
+    def test_list_filter_delete_and_missing_document(self, documents_backend):
+        from services.document_service import (
+            DocumentNotFoundError,
+            add_document,
+            delete_document,
+            get_document,
+            list_documents,
+        )
+
+        invoice = add_document(FARM, {
+            "document_type": "invoice", "record_type": "expense", "date": "2026-02-07",
+            "counterparty": "Parts Supplier", "amount": 200.0, "category": "machinery",
+            "payment_status": "unpaid", "description": "Parts invoice",
+        })
+        add_document(FARM, {
+            "document_type": "receipt", "record_type": "expense", "date": "2026-02-08",
+            "counterparty": "Fuel Depot", "amount": 90.0, "category": "fuel",
+            "payment_status": "paid", "description": "Diesel top-up",
+        })
+
+        assert len(list_documents(FARM)) == 2
+        assert len(list_documents(FARM, document_type="invoice")) == 1
+        assert len(list_documents(FARM, payment_status="paid")) == 1
+
+        delete_document(FARM, invoice["id"])
+        assert len(list_documents(FARM)) == 1
+        with pytest.raises(DocumentNotFoundError):
+            get_document(FARM, invoice["id"])
+
 
 class TestCategoryBudgetsParity:
     def test_monthly_upsert_annual_allocation_and_missing_budget_state(self, category_budgets_backend):
@@ -174,6 +205,28 @@ class TestCategoryBudgetsParity:
         # No budget was ever set for "labour" - callers must see an
         # explicit absence, never a fabricated zero.
         assert ("expense", "labour", 2026, 3) not in lookup
+
+    def test_delete_and_missing_budget(self, category_budgets_backend):
+        from services.category_budget_service import (
+            CategoryBudgetNotFoundError,
+            get_category_budget,
+            list_category_budgets,
+            set_monthly_budget,
+        )
+
+        budget = set_monthly_budget(FARM, {
+            "sector": None, "record_type": "expense", "category": "fuel",
+            "year": 2026, "month": 4, "amount": 150.0,
+        })
+        assert len(list_category_budgets(FARM, year=2026, category="fuel")) == 1
+
+        from services.category_budget_service import delete_category_budget
+        delete_category_budget(FARM, budget["id"])
+        assert list_category_budgets(FARM, year=2026, category="fuel") == []
+        with pytest.raises(CategoryBudgetNotFoundError):
+            get_category_budget(FARM, budget["id"])
+        with pytest.raises(CategoryBudgetNotFoundError):
+            delete_category_budget(FARM, "does-not-exist")
 
 
 class TestOnboardingParity:

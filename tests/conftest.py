@@ -19,6 +19,7 @@ def isolated_db(tmp_path, monkeypatch):
         connect_args={"check_same_thread": False},
         future=True,
     )
+    db_session.enable_sqlite_foreign_keys(engine)
     session_local = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
     monkeypatch.setattr(db_session, "engine", engine)
     monkeypatch.setattr(db_session, "SessionLocal", session_local)

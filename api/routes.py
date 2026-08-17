@@ -137,6 +137,7 @@ from services.document_service import (
     update_document,
 )
 from services.onboarding_service import complete_onboarding, get_onboarding_status
+from scripts.farm_data_export import export_farm
 
 router = APIRouter()
 
@@ -663,6 +664,28 @@ def farmer_delete_category_budget(
         return CategoryBudgetDeleteResponse(success=True, deleted_id=budget_id)
     except CategoryBudgetNotFoundError as error:
         raise HTTPException(status_code=404, detail=f"Category budget not found: {error}") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/farm-data/export",
+    tags=["Farmer Edition"],
+    summary="Export one farm's owned financial data as JSON (P3.7 backup/recovery) - membership required",
+)
+def farmer_export_farm_data(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
+):
+    """The API-level, access-controlled counterpart to
+    `scripts/farm_data_export.py`'s CLI export - same underlying function,
+    but reachable only for a farm the caller actually has membership on
+    (`enforce_farm_access`), so one farm can never export another farm's
+    data merely by supplying a different `farm_file`."""
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file)
+        return export_farm(farm_file)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
