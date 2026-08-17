@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -51,6 +52,18 @@ def test_run_analysis_all_sectors():
     for loan in data["debt_register"]:
         assert "outstanding_balance" in loan
         assert "years_remaining" in loan
+    # P1.4: Loans & Finance summary-first view — total debt/annual repayments
+    # re-derived from the same debt register, plus a "next loan to clear".
+    loans_summary = data["loans_summary"]
+    assert loans_summary["loan_count"] == 2
+    assert loans_summary["total_outstanding_debt"] == pytest.approx(
+        sum(loan["outstanding_balance"] for loan in data["debt_register"]),
+    )
+    assert loans_summary["total_annual_repayments"] == pytest.approx(
+        sum(loan["monthly_repayment"] for loan in data["debt_register"]) * 12,
+    )
+    assert loans_summary["next_loan_to_clear"]["lender"] in {loan["lender"] for loan in data["debt_register"]}
+    assert loans_summary["loans"] == data["debt_register"]
     # Phase 6: month-by-month early cash-flow warnings should surface alongside
     # the legacy annual-level alerts when the farm's monthly forecast dips negative.
     alert_messages = " | ".join(a["message"] for a in data["alerts"])

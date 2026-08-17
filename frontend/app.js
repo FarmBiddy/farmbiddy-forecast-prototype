@@ -383,6 +383,38 @@ function renderSectorTable(rows) {
     </table>`;
 }
 
+function renderLoansSummary(summary) {
+  const box = $("loans-summary");
+  const warningBox = $("loans-low-cash-warning");
+  if (!box) return;
+  if (!summary || !summary.loan_count) {
+    box.innerHTML = `<p class="muted">No outstanding loans on record.</p>`;
+    warningBox?.classList.add("hidden");
+    return;
+  }
+
+  const nextLoan = summary.next_loan_to_clear;
+  const nextLoanSub = nextLoan
+    ? `${nextLoan.years_remaining} yrs remaining, ${formatCurrency(nextLoan.monthly_repayment)}/mo freed up after`
+    : "";
+
+  box.innerHTML = [
+    overviewMetricCard("Total Debt", formatCurrency(summary.total_outstanding_debt), `${summary.loan_count} loan(s) outstanding`),
+    overviewMetricCard("Annual Repayments", formatCurrency(summary.total_annual_repayments), "Across all loans, per year"),
+    overviewMetricCard("Next Loan to Clear", nextLoan ? nextLoan.lender : "—", nextLoanSub),
+  ].join("");
+
+  if (warningBox) {
+    if (summary.low_cash_interaction) {
+      warningBox.classList.remove("hidden");
+      warningBox.innerHTML = `<ul class="alert-list">${renderAlertListItem(summary.low_cash_interaction)}</ul>`;
+    } else {
+      warningBox.classList.add("hidden");
+      warningBox.innerHTML = "";
+    }
+  }
+}
+
 function renderDebtRegister(loans) {
   const box = $("debt-register-table");
   if (!box) return;
@@ -721,26 +753,28 @@ function renderCashPositionChart(cashPosition) {
   });
 }
 
+function renderAlertListItem(a) {
+  if (typeof a === "string") return `<li class="alert-medium">${a}</li>`;
+  const sev = a.severity || "medium";
+  const rows = [];
+  if (a.cause || a.why) rows.push(`<div class="alert-detail"><strong>Why:</strong> ${a.cause || a.why}</div>`);
+  if (a.review) rows.push(`<div class="alert-detail"><strong>Review:</strong> ${a.review}</div>`);
+  return `
+    <li class="alert-${sev}">
+      <div class="alert-headline-row">
+        <span class="alert-headline">${a.what || a.message}</span>
+        ${a.when ? `<span class="alert-badge">${a.when}</span>` : ""}
+      </div>
+      ${a.message ? `<div class="alert-message muted">${a.message}</div>` : ""}
+      ${rows.join("")}
+    </li>`;
+}
+
 function renderExecutiveAlerts(alerts, listId = "alerts-list") {
   const list = $(listId);
   if (!list) return;
   const items = alerts?.length ? alerts : [{ message: "Nothing needs your attention right now.", severity: "info" }];
-  list.innerHTML = items.map((a) => {
-    if (typeof a === "string") return `<li class="alert-medium">${a}</li>`;
-    const sev = a.severity || "medium";
-    const rows = [];
-    if (a.cause) rows.push(`<div class="alert-detail"><strong>Why:</strong> ${a.cause}</div>`);
-    if (a.review) rows.push(`<div class="alert-detail"><strong>Review:</strong> ${a.review}</div>`);
-    return `
-      <li class="alert-${sev}">
-        <div class="alert-headline-row">
-          <span class="alert-headline">${a.what || a.message}</span>
-          ${a.when ? `<span class="alert-badge">${a.when}</span>` : ""}
-        </div>
-        <div class="alert-message muted">${a.message}</div>
-        ${rows.join("")}
-      </li>`;
-  }).join("");
+  list.innerHTML = items.map(renderAlertListItem).join("");
 }
 
 function overviewMetricCard(label, valueHtml, subHtml, extraClass = "") {
@@ -835,6 +869,7 @@ function renderExecutiveDashboard(data) {
   renderExecutiveAlerts(data.needs_attention, "alerts-full");
   updateAlertsNavHighlight(data.needs_attention);
   renderOverviewChart(data.overview_chart);
+  renderLoansSummary(data.loans_summary);
   renderDebtRegister(data.debt_register);
 }
 

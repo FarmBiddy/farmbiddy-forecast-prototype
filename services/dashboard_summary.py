@@ -36,6 +36,7 @@ from services.multi_sector_farm import (
     load_multi_sector_farm,
 )
 from services.financial_record_service import list_financial_records
+from services.loans_service import build_loans_summary
 
 ALERT_PRIORITY = {
     "negative profit": 1,
@@ -874,6 +875,7 @@ def build_executive_dashboard(
         "overview_chart": build_overview_chart_data(filtered_raw),
         "forecast_summary": summary,
         "debt_register": debt_register,
+        "loans_summary": build_loans_summary(debt_register, alerts),
         "data_quality_warnings": build_data_quality_warnings(
             farm_enriched, profile, summary,
             monthly_forecast=monthly_forecast,

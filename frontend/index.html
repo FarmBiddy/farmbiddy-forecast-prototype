@@ -138,6 +138,7 @@
             <button type="button" class="subtab-btn" data-subtab="cashflow-budget">Budget vs Actual</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-income-expenses">Income &amp; Expenses</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-documents">Invoices &amp; Receipts</button>
+            <button type="button" class="subtab-btn" data-subtab="cashflow-loans">Loans &amp; Finance</button>
           </div>
         </div>
 
@@ -354,6 +355,20 @@
             <div id="doc-list" class="ie-records-list"></div>
           </div>
         </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="cashflow-loans">
+          <div class="card">
+            <h3>Loans &amp; Finance</h3>
+            <p class="muted">What you owe, what it costs you per year, and what's due to clear first.</p>
+            <div id="loans-summary" class="overview-summary-grid"></div>
+            <div id="loans-low-cash-warning" class="hidden"></div>
+          </div>
+          <div class="card">
+            <h3>Individual Loans</h3>
+            <p class="muted">Per-lender outstanding balance and years remaining (estimated from principal, rate, repayment, and maturity)</p>
+            <div id="debt-register-table" class="table-wrap"></div>
+          </div>
+        </div>
       </section>
 
       <!-- Farm Performance: whole-farm and per-sector results, historical trend -->
@@ -553,9 +568,7 @@
       <section class="view hidden" id="view-farm-data">
         <div class="card"><h3>My Farm Profile</h3><div id="farm-profile-detail" class="profile-grid"></div></div>
         <div class="card">
-          <h3>Debt Register</h3>
-          <p class="muted">Per-lender outstanding balance and years remaining (estimated from principal, rate, repayment, and maturity)</p>
-          <div id="debt-register-table" class="table-wrap"></div>
+          <p class="muted">Looking for loan details? See <strong>Cash Flow &rarr; Loans &amp; Finance</strong>.</p>
         </div>
       </section>
 
@@ -645,6 +658,6 @@
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=11"></script>
+  <script src="/assets/app.js?v=12"></script>
 </body>
 </html>

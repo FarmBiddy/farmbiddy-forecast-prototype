@@ -537,6 +537,7 @@ class FarmerAnalysisResponse(BaseModel):
     forecast_summary: Optional[Dict[str, Any]] = None
     selected_sectors: List[str] = Field(default_factory=list)
     debt_register: List[Dict[str, Any]] = Field(default_factory=list)
+    loans_summary: Dict[str, Any] = Field(default_factory=dict)
     data_quality_warnings: List[Dict[str, Any]] = Field(default_factory=list)
     needs_attention: List[Dict[str, Any]] = Field(default_factory=list)
     # Legacy alias used by KPI row during initial load
