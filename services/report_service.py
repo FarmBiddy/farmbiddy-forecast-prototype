@@ -43,9 +43,14 @@ from forecast_engine.revenue import calculate_revenue
 from forecast_engine.risk_level import calculate_risk_level
 from forecast_engine.scenarios import calculate_scenarios
 from models.api_models import ForecastOutputs, SandboxOutputs
+from services.category_variance_service import build_category_budget_vs_actual
+from services.dashboard_summary import generate_dashboard_alerts
 from services.farmer_dashboard_service import get_farmer_profile, resolve_farm_file, resolve_sectors
 from services.financial_intelligence_service import get_financial_intelligence
 from services.forecast_service import run_forecast, run_sandbox_forecast
+from services.historical_performance_service import build_year_over_year_comparison
+from services.income_expense_service import build_income_expense_summary
+from services.loans_service import build_loans_summary
 from services.multi_sector_farm import load_farm_for_analysis
 
 SOFTWARE_VERSION = "1.0.0"
@@ -63,6 +68,7 @@ REPORT_TYPES = {
     "full": "Full Financial Report",
     "scenario": "Scenario Report",
     "investment": "Investment Report",
+    "accountant": "Accountant / Advisor Summary",
 }
 
 PAGE_SETS: dict[str, list[str]] = {
@@ -79,6 +85,15 @@ PAGE_SETS: dict[str, list[str]] = {
     ],
     "investment": [
         "cover", "executive", "snapshot", "investment", "advisor", "closing",
+    ],
+    # Actual recorded figures an accountant/advisor needs (Income & Expenses,
+    # category Budget vs Actual, Loans & Finance, year-over-year) rather than
+    # the farmer's own forecast/scenario/Monte Carlo planning tools - built
+    # entirely from the same P0-P1 Actuals services the live app uses, never
+    # a second copy of that logic.
+    "accountant": [
+        "cover", "executive", "income_expenses_actual", "budget_variance",
+        "loans_finance", "year_over_year", "closing",
     ],
 }
 
@@ -481,6 +496,19 @@ def collect_report_data(
     opening = farm.get("opening_cash_balance", 0)
     end_cash = monthly[-1].get("running_balance", opening) if monthly else opening
 
+    income_expense_actual = build_income_expense_summary(farm_file, selected)
+    budget_variance = build_category_budget_vs_actual(farm_file, selected)
+    # build_loans_summary needs the same dict-shaped {what, when, ...} alerts
+    # the live dashboard uses to spot a "loan repayment lands in a low-cash
+    # month" overlap - the plain-string `forecast_run["alerts"]` below comes
+    # from the older forecast_engine.alerts shape and cannot be looked up by
+    # `what`, so it is recomputed here exactly as
+    # `dashboard_summary.build_executive_dashboard` already does.
+    debt_register = farm.get("debt_register") or []
+    dashboard_alerts = generate_dashboard_alerts(farm, summary, kpis, monthly_forecast=monthly, debt_register=debt_register)
+    loans_summary = build_loans_summary(debt_register, dashboard_alerts)
+    year_over_year = build_year_over_year_comparison(farm_file, selected)
+
     cost_breakdown = {
         "Feed": farm.get("feed", 0),
         "Fertiliser": farm.get("fertiliser", 0),
@@ -537,6 +565,10 @@ def collect_report_data(
         "risk_dashboard": risk_rows,
         "investment_readiness": investment,
         "alerts": forecast_run.get("alerts", []),
+        "income_expense_actual": income_expense_actual,
+        "budget_variance": budget_variance,
+        "loans_summary": loans_summary,
+        "year_over_year": year_over_year,
     }
 
 
@@ -1026,6 +1058,198 @@ def _page_investment(data: dict, st: dict) -> list:
     ]
 
 
+def _category_totals_table(rows: list[dict], header: str) -> Table:
+    table_rows = [[Paragraph(f"<b>{header}</b>", ParagraphStyle("h", fontSize=9, textColor=WHITE)),
+                   Paragraph("<b>Actual</b>", ParagraphStyle("h2", fontSize=9, textColor=WHITE, alignment=TA_CENTER))]]
+    for row in rows:
+        table_rows.append([row.get("label", row.get("category_id", "")), format_currency(row.get("total", 0))])
+    table = Table(table_rows, colWidths=[10 * cm, 4 * cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return table
+
+
+def _page_income_expenses_actual(data: dict, st: dict) -> list:
+    """Actual recorded income/expenses (dataset + the farmer's own manual
+    entries) - the real accounting figures, distinct from any forecast or
+    scenario elsewhere in this report."""
+    ie = data.get("income_expense_actual") or {}
+    story = [
+        Paragraph("Income & Expenses — Actual", st["title"]),
+        Paragraph(
+            "Recorded income and expenses for the last 12 months, combining the farm's "
+            "records with any transactions the farmer has logged directly in FarmBiddy.",
+            st["muted"],
+        ),
+        Spacer(1, 0.3 * cm),
+    ]
+    cards = _kpi_cards([
+        ("Total Income", format_currency(ie.get("income_total", 0)), GREEN),
+        ("Total Expenses", format_currency(ie.get("expense_total", 0)), NAVY),
+        ("Net Difference", format_currency(ie.get("difference", 0)),
+         GREEN if ie.get("difference", 0) >= 0 else RED),
+    ])
+    story += [cards, Spacer(1, 0.4 * cm)]
+    if ie.get("income_categories"):
+        story += [Paragraph("Income by Category", st["h3"]), _category_totals_table(ie["income_categories"], "Category"), Spacer(1, 0.4 * cm)]
+    if ie.get("expense_categories"):
+        story += [Paragraph("Expenses by Category", st["h3"]), _category_totals_table(ie["expense_categories"], "Category"), Spacer(1, 0.3 * cm)]
+    if ie.get("manual_income_total") or ie.get("manual_expense_total"):
+        story.append(Paragraph(
+            f"Of the above, {format_currency(ie.get('manual_income_total', 0))} income and "
+            f"{format_currency(ie.get('manual_expense_total', 0))} expenses were entered directly "
+            "by the farmer (not part of the underlying farm dataset).",
+            st["muted"],
+        ))
+    story.append(PageBreak())
+    return story
+
+
+def _page_budget_variance(data: dict, st: dict) -> list:
+    """Category-level Budget vs Actual - only for categories the farmer has
+    actually set a budget for; unbudgeted categories are listed separately
+    rather than shown with a fabricated zero variance."""
+    bv = data.get("budget_variance") or {}
+    story = [
+        Paragraph("Budget vs Actual — By Category", st["title"]),
+        Paragraph(bv.get("overall_summary", "No category budgets have been set yet."), st["body"]),
+        Spacer(1, 0.3 * cm),
+    ]
+    categories = bv.get("categories") or []
+    if categories:
+        rows = [["Category", "Budget", "Actual", "Difference", "Status"]]
+        for row in categories:
+            rows.append([
+                row["label"],
+                format_currency(row["budget_total"]),
+                format_currency(row["actual_total"]),
+                format_currency(row["difference"]),
+                row["status"].replace("_", " ").title(),
+            ])
+        table = Table(rows, colWidths=[4.5 * cm, 2.8 * cm, 2.8 * cm, 2.8 * cm, 2.7 * cm])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story += [table, Spacer(1, 0.4 * cm)]
+    unbudgeted = bv.get("unbudgeted_categories") or []
+    if unbudgeted:
+        labels = ", ".join(row["label"] for row in unbudgeted)
+        story.append(Paragraph(f"<b>No budget set yet for:</b> {labels}.", st["muted"]))
+    story.append(PageBreak())
+    return story
+
+
+def _page_loans_finance(data: dict, st: dict) -> list:
+    """Summary-first presentation of the farm's debt register - the same
+    figures the Loans & Finance page in the app already shows."""
+    loans = data.get("loans_summary") or {}
+    next_loan = loans.get("next_loan_to_clear")
+    story = [Paragraph("Loans & Finance", st["title"])]
+    cards = _kpi_cards([
+        ("Total Outstanding Debt", format_currency(loans.get("total_outstanding_debt", 0)), NAVY),
+        ("Annual Repayments", format_currency(loans.get("total_annual_repayments", 0)), NAVY),
+        ("Next Loan to Clear", next_loan.get("lender", "—") if next_loan else "None outstanding", GREEN),
+    ])
+    story += [cards, Spacer(1, 0.4 * cm)]
+    register = loans.get("loans") or []
+    if register:
+        rows = [["Lender", "Outstanding", "Monthly Repayment", "Months Remaining"]]
+        for loan in register:
+            rows.append([
+                loan.get("lender", "—"),
+                format_currency(loan.get("outstanding_balance", 0)),
+                format_currency(loan.get("monthly_repayment", 0)),
+                str(loan.get("months_remaining", "—")),
+            ])
+        table = Table(rows, colWidths=[5 * cm, 3.5 * cm, 3.8 * cm, 3.7 * cm])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(table)
+    else:
+        story.append(Paragraph("No loans on record for this farm.", st["body"]))
+    story.append(PageBreak())
+    return story
+
+
+def _page_year_over_year(data: dict, st: dict) -> list:
+    """Year-over-year comparison of Income, Costs, Farm Profit, and Cash
+    Generated - restricted to like-for-like months whenever a year is
+    partial, exactly as the app's Previous Performance page does."""
+    yoy = data.get("year_over_year") or {}
+    story = [Paragraph("Previous Performance — Year on Year", st["title"])]
+    years = yoy.get("years") or []
+    if years:
+        rows = [["Year", "Income", "Costs", "Farm Profit", "Cash Generated", "Coverage"]]
+        for year_row in years:
+            coverage = f"{year_row['months_covered']} of 12 months" if year_row.get("is_partial") else "Full year"
+            rows.append([
+                str(year_row["year"]),
+                format_currency(year_row["income"]),
+                format_currency(year_row["costs"]),
+                format_currency(year_row["farm_profit"]),
+                format_currency(year_row["cash_generated"]),
+                coverage,
+            ])
+        table = Table(rows, colWidths=[1.8 * cm, 2.9 * cm, 2.9 * cm, 2.9 * cm, 2.9 * cm, 2.6 * cm])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story += [table, Spacer(1, 0.4 * cm)]
+    else:
+        story.append(Paragraph("Not enough recorded history yet to compare years.", st["body"]))
+    for comparison in yoy.get("comparisons") or []:
+        note = comparison.get("note")
+        story.append(Paragraph(
+            f"<b>{comparison['year']} vs {comparison['previous_year']}</b>"
+            + (f" — {note}" if note else ""),
+            st["h3"],
+        ))
+        for metric_key, metric_label in (
+            ("income", "Income"), ("costs", "Costs"),
+            ("farm_profit", "Farm Profit"), ("cash_generated", "Cash Generated"),
+        ):
+            metric = comparison.get(metric_key)
+            if not metric:
+                continue
+            change_pct = f" ({metric['change_pct']:+.1f}%)" if metric.get("change_pct") is not None else ""
+            story.append(Paragraph(
+                f"{metric_label}: {format_currency(metric['current'])} vs {format_currency(metric['previous'])} "
+                f"({format_currency(metric['change'])}{change_pct})",
+                st["body"],
+            ))
+        story.append(Spacer(1, 0.2 * cm))
+    story.append(PageBreak())
+    return story
+
+
 def _page_closing(data: dict, st: dict) -> list:
     return [
         Spacer(1, 5 * cm),
@@ -1055,6 +1279,10 @@ PAGE_BUILDERS = {
     "advisor": lambda d, s, c: _page_advisor(d, s),
     "action_plan": lambda d, s, c: _page_action_plan(d, s),
     "investment": lambda d, s, c: _page_investment(d, s),
+    "income_expenses_actual": lambda d, s, c: _page_income_expenses_actual(d, s),
+    "budget_variance": lambda d, s, c: _page_budget_variance(d, s),
+    "loans_finance": lambda d, s, c: _page_loans_finance(d, s),
+    "year_over_year": lambda d, s, c: _page_year_over_year(d, s),
     "closing": lambda d, s, c: _page_closing(d, s),
 }
 

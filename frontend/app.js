@@ -1022,6 +1022,13 @@ const REPORT_SECTIONS = {
     "Investment readiness score",
     "AI advisor summary for banks and investors",
   ],
+  accountant: [
+    "Cover page and summary",
+    "Income & Expenses — actual recorded figures",
+    "Budget vs Actual by category",
+    "Loans & Finance summary",
+    "Previous Performance — year on year",
+  ],
 };
 
 function initReportDate() {
