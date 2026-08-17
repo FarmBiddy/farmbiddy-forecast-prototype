@@ -4,7 +4,10 @@ FarmBiddy API routes — shared by /api/... and legacy root paths.
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from identity.access import enforce_farm_access
+from identity.context import RequestIdentity, get_current_identity
 
 from models.api_models import (
     AnalyseRequest,
@@ -298,9 +301,11 @@ def farmer_list_financial_records(
     sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
     record_type: Optional[str] = Query(default=None, description="income or expense"),
     category: Optional[str] = Query(default=None),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file)
         records = list_financial_records(
             farm_file,
             sectors=_parse_sectors_query(sectors),
@@ -321,9 +326,11 @@ def farmer_list_financial_records(
 def farmer_add_financial_record(
     record: FinancialRecordCreate,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         created, duplicate = add_financial_record(farm_file, record.model_dump())
         return FinancialRecordResponse(
             success=True,
@@ -347,9 +354,11 @@ def farmer_update_financial_record(
     record_id: str,
     changes: FinancialRecordUpdate,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         updated = update_financial_record(farm_file, record_id, changes.model_dump(exclude_unset=True))
         return FinancialRecordResponse(success=True, record=updated)
     except FinancialRecordNotFoundError as error:
@@ -369,9 +378,11 @@ def farmer_update_financial_record(
 def farmer_delete_financial_record(
     record_id: str,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         delete_financial_record(farm_file, record_id)
         return FinancialRecordDeleteResponse(success=True, deleted_id=record_id)
     except FinancialRecordNotFoundError as error:
@@ -391,9 +402,11 @@ def farmer_list_documents(
     sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
     document_type: Optional[str] = Query(default=None, description="invoice or receipt"),
     payment_status: Optional[str] = Query(default=None, description="unpaid or paid"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file)
         documents = list_documents(
             farm_file,
             sectors=_parse_sectors_query(sectors),
@@ -414,9 +427,11 @@ def farmer_list_documents(
 def farmer_add_document(
     document: DocumentCreate,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         created = add_document(farm_file, document.model_dump())
         return DocumentResponse(success=True, document=created)
     except FileNotFoundError as error:
@@ -435,9 +450,11 @@ def farmer_update_document(
     document_id: str,
     changes: DocumentUpdate,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         updated = update_document(farm_file, document_id, changes.model_dump(exclude_unset=True))
         return DocumentResponse(success=True, document=updated)
     except DocumentNotFoundError as error:
@@ -457,9 +474,11 @@ def farmer_update_document(
 def farmer_delete_document(
     document_id: str,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         delete_document(farm_file, document_id)
         return DocumentDeleteResponse(success=True, deleted_id=document_id)
     except DocumentNotFoundError as error:
@@ -476,9 +495,11 @@ def farmer_delete_document(
 )
 def farmer_onboarding_status(
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file)
         return OnboardingStatusResponse(**get_onboarding_status(farm_file))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
@@ -493,9 +514,11 @@ def farmer_onboarding_status(
 def farmer_complete_onboarding(
     onboarding: OnboardingRequest,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         summary = complete_onboarding(farm_file, onboarding.model_dump())
         return OnboardingResponse(success=True, summary=summary)
     except FileNotFoundError as error:
@@ -516,9 +539,11 @@ def farmer_list_category_budgets(
     record_type: Optional[str] = Query(default=None, description="income or expense"),
     category: Optional[str] = Query(default=None),
     year: Optional[int] = Query(default=None),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file)
         budgets = list_category_budgets(
             farm_file,
             sectors=_parse_sectors_query(sectors),
@@ -560,9 +585,11 @@ def farmer_category_budget_vs_actual(
 def farmer_set_monthly_category_budget(
     budget: CategoryBudgetMonthlyCreate,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         created = set_monthly_budget(farm_file, budget.model_dump())
         return CategoryBudgetResponse(success=True, budgets=[created])
     except FileNotFoundError as error:
@@ -580,9 +607,11 @@ def farmer_set_monthly_category_budget(
 def farmer_set_annual_category_budget(
     budget: CategoryBudgetAnnualCreate,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         created = set_annual_budget(farm_file, budget.model_dump())
         return CategoryBudgetResponse(success=True, budgets=created)
     except FileNotFoundError as error:
@@ -601,9 +630,11 @@ def farmer_update_category_budget(
     budget_id: str,
     changes: CategoryBudgetUpdate,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         updated = update_category_budget(farm_file, budget_id, changes.model_dump(exclude_unset=True))
         return CategoryBudgetResponse(success=True, budgets=[updated])
     except CategoryBudgetNotFoundError as error:
@@ -623,9 +654,11 @@ def farmer_update_category_budget(
 def farmer_delete_category_budget(
     budget_id: str,
     farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
 ):
     try:
         farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file, write=True)
         delete_category_budget(farm_file, budget_id)
         return CategoryBudgetDeleteResponse(success=True, deleted_id=budget_id)
     except CategoryBudgetNotFoundError as error:

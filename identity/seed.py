@@ -13,6 +13,7 @@ import os
 
 from sqlalchemy.orm import Session
 
+from config.paths import DATASETS_DIR
 from db.orm_models import Farm, FarmMembership
 from identity.context import get_or_create_dev_user
 
@@ -36,10 +37,18 @@ def get_or_create_farm(
     step first) keeps every existing test/API caller that already passes an
     arbitrary `farm_file` string working unchanged during the P3 migration -
     see `repositories/*` for where this is called from.
+
+    A newly-created row's `dataset_file` defaults to `farm_file` itself when
+    a matching read-only sample dataset actually exists on disk (so
+    `DevIdentityProvider`'s "auto-enrol the sample farm" convenience - see
+    `identity/context.py` - recognises it), unless the caller explicitly
+    overrides it (e.g. the migration script already knows the answer).
     """
     slug = slug_for_farm_file(farm_file)
     farm = session.query(Farm).filter(Farm.slug == slug).one_or_none()
     if farm is None:
+        if dataset_file is None and os.path.exists(os.path.join(DATASETS_DIR, farm_file)):
+            dataset_file = farm_file
         farm = Farm(
             slug=slug,
             name=name or slug.replace("_", " ").title(),

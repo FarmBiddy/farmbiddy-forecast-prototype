@@ -13,12 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from config.settings import IDENTITY_PROVIDER
-from db.orm_models import FarmMembership, User
-from db.session import get_db
+from db.orm_models import Farm, FarmMembership, User
 
 DEV_USER_EMAIL = "dev@farmbiddy.local"
 
@@ -63,6 +61,29 @@ def get_or_create_dev_user(session: Session) -> User:
     return user
 
 
+def _auto_enroll_dataset_farms(session: Session, user: User) -> None:
+    """Prototype-only convenience: there is exactly one human operator
+    behind `DevIdentityProvider`, so it is automatically an `owner` of every
+    farm backed by a read-only sample dataset (`Farm.dataset_file` set) -
+    matching "if a user belongs to one farm: enter it automatically" for
+    today's single-farm demo experience without any manual setup step.
+
+    Farms with no `dataset_file` (created via onboarding, or created
+    directly in isolation tests) are deliberately NOT auto-enrolled here,
+    so cross-farm access denial for them is real, not bypassed.
+    """
+    dataset_farms = session.query(Farm).filter(Farm.dataset_file.isnot(None)).all()
+    if not dataset_farms:
+        return
+    existing_farm_ids = {
+        m.farm_id for m in session.query(FarmMembership).filter(FarmMembership.user_id == user.id).all()
+    }
+    for farm in dataset_farms:
+        if farm.id not in existing_farm_ids:
+            session.add(FarmMembership(user_id=user.id, farm_id=farm.id, role="owner"))
+    session.flush()
+
+
 class DevIdentityProvider:
     """PROTOTYPE ONLY - see module docstring.
 
@@ -75,6 +96,7 @@ class DevIdentityProvider:
 
     def resolve(self, session: Session) -> RequestIdentity:
         user = get_or_create_dev_user(session)
+        _auto_enroll_dataset_farms(session, user)
         memberships = session.query(FarmMembership).filter(FarmMembership.user_id == user.id).all()
         return RequestIdentity(
             user_id=user.id,
@@ -91,10 +113,20 @@ def get_identity_provider() -> IdentityProvider:
     return _PROVIDERS.get(IDENTITY_PROVIDER, _PROVIDERS["dev"])
 
 
-def get_current_identity(session: Session = Depends(get_db)) -> RequestIdentity:
+def get_current_identity() -> RequestIdentity:
     """FastAPI dependency: the one place routes ask "who is calling?".
 
     Change `IDENTITY_PROVIDER` (config/settings.py) to change the answer
     without touching any route or service.
+
+    Deliberately opens its own short-lived, immediately-committed session
+    (rather than depending on a request-scoped session shared with the rest
+    of the route) so identity resolution never holds a transaction open
+    while the route body goes on to make its own repository calls -
+    SQLite only allows one writer at a time, and a long-lived request-scoped
+    session here would otherwise deadlock against them.
     """
-    return get_identity_provider().resolve(session)
+    from db.session import session_scope
+
+    with session_scope() as session:
+        return get_identity_provider().resolve(session)

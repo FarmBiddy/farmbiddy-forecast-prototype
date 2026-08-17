@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api.routes import router as api_router
 from config.paths import CHARTS_DIR, FRONTEND_DIR, REPORTS_DIR, ensure_output_dirs
+from identity.access import FarmAccessDeniedError
 from services.forecast_service import (
     FarmFileNotFoundError,
     ForecastFileNotFoundError,
@@ -70,6 +71,11 @@ async def value_error_handler(_request, exc: ValueError):
 @app.exception_handler(InvalidFarmDataError)
 async def invalid_farm_handler(_request, exc: InvalidFarmDataError):
     return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
+@app.exception_handler(FarmAccessDeniedError)
+async def farm_access_denied_handler(_request, exc: FarmAccessDeniedError):
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
 # ---------------------------------------------------------------------------
