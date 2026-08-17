@@ -32,6 +32,15 @@ exact same duplicate prevention and financial-effect lifecycle - rather than
 a second, parallel one. `provider_reference` is enforced unique per farm so
 re-running a provider fetch over the same window can never create a second
 document for the same external item.
+
+`review_status` (see `models/document.py`) is a second, independent gate on
+top of `payment_status`: `_reconcile_financial_effect` only creates/keeps a
+linked `FinancialRecord` when a document is BOTH `payment_status="paid"` AND
+`review_status="confirmed"`. A farmer-entered document is "confirmed" from
+creation (unchanged behaviour); a provider-sourced document starts
+"pending_review" and only gains a financial effect once `confirm_document`
+is called, so an OCR/bank-feed extraction never silently touches a farmer's
+Actuals before they have seen and accepted it.
 """
 
 from __future__ import annotations
@@ -106,6 +115,7 @@ def list_documents(
     sectors: list[str] | None = None,
     document_type: str | None = None,
     payment_status: str | None = None,
+    review_status: str | None = None,
 ) -> list[dict]:
     """All documents for a farm, newest first, optionally filtered."""
     documents = _load_documents(farm_file)
@@ -113,6 +123,8 @@ def list_documents(
         documents = [d for d in documents if d.get("document_type") == document_type]
     if payment_status:
         documents = [d for d in documents if d.get("payment_status") == payment_status]
+    if review_status:
+        documents = [d for d in documents if d.get("review_status", "confirmed") == review_status]
     if sectors:
         allowed = set(sectors)
         documents = [d for d in documents if not d.get("sector") or d.get("sector") in allowed]
@@ -152,10 +164,19 @@ def _financial_effect_description(document: dict) -> str:
 
 def _reconcile_financial_effect(farm_file: str, document: dict) -> dict:
     """Bring the linked FinancialRecord (if any) in line with the
-    document's current payment_status/date/amount/category/etc. Mutates
-    and returns `document` with `linked_financial_record_id` and
-    `possible_duplicate_manual_record_id` set to their correct values."""
-    should_be_linked = document.get("payment_status") == "paid"
+    document's current payment_status/review_status/date/amount/category/
+    etc. Mutates and returns `document` with `linked_financial_record_id`
+    and `possible_duplicate_manual_record_id` set to their correct values.
+
+    A document only ever gets a financial effect when it is BOTH paid AND
+    confirmed (see module docstring) - a `pending_review` document is held
+    back from Actuals no matter its payment_status, exactly like an unpaid
+    document is held back regardless of review_status.
+    """
+    should_be_linked = (
+        document.get("payment_status") == "paid"
+        and document.get("review_status", "confirmed") == "confirmed"
+    )
     linked_id = document.get("linked_financial_record_id")
 
     if not should_be_linked:
@@ -209,14 +230,20 @@ def add_document(
     data: dict,
     source: str = "manual",
     provider_reference: str | None = None,
+    review_status: str = "confirmed",
+    extraction_confidence: float | None = None,
 ) -> dict:
     """Create and persist a new invoice/receipt, applying the default
     payment lifecycle (receipts default to paid; invoices default to
     unpaid) and reconciling its financial effect.
 
-    `source`/`provider_reference` are for provider-originated documents
-    (see `services/document_providers.py`); farmer-entered documents leave
-    both at their defaults ("manual"/None).
+    `source`/`provider_reference`/`review_status`/`extraction_confidence`
+    are for provider-originated documents (see
+    `services/document_providers.py`); farmer-entered documents leave all
+    four at their defaults ("manual"/None/"confirmed"/None). A document
+    created with `review_status="pending_review"` is saved and listed
+    normally but is held back from having any financial effect until
+    `confirm_document` is called - see `_reconcile_financial_effect`.
     """
     if not is_valid_category(data["record_type"], data["category"]):
         raise ValueError(f"Unknown {data['record_type']} category '{data['category']}'.")
@@ -256,6 +283,8 @@ def add_document(
             "sector": data.get("sector"),
             "source": source,
             "provider_reference": provider_reference,
+            "extraction_confidence": extraction_confidence,
+            "review_status": review_status,
             "linked_financial_record_id": None,
             "possible_duplicate_manual_record_id": None,
             "created_at": now,
@@ -295,6 +324,57 @@ def update_document(farm_file: str, document_id: str, changes: dict) -> dict:
             if document["payment_status"] == "paid" and not document.get("payment_date"):
                 document["payment_date"] = document["date"]
 
+            document["updated_at"] = _now()
+            document = _reconcile_financial_effect(farm_file, document)
+            _save_documents(farm_file, documents)
+            return document
+        raise DocumentNotFoundError(document_id)
+
+
+def confirm_document(farm_file: str, document_id: str, corrections: dict | None = None) -> dict:
+    """Farmer review step for a provider-sourced document: optionally apply
+    corrections (same editable fields as `update_document`), then move it to
+    `review_status="confirmed"` and reconcile - this is the one moment a
+    `pending_review` document can first gain a financial effect. Confirming
+    an already-confirmed document (e.g. a manual one) is a harmless no-op
+    beyond applying any corrections given.
+    """
+    with _LOCK:
+        documents = _load_documents(farm_file)
+        for document in documents:
+            if document.get("id") != document_id:
+                continue
+            for field, value in (corrections or {}).items():
+                if field in (
+                    "date", "counterparty", "category", "amount", "reference",
+                    "attachment_reference", "notes", "sector", "payment_status", "payment_date",
+                ) and value is not None:
+                    if field == "category" and not is_valid_category(document["record_type"], value):
+                        raise ValueError(f"Unknown {document['record_type']} category '{value}'.")
+                    document[field] = round(float(value), 2) if field == "amount" else value
+            document["review_status"] = "confirmed"
+            if document["payment_status"] == "paid" and not document.get("payment_date"):
+                document["payment_date"] = document["date"]
+            document["updated_at"] = _now()
+            document = _reconcile_financial_effect(farm_file, document)
+            _save_documents(farm_file, documents)
+            return document
+        raise DocumentNotFoundError(document_id)
+
+
+def reject_document(farm_file: str, document_id: str) -> dict:
+    """Farmer discards a provider-sourced document as wrong/not theirs. The
+    document stays on file (so a farmer can see what was extracted and why
+    it was rejected) but is guaranteed to have no financial effect - any
+    financial record `_reconcile_financial_effect` may already have created
+    is removed here, and `review_status="rejected"` blocks a new one from
+    ever being created for this document again."""
+    with _LOCK:
+        documents = _load_documents(farm_file)
+        for document in documents:
+            if document.get("id") != document_id:
+                continue
+            document["review_status"] = "rejected"
             document["updated_at"] = _now()
             document = _reconcile_financial_effect(farm_file, document)
             _save_documents(farm_file, documents)

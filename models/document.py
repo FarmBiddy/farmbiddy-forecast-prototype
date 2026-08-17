@@ -59,6 +59,29 @@ prevention, the paid/unpaid financial-effect lifecycle, and Budget vs
 Actual/Forecast/Alerts visibility for free, with no second code path to
 maintain. `attachment_reference` remains a placeholder for wherever the
 underlying scanned file/PDF ends up being stored.
+
+Review gate for automated/extracted documents
+----------------------------------------------
+A farmer typing a document in by hand has, by definition, already reviewed
+what they entered - such a document's `review_status` is "confirmed" from
+the moment it is created, exactly as before this field existed. A
+provider-sourced document (OCR, an emailed invoice, a bank feed line) is
+instead created as `review_status="pending_review"`: it is visible in the
+Documents list and carries its `extraction_confidence` (if the provider
+supplied one) so the farmer can see how sure the extraction was, but it
+cannot yet affect financial actuals - `services/document_service.py`'s
+`_reconcile_financial_effect` only ever creates/keeps a linked
+`FinancialRecord` for a `review_status="confirmed"` document, regardless of
+`payment_status`. The farmer moves a pending document to "confirmed" (optionally
+correcting any field first) via `confirm_document`, or discards it via
+`reject_document` - both in `services/document_service.py`. This keeps the
+pipeline explicit end to end:
+
+    raw provider extraction -> ProviderDocument (normalisation)
+        -> Document(review_status="pending_review") (staged, no financial effect)
+        -> farmer confirms/corrects -> Document(review_status="confirmed")
+        -> FinancialRecord (only now) -> Actual -> Budget vs Actual
+        -> Forecast -> Alert/Insight
 """
 
 from __future__ import annotations
@@ -72,6 +95,7 @@ from models.financial_record import is_valid_category
 DOCUMENT_TYPES = ("invoice", "receipt")
 PAYMENT_STATUSES = ("unpaid", "paid")
 DOCUMENT_SOURCES = ("manual", "ocr", "bank_feed", "accounting_sync")
+REVIEW_STATUSES = ("confirmed", "pending_review", "rejected")
 
 
 class DocumentCreate(BaseModel):
@@ -163,6 +187,14 @@ class Document(BaseModel):
     provider_reference: Optional[str] = Field(
         default=None,
         description="Stable id from the originating provider (OCR/bank feed/accounting sync); unset for farmer-entered documents",
+    )
+    extraction_confidence: Optional[float] = Field(
+        default=None, ge=0, le=1,
+        description="Provider-reported confidence in the extracted data (0-1), if supplied; unset for farmer-entered documents",
+    )
+    review_status: Literal["confirmed", "pending_review", "rejected"] = Field(
+        default="confirmed",
+        description="'pending_review' blocks any financial effect until the farmer confirms or corrects a provider-sourced document",
     )
     linked_financial_record_id: Optional[str] = None
     possible_duplicate_manual_record_id: Optional[str] = Field(
