@@ -431,27 +431,6 @@ function periodBadgeHtml(period) {
   return `<span class="period-badge" title="${title}">${period.label || period.period_type}</span>`;
 }
 
-/**
- * Data-quality warning banners (Phase 9 / UX item 12). Each warning names the
- * affected area so it reads like "near the figure it affects" even though
- * today's dashboard renders them together above the KPI row.
- */
-function renderDataQualityWarnings(warnings) {
-  const box = $("data-quality-warnings");
-  if (!box) return;
-  if (!warnings?.length) {
-    box.innerHTML = "";
-    box.classList.add("hidden");
-    return;
-  }
-  box.classList.remove("hidden");
-  box.innerHTML = warnings.map((w) => `
-    <div class="dq-banner dq-${w.severity || "medium"}">
-      <span class="dq-area">${w.area || "Data quality"}</span>
-      <span class="dq-message">${w.message}</span>
-    </div>`).join("");
-}
-
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatChartEuro(value) {
@@ -745,7 +724,7 @@ function renderCashPositionChart(cashPosition) {
 function renderExecutiveAlerts(alerts, listId = "alerts-list") {
   const list = $(listId);
   if (!list) return;
-  const items = alerts?.length ? alerts : [{ message: "No critical alerts right now.", severity: "info" }];
+  const items = alerts?.length ? alerts : [{ message: "Nothing needs your attention right now.", severity: "info" }];
   list.innerHTML = items.map((a) => {
     if (typeof a === "string") return `<li class="alert-medium">${a}</li>`;
     const sev = a.severity || "medium";
@@ -773,13 +752,17 @@ function overviewMetricCard(label, valueHtml, subHtml, extraClass = "") {
     </div>`;
 }
 
-function renderOverviewSummary(summary) {
+function renderOverviewSummary(summary, needsAttention) {
   const box = $("overview-summary");
   if (!box || !summary) return;
   const cash = summary.current_cash_position || {};
   const lowest = summary.lowest_projected_cash_balance || {};
   const annual = summary.projected_annual_cashflow || {};
   const profit = summary.expected_annual_farm_profit || {};
+  const attentionCount = needsAttention?.length || 0;
+  const attentionSub = attentionCount > 1
+    ? `+ ${attentionCount - 1} more in Action Plan &rarr; Needs Your Attention`
+    : "";
 
   box.innerHTML = [
     overviewMetricCard(
@@ -805,7 +788,7 @@ function renderOverviewSummary(summary) {
     overviewMetricCard(
       "Needs Your Attention",
       summary.main_financial_concern || "—",
-      "",
+      attentionSub,
       "overview-metric-wide",
     ),
     overviewMetricCard(
@@ -841,17 +824,16 @@ function renderCurrentPeriod(currentPeriod) {
 function renderExecutiveDashboard(data) {
   $("dashboard-empty")?.classList.add("hidden");
   $("dashboard-results")?.classList.remove("hidden");
-  renderDataQualityWarnings(data.data_quality_warnings);
   renderOverviewHeader(data.overview_header);
   renderCurrentPeriod(data.overview_summary?.current_period);
-  renderOverviewSummary(data.overview_summary);
+  renderOverviewSummary(data.overview_summary, data.needs_attention);
   renderCashPositionChart(data.overview_summary?.cash_position);
   renderKpis(data.executive_kpis || data.kpis);
   renderHealthSnapshot(data.health_snapshot);
   renderHealthScoreDetail(data.health_score);
   renderSectorTable(data.sector_performance);
-  renderExecutiveAlerts(data.alerts, "alerts-full");
-  updateAlertsNavHighlight(data.alerts);
+  renderExecutiveAlerts(data.needs_attention, "alerts-full");
+  updateAlertsNavHighlight(data.needs_attention);
   renderOverviewChart(data.overview_chart);
   renderDebtRegister(data.debt_register);
 }

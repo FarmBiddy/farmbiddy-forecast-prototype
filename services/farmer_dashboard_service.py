@@ -46,6 +46,8 @@ from services.dashboard_summary import (
     get_selected_sector_data,
 )
 from services.cashflow_budget_service import compare_budget_vs_actual
+from services.category_variance_service import build_category_budget_vs_actual
+from services.attention_service import build_needs_attention
 
 
 DEFAULT_FARM_FILE = MULTI_SECTOR_FILE
@@ -448,6 +450,21 @@ def run_farmer_analysis(
     executive = build_executive_dashboard(
         farm_file, selected, profile, forecast, farm, filtered_raw,
     )
+
+    # P1.1: one consolidated "Needs Your Attention" feed spanning forecast
+    # alerts, data-quality warnings, and category-level budget variances -
+    # see services/attention_service.py. Reuses the category comparison
+    # already built for the Budget by Category card rather than
+    # recomputing it a second time.
+    category_budget_result = build_category_budget_vs_actual(farm_file, selected, filtered_raw=filtered_raw)
+    needs_attention = build_needs_attention(
+        executive.get("alerts"), executive.get("data_quality_warnings"), category_budget_result,
+    )
+    executive["needs_attention"] = needs_attention
+    if needs_attention:
+        top = needs_attention[0]
+        executive["overview_summary"]["main_financial_concern"] = top["what"]
+        executive["overview_summary"]["recommended_next_action"] = top["review"]
 
     return {
         "success": True,

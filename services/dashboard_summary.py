@@ -62,12 +62,12 @@ ALERT_DETAILS = {
     "increasing overdraft use": {
         "what": "Overdraft use is widening, not stabilising",
         "cause": "The projected cash balance has worsened for several consecutive months.",
-        "review": "Investigate whether the shortfall is short-term or structural, and test the practical cash-flow actions in the Scenario Sandbox.",
+        "review": "Investigate whether the shortfall is short-term or ongoing, and test the practical cash-flow actions under What If?.",
     },
     "negative monthly cashflow": {
         "what": "Monthly income is not covering monthly costs",
         "cause": "Average monthly cash inflows are below average monthly outflows.",
-        "review": "Review the timing of major costs and test the cash-flow actions in the Scenario Sandbox.",
+        "review": "Review the timing of major costs and test the cash-flow actions under What If?.",
     },
     "cash-flow warning": {
         "what": "Future months show a negative cash balance",
@@ -87,7 +87,7 @@ ALERT_DETAILS = {
     "loan repayments due in a low-cash month": {
         "what": "Loan repayments land in an already low-cash month",
         "cause": "A scheduled loan repayment coincides with a month where cash is tight.",
-        "review": "Consider the 'adjust loan timing' action in the Scenario Sandbox.",
+        "review": "Consider the 'adjust loan timing' action under What If?.",
     },
     "low profit margin": {
         "what": "Profit margin is below target",

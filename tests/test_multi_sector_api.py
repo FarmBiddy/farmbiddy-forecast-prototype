@@ -74,6 +74,23 @@ def test_run_analysis_all_sectors():
     assert "sample_data" in warning_types
     for warning in data["data_quality_warnings"]:
         assert set(("type", "area", "severity", "message")) <= set(warning.keys())
+    # P1.1: "Needs Your Attention" consolidates forecast alerts, data-quality
+    # warnings, and category-budget variances into one prioritised list, each
+    # with a consistent what/when/why/review shape.
+    assert "needs_attention" in data
+    assert len(data["needs_attention"]) > 0
+    sources = {item["source"] for item in data["needs_attention"]}
+    assert "forecast" in sources
+    assert "data_quality" in sources
+    for item in data["needs_attention"]:
+        assert set(("source", "what", "when", "why", "review", "severity")) <= set(item.keys())
+        assert item["what"] and item["review"]
+        assert item["severity"] != "info"
+    # The Overview's headline "Needs Your Attention" card must reflect the
+    # same top-priority item as the consolidated feed, not a stale forecast-
+    # only concern.
+    assert data["overview_summary"]["main_financial_concern"] == data["needs_attention"][0]["what"]
+    assert data["overview_summary"]["recommended_next_action"] == data["needs_attention"][0]["review"]
 
 
 def test_historical_data_endpoint():

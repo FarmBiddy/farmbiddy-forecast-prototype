@@ -90,8 +90,6 @@
         </div>
 
         <div id="dashboard-results" class="hidden">
-          <div id="data-quality-warnings" class="dq-warnings hidden"></div>
-
           <div class="card current-period-card" id="current-period-card">
             <div class="card-title-row">
               <h3>This Month</h3>
@@ -333,7 +331,11 @@
         </div>
 
         <div class="subtab-panel" data-subtab-panel="ap-alerts">
-          <div class="card exec-alerts"><h3>All Alerts</h3><ul id="alerts-full" class="alert-list"></ul></div>
+          <div class="card exec-alerts">
+            <h3>Needs Your Attention</h3>
+            <p class="muted">Everything worth reviewing in one place — cash-flow warnings, categories running over or under budget, and missing or outdated records.</p>
+            <ul id="alerts-full" class="alert-list"></ul>
+          </div>
         </div>
 
         <div class="subtab-panel hidden" data-subtab-panel="ap-recommendations">
