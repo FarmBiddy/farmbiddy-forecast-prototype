@@ -1,18 +1,15 @@
 """
-Manual financial-record persistence and aggregation (P0.2).
+Manual financial-record business logic and aggregation (P0.2).
 
-Farmer-entered income/expense records are stored per-farm under
-`config.paths.FINANCIAL_RECORDS_DIR` - never inside `datasets/`, which is
-the read-only, Git-committed canonical farm dataset. This keeps manual
-entry from ever corrupting or reshaping that dataset.
-
-Persistence is "write to a temp file, then atomically replace" so a crash
-or concurrent request mid-write can never leave a half-written, corrupted
-records file - the kind of safe/atomic persistence appropriate for this
-prototype's single-process deployment. A process-local lock serialises
-writes from concurrent requests within that one process; it does not
-protect against multiple server processes writing the same file, which is
-out of scope for this prototype.
+Storage itself (P3) is delegated to `repositories.financial_records`, which
+offers a JSON-file-backed implementation (the original P0.2 design - one
+file per farm, temp-file-then-atomic-replace, never inside `datasets/` so
+manual entry can never corrupt or reshape the read-only canonical dataset)
+and a database-backed implementation (real per-farm rows with a `farm_id`
+foreign key), selected by `config.settings.backend_for("FINANCIAL_RECORDS")`.
+Every function below is unchanged either way - dedup, validation, category
+totals, and the public function signatures all operate purely on the
+plain-dict shapes the repository returns.
 
 Duplicate prevention (P1.2 boundary): once invoices/receipts can also
 create `FinancialRecord`s, the same real-world transaction must not be
@@ -29,21 +26,18 @@ counted twice. Two mechanisms exist for that already:
 
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 import threading
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from config.paths import FINANCIAL_RECORDS_DIR
 from models.financial_record import (
     EXPENSE_CATEGORIES,
     INCOME_CATEGORIES,
     category_label,
     is_valid_category,
 )
+from repositories.financial_records import get_repository
 
 _LOCK = threading.Lock()
 
@@ -57,35 +51,12 @@ class FinancialRecordNotFoundError(LookupError):
     pass
 
 
-def _records_path(farm_file: str) -> str:
-    stem = os.path.splitext(os.path.basename(farm_file))[0]
-    os.makedirs(FINANCIAL_RECORDS_DIR, exist_ok=True)
-    return os.path.join(FINANCIAL_RECORDS_DIR, f"{stem}.json")
-
-
 def _load_records(farm_file: str) -> list[dict]:
-    path = _records_path(farm_file)
-    if not os.path.exists(path):
-        return []
-    with open(path, "r", encoding="utf-8") as fh:
-        try:
-            data = json.load(fh)
-        except json.JSONDecodeError:
-            return []
-    return data if isinstance(data, list) else []
+    return get_repository().load(farm_file)
 
 
 def _save_records(farm_file: str, records: list[dict]) -> None:
-    path = _records_path(farm_file)
-    directory = os.path.dirname(path)
-    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_records_", dir=directory)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(records, fh, indent=2)
-        os.replace(tmp_path, path)
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    get_repository().save(farm_file, records)
 
 
 def _now() -> str:

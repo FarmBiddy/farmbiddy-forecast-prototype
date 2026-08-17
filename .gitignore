@@ -34,6 +34,10 @@ outputs/farm_events/*
 outputs/*.json
 outputs/daily_updates.json
 
+# P3: local SQLite database file (dev/test only - production uses DATABASE_URL)
+outputs/*.db
+outputs/*.db-journal
+
 # IDE / editor
 .cursor/
 .vscode/

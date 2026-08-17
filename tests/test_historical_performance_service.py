@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-import services.financial_record_service as record_svc
+import repositories.financial_records as records_repo
 from services.financial_record_service import add_financial_record
 from services.historical_performance_service import build_year_over_year_comparison
 
@@ -20,7 +20,7 @@ SECTORS = ["dairy", "beef", "lamb"]
 
 @pytest.fixture(autouse=True)
 def isolated_records_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(record_svc, "FINANCIAL_RECORDS_DIR", str(tmp_path))
+    monkeypatch.setattr(records_repo, "FINANCIAL_RECORDS_DIR", str(tmp_path))
     yield tmp_path
 
 

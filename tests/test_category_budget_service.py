@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import pytest
 
+import repositories.category_budgets as budgets_repo
 import services.category_budget_service as svc
 
 
 @pytest.fixture(autouse=True)
 def isolated_budgets_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(svc, "CATEGORY_BUDGETS_DIR", str(tmp_path))
+    monkeypatch.setattr(budgets_repo, "CATEGORY_BUDGETS_DIR", str(tmp_path))
     yield tmp_path
 
 

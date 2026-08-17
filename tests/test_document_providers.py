@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import pytest
 
+import repositories.documents as documents_repo
+import repositories.financial_records as records_repo
 import services.document_providers as providers
 import services.document_service as doc_svc
 import services.financial_record_service as record_svc
@@ -20,8 +22,8 @@ FARM = "test_farm.json"
 
 @pytest.fixture(autouse=True)
 def isolated_dirs(tmp_path, monkeypatch):
-    monkeypatch.setattr(doc_svc, "DOCUMENTS_DIR", str(tmp_path / "documents"))
-    monkeypatch.setattr(record_svc, "FINANCIAL_RECORDS_DIR", str(tmp_path / "records"))
+    monkeypatch.setattr(documents_repo, "DOCUMENTS_DIR", str(tmp_path / "documents"))
+    monkeypatch.setattr(records_repo, "FINANCIAL_RECORDS_DIR", str(tmp_path / "records"))
     yield tmp_path
 
 

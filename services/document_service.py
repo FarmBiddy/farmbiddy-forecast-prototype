@@ -45,15 +45,12 @@ Actuals before they have seen and accepted it.
 
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 import threading
 import uuid
 from datetime import datetime, timezone
 
-from config.paths import DOCUMENTS_DIR
 from models.document import is_valid_category
+from repositories.documents import get_repository
 from services.financial_record_service import (
     FinancialRecordNotFoundError,
     add_financial_record,
@@ -75,35 +72,12 @@ class DuplicateProviderReferenceError(ValueError):
     one Document, no matter how many times a fetch/ingest cycle runs."""
 
 
-def _documents_path(farm_file: str) -> str:
-    stem = os.path.splitext(os.path.basename(farm_file))[0]
-    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
-    return os.path.join(DOCUMENTS_DIR, f"{stem}.json")
-
-
 def _load_documents(farm_file: str) -> list[dict]:
-    path = _documents_path(farm_file)
-    if not os.path.exists(path):
-        return []
-    with open(path, "r", encoding="utf-8") as fh:
-        try:
-            data = json.load(fh)
-        except json.JSONDecodeError:
-            return []
-    return data if isinstance(data, list) else []
+    return get_repository().load(farm_file)
 
 
 def _save_documents(farm_file: str, documents: list[dict]) -> None:
-    path = _documents_path(farm_file)
-    directory = os.path.dirname(path)
-    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_documents_", dir=directory)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(documents, fh, indent=2)
-        os.replace(tmp_path, path)
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    get_repository().save(farm_file, documents)
 
 
 def _now() -> str:

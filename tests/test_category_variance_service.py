@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pytest
 
+import repositories.category_budgets as budgets_repo
+import repositories.financial_records as records_repo
 import services.category_budget_service as budget_svc
 import services.financial_record_service as record_svc
 from services.category_variance_service import build_category_budget_vs_actual
@@ -22,8 +24,8 @@ SECTORS = ["dairy", "beef", "lamb"]
 
 @pytest.fixture(autouse=True)
 def isolated_dirs(tmp_path, monkeypatch):
-    monkeypatch.setattr(budget_svc, "CATEGORY_BUDGETS_DIR", str(tmp_path / "budgets"))
-    monkeypatch.setattr(record_svc, "FINANCIAL_RECORDS_DIR", str(tmp_path / "records"))
+    monkeypatch.setattr(budgets_repo, "CATEGORY_BUDGETS_DIR", str(tmp_path / "budgets"))
+    monkeypatch.setattr(records_repo, "FINANCIAL_RECORDS_DIR", str(tmp_path / "records"))
     yield tmp_path
 
 

@@ -10,12 +10,13 @@ import os
 
 import pytest
 
+import repositories.financial_records as records_repo
 import services.financial_record_service as svc
 
 
 @pytest.fixture(autouse=True)
 def isolated_records_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(svc, "FINANCIAL_RECORDS_DIR", str(tmp_path))
+    monkeypatch.setattr(records_repo, "FINANCIAL_RECORDS_DIR", str(tmp_path))
     yield tmp_path
 
 

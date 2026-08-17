@@ -17,15 +17,12 @@ budget for March".
 
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 import threading
 import uuid
 from datetime import datetime, timezone
 
-from config.paths import CATEGORY_BUDGETS_DIR
 from models.financial_record import is_valid_category
+from repositories.category_budgets import get_repository
 
 _LOCK = threading.Lock()
 
@@ -34,35 +31,12 @@ class CategoryBudgetNotFoundError(LookupError):
     pass
 
 
-def _budgets_path(farm_file: str) -> str:
-    stem = os.path.splitext(os.path.basename(farm_file))[0]
-    os.makedirs(CATEGORY_BUDGETS_DIR, exist_ok=True)
-    return os.path.join(CATEGORY_BUDGETS_DIR, f"{stem}.json")
-
-
 def _load_budgets(farm_file: str) -> list[dict]:
-    path = _budgets_path(farm_file)
-    if not os.path.exists(path):
-        return []
-    with open(path, "r", encoding="utf-8") as fh:
-        try:
-            data = json.load(fh)
-        except json.JSONDecodeError:
-            return []
-    return data if isinstance(data, list) else []
+    return get_repository().load(farm_file)
 
 
 def _save_budgets(farm_file: str, budgets: list[dict]) -> None:
-    path = _budgets_path(farm_file)
-    directory = os.path.dirname(path)
-    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_budgets_", dir=directory)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(budgets, fh, indent=2)
-        os.replace(tmp_path, path)
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    get_repository().save(farm_file, budgets)
 
 
 def _now() -> str:

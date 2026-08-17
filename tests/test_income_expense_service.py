@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+import repositories.financial_records as records_repo
 import services.financial_record_service as record_svc
 from services.dashboard_summary import get_selected_sector_data
 from services.income_expense_service import build_income_expense_summary
@@ -17,7 +18,7 @@ from services.income_expense_service import build_income_expense_summary
 
 @pytest.fixture(autouse=True)
 def isolated_records_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(record_svc, "FINANCIAL_RECORDS_DIR", str(tmp_path))
+    monkeypatch.setattr(records_repo, "FINANCIAL_RECORDS_DIR", str(tmp_path))
     yield tmp_path
 
 

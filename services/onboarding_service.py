@@ -9,15 +9,12 @@ does and does not create.
 
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 import threading
 from datetime import date, datetime, timezone
 
-from config.paths import ONBOARDING_DIR
 from models.financial_record import category_choices
 from models.onboarding import FARM_TYPE_LABELS
+from repositories.onboarding import get_repository
 from services.category_budget_service import set_annual_budget
 
 _LOCK = threading.Lock()
@@ -34,35 +31,12 @@ FARM_TYPE_SECTOR_MAP: dict[str, list[str]] = {
 LOAN_REPAYMENTS_CATEGORY = "loan_repayments"
 
 
-def _onboarding_path(farm_file: str) -> str:
-    stem = os.path.splitext(os.path.basename(farm_file))[0]
-    os.makedirs(ONBOARDING_DIR, exist_ok=True)
-    return os.path.join(ONBOARDING_DIR, f"{stem}.json")
-
-
 def _load(farm_file: str) -> dict:
-    path = _onboarding_path(farm_file)
-    if not os.path.exists(path):
-        return {}
-    with open(path, "r", encoding="utf-8") as fh:
-        try:
-            data = json.load(fh)
-        except json.JSONDecodeError:
-            return {}
-    return data if isinstance(data, dict) else {}
+    return get_repository().load(farm_file)
 
 
 def _save(farm_file: str, data: dict) -> None:
-    path = _onboarding_path(farm_file)
-    directory = os.path.dirname(path)
-    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_onboarding_", dir=directory)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
-        os.replace(tmp_path, path)
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    get_repository().save(farm_file, data)
 
 
 def get_onboarding_overrides(farm_file: str) -> dict:

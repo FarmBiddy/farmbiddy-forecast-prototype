@@ -8,8 +8,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-import services.category_budget_service as budget_svc
-import services.onboarding_service as onboarding_svc
+import repositories.category_budgets as budgets_repo
+import repositories.onboarding as onboarding_repo
 from api.main import app
 
 client = TestClient(app)
@@ -18,8 +18,8 @@ FARM = "multi_sector_farm.json"
 
 @pytest.fixture(autouse=True)
 def isolated_dirs(tmp_path, monkeypatch):
-    monkeypatch.setattr(onboarding_svc, "ONBOARDING_DIR", str(tmp_path / "onboarding"))
-    monkeypatch.setattr(budget_svc, "CATEGORY_BUDGETS_DIR", str(tmp_path / "budgets"))
+    monkeypatch.setattr(onboarding_repo, "ONBOARDING_DIR", str(tmp_path / "onboarding"))
+    monkeypatch.setattr(budgets_repo, "CATEGORY_BUDGETS_DIR", str(tmp_path / "budgets"))
     yield tmp_path
 
 
