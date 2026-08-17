@@ -45,9 +45,20 @@ second `FinancialRecord` is created. The document is still saved (so the
 paper trail is on file), but flagged `possible_duplicate_manual_record_id`
 so the UI can tell the farmer why no new Actual was added.
 
-No OCR, bank feed, or accounting sync yet - `source` and
-`attachment_reference` exist purely as a stable extension point for those
-future providers to populate without changing this shape.
+No OCR, bank feed, or accounting sync provider is implemented yet, but the
+extension point is real, not just a comment: `source` records which kind of
+provider produced a document, and `provider_reference` is that provider's
+own stable id for the source item (an OCR scan id, a bank transaction id, a
+line in an accounting export). `services/document_providers.py` defines the
+`DocumentProvider` interface any future integration implements, plus the one
+ingestion path (`ingest_from_provider`) that turns its output into
+`Document`s through this same model and the same
+`services/document_service.add_document` lifecycle every farmer-entered
+document already goes through - so a future provider gets duplicate
+prevention, the paid/unpaid financial-effect lifecycle, and Budget vs
+Actual/Forecast/Alerts visibility for free, with no second code path to
+maintain. `attachment_reference` remains a placeholder for wherever the
+underlying scanned file/PDF ends up being stored.
 """
 
 from __future__ import annotations
@@ -60,7 +71,7 @@ from models.financial_record import is_valid_category
 
 DOCUMENT_TYPES = ("invoice", "receipt")
 PAYMENT_STATUSES = ("unpaid", "paid")
-DOCUMENT_SOURCES = ("manual",)  # future: "ocr", "bank_feed", "accounting_sync"
+DOCUMENT_SOURCES = ("manual", "ocr", "bank_feed", "accounting_sync")
 
 
 class DocumentCreate(BaseModel):
@@ -148,7 +159,11 @@ class Document(BaseModel):
     attachment_reference: Optional[str] = None
     notes: Optional[str] = None
     sector: Optional[str] = None
-    source: Literal["manual"] = "manual"
+    source: Literal["manual", "ocr", "bank_feed", "accounting_sync"] = "manual"
+    provider_reference: Optional[str] = Field(
+        default=None,
+        description="Stable id from the originating provider (OCR/bank feed/accounting sync); unset for farmer-entered documents",
+    )
     linked_financial_record_id: Optional[str] = None
     possible_duplicate_manual_record_id: Optional[str] = Field(
         default=None,

@@ -24,6 +24,14 @@ Invoice/Receipt -> Financial Record architecture decision from
 Every create/update/delete of a document runs back through this one
 function, so the linked FinancialRecord can never silently drift out of
 sync with the document that produced it.
+
+`add_document` also accepts an optional `source`/`provider_reference` pair
+(see `models/document.py` and `services/document_providers.py`) so a future
+automated provider reuses this exact same creation path - and therefore the
+exact same duplicate prevention and financial-effect lifecycle - rather than
+a second, parallel one. `provider_reference` is enforced unique per farm so
+re-running a provider fetch over the same window can never create a second
+document for the same external item.
 """
 
 from __future__ import annotations
@@ -50,6 +58,12 @@ _LOCK = threading.Lock()
 
 class DocumentNotFoundError(LookupError):
     pass
+
+
+class DuplicateProviderReferenceError(ValueError):
+    """Raised when a provider-sourced document reuses a `provider_reference`
+    already on file for this farm - a source item must only ever produce
+    one Document, no matter how many times a fetch/ingest cycle runs."""
 
 
 def _documents_path(farm_file: str) -> str:
@@ -190,15 +204,32 @@ def _reconcile_financial_effect(farm_file: str, document: dict) -> dict:
     return document
 
 
-def add_document(farm_file: str, data: dict) -> dict:
+def add_document(
+    farm_file: str,
+    data: dict,
+    source: str = "manual",
+    provider_reference: str | None = None,
+) -> dict:
     """Create and persist a new invoice/receipt, applying the default
     payment lifecycle (receipts default to paid; invoices default to
-    unpaid) and reconciling its financial effect."""
+    unpaid) and reconciling its financial effect.
+
+    `source`/`provider_reference` are for provider-originated documents
+    (see `services/document_providers.py`); farmer-entered documents leave
+    both at their defaults ("manual"/None).
+    """
     if not is_valid_category(data["record_type"], data["category"]):
         raise ValueError(f"Unknown {data['record_type']} category '{data['category']}'.")
 
     with _LOCK:
         documents = _load_documents(farm_file)
+
+        if provider_reference:
+            for existing in documents:
+                if existing.get("provider_reference") == provider_reference:
+                    raise DuplicateProviderReferenceError(
+                        f"A document already exists for provider reference '{provider_reference}'.",
+                    )
 
         payment_status = data.get("payment_status") or ("paid" if data["document_type"] == "receipt" else "unpaid")
         payment_date = data.get("payment_date")
@@ -223,7 +254,8 @@ def add_document(farm_file: str, data: dict) -> dict:
             "attachment_reference": data.get("attachment_reference"),
             "notes": data.get("notes"),
             "sector": data.get("sector"),
-            "source": "manual",
+            "source": source,
+            "provider_reference": provider_reference,
             "linked_financial_record_id": None,
             "possible_duplicate_manual_record_id": None,
             "created_at": now,
