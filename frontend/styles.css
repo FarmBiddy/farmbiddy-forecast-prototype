@@ -635,6 +635,20 @@ body {
 .ie-record-desc { color: var(--muted); }
 .ie-record-amount { font-weight: 700; white-space: nowrap; }
 .ie-record-actions { display: flex; gap: 0.75rem; }
+
+.doc-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #eef2f6;
+  color: var(--muted);
+}
+.doc-badge.paid { background: var(--green-light); color: var(--green-dark); }
+.doc-badge.unpaid { background: #fffbeb; color: #92400e; }
+.doc-record-note { flex-basis: 100%; font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
 .btn-link {
   background: none;
   border: none;

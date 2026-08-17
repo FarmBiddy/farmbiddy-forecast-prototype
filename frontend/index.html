@@ -137,6 +137,7 @@
             <button type="button" class="subtab-btn active" data-subtab="cashflow-forecast">Forecast</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-budget">Budget vs Actual</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-income-expenses">Income &amp; Expenses</button>
+            <button type="button" class="subtab-btn" data-subtab="cashflow-documents">Invoices &amp; Receipts</button>
           </div>
         </div>
 
@@ -284,6 +285,73 @@
             </form>
 
             <div id="ie-records-list" class="ie-records-list"></div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="cashflow-documents">
+          <div class="card">
+            <div class="card-title-row">
+              <h3>Invoices &amp; Receipts</h3>
+              <button type="button" class="btn-secondary" id="doc-add-btn">+ Add Invoice / Receipt</button>
+            </div>
+            <p class="muted">Keep a record of invoices and receipts. A receipt counts as paid straight away; an invoice only affects your cash flow once you mark it paid.</p>
+
+            <form id="doc-form" class="ie-entry-form hidden">
+              <input type="hidden" id="doc-id" value="" />
+              <div class="ie-form-row">
+                <label>Document
+                  <select id="doc-type">
+                    <option value="receipt">Receipt</option>
+                    <option value="invoice">Invoice</option>
+                  </select>
+                </label>
+                <label>Type
+                  <select id="doc-record-type">
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                  </select>
+                </label>
+                <label>Date
+                  <input type="date" id="doc-date" required />
+                </label>
+              </div>
+              <div class="ie-form-row">
+                <label>Category
+                  <select id="doc-category" required></select>
+                </label>
+                <label>Amount (€)
+                  <input type="number" id="doc-amount" min="0.01" step="0.01" required />
+                </label>
+                <label class="ie-form-wide">Supplier / Customer
+                  <input type="text" id="doc-counterparty" maxlength="120" required placeholder="e.g. Co-op Superstores" />
+                </label>
+              </div>
+              <div class="ie-form-row">
+                <label>Payment status
+                  <select id="doc-payment-status">
+                    <option value="paid">Paid</option>
+                    <option value="unpaid">Not paid yet</option>
+                  </select>
+                </label>
+                <label id="doc-payment-date-field">Payment date
+                  <input type="date" id="doc-payment-date" />
+                </label>
+                <label>Reference (optional)
+                  <input type="text" id="doc-reference" maxlength="100" placeholder="Invoice / receipt no." />
+                </label>
+              </div>
+              <div class="ie-form-row">
+                <label class="ie-form-wide">Notes (optional)
+                  <input type="text" id="doc-notes" maxlength="1000" />
+                </label>
+              </div>
+              <div class="ie-form-actions">
+                <button type="submit" class="btn-run">Save</button>
+                <button type="button" class="btn-secondary" id="doc-cancel-btn">Cancel</button>
+              </div>
+            </form>
+
+            <div id="doc-list" class="ie-records-list"></div>
           </div>
         </div>
       </section>

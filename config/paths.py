@@ -38,6 +38,10 @@ FINANCIAL_RECORDS_DIR = os.path.join(FARM_EVENTS_DIR, "financial_records")
 # (Actuals) and the dataset's whole-farm `cash_flow_budget` entries, so
 # Budget and Actual can never be silently merged into one number.
 CATEGORY_BUDGETS_DIR = os.path.join(FARM_EVENTS_DIR, "category_budgets")
+# Farmer-entered invoices/receipts (P1.2). Each document is metadata about a
+# real-world paper/PDF trail; its financial effect (if any) is a linked
+# FinancialRecord in FINANCIAL_RECORDS_DIR - see services/document_service.py.
+DOCUMENTS_DIR = os.path.join(FARM_EVENTS_DIR, "documents")
 DAILY_UPDATES_PATH = os.path.join(STORAGE_ROOT, "daily_updates.json")
 INGESTION_REPORT_PATH = os.path.join(HISTORY_DIR, "ingestion_report.json")
 
@@ -59,5 +63,6 @@ def ensure_output_dirs():
         FARM_EVENTS_DIR,
         FINANCIAL_RECORDS_DIR,
         CATEGORY_BUDGETS_DIR,
+        DOCUMENTS_DIR,
     ):
         os.makedirs(folder, exist_ok=True)

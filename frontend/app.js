@@ -1457,6 +1457,7 @@ const SUBTAB_LOADERS = {
   "cashflow-forecast": () => ensureAdvancedForecast(),
   "cashflow-budget": () => { loadCashflowBudget(); loadCategoryBudgets(); },
   "cashflow-income-expenses": () => loadIncomeExpenses(),
+  "cashflow-documents": () => loadDocuments(),
   "fp-historical": () => loadHistoricalData(),
   "ap-recommendations": () => loadFinancialIntelligence(),
   "ap-ask": () => initFarmIntelligencePage(),
@@ -2025,6 +2026,182 @@ async function deleteIeRecord(id) {
   }
 }
 
+function docPaymentBadgeHtml(doc) {
+  return doc.payment_status === "paid"
+    ? `<span class="doc-badge paid">Paid</span>`
+    : `<span class="doc-badge unpaid">Not paid yet</span>`;
+}
+
+function docTypeLabel(doc) {
+  return doc.document_type === "invoice" ? "Invoice" : "Receipt";
+}
+
+function docNoteHtml(doc) {
+  if (doc.possible_duplicate_manual_record_id) {
+    return `<div class="doc-record-note">Not counted separately in Income &amp; Expenses — it matches an entry you already logged manually.</div>`;
+  }
+  if (doc.payment_status === "unpaid") {
+    return `<div class="doc-record-note">Not yet counted in your cash flow — mark it paid once payment happens.</div>`;
+  }
+  return "";
+}
+
+function renderDocumentsList(documents) {
+  const box = $("doc-list");
+  if (!box) return;
+  if (!documents?.length) {
+    box.innerHTML = `<p class="muted">No invoices or receipts logged yet — add your first one above.</p>`;
+    return;
+  }
+  box.innerHTML = documents.map((d) => `
+    <div class="ie-record-row" data-id="${d.id}">
+      <div class="ie-record-main">
+        <span class="ie-record-type ${d.record_type}">${d.record_type === "income" ? "Income" : "Expense"}</span>
+        <span class="doc-badge">${docTypeLabel(d)}</span>
+        ${docPaymentBadgeHtml(d)}
+        <span class="ie-record-date">${d.date}</span>
+        <span class="ie-record-category">${ieCategoryLabel(d.record_type, d.category)}</span>
+        <span class="ie-record-desc">${d.counterparty}${d.reference ? ` · Ref ${d.reference}` : ""}</span>
+        ${docNoteHtml(d)}
+      </div>
+      <div class="ie-record-amount ${d.record_type === "income" ? "positive" : "negative"}">${d.record_type === "income" ? "+" : "-"}${formatCurrency(d.amount)}</div>
+      <div class="ie-record-actions">
+        <button type="button" class="btn-link doc-edit-btn" data-id="${d.id}">Edit</button>
+        <button type="button" class="btn-link doc-delete-btn" data-id="${d.id}">Delete</button>
+      </div>
+    </div>`).join("");
+
+  box.querySelectorAll(".doc-edit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const doc = documents.find((d) => d.id === btn.dataset.id);
+      if (doc) openDocForm(doc);
+    });
+  });
+  box.querySelectorAll(".doc-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", () => deleteDocRecord(btn.dataset.id));
+  });
+}
+
+async function loadDocuments() {
+  try {
+    await ensureCategoryChoicesLoaded();
+    const data = await api(`/farmer/documents${sectorsQuery()}`);
+    state.documents = data.documents || [];
+    renderDocumentsList(state.documents);
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+function populateDocCategorySelect() {
+  const typeSelect = $("doc-record-type");
+  const categorySelect = $("doc-category");
+  if (!typeSelect || !categorySelect) return;
+  const previous = categorySelect.value;
+  categorySelect.innerHTML = ieCategoryOptions(typeSelect.value);
+  if ([...categorySelect.options].some((o) => o.value === previous)) categorySelect.value = previous;
+}
+
+function docUpdatePaymentDateVisibility() {
+  const paid = $("doc-payment-status")?.value === "paid";
+  $("doc-payment-date-field")?.classList.toggle("hidden", !paid);
+}
+
+function docApplyTypeDefaults() {
+  const isReceipt = $("doc-type")?.value === "receipt";
+  $("doc-payment-status").value = isReceipt ? "paid" : "unpaid";
+  docUpdatePaymentDateVisibility();
+}
+
+function openDocForm(doc = null) {
+  const form = $("doc-form");
+  if (!form) return;
+  form.classList.remove("hidden");
+  $("doc-add-btn")?.classList.add("hidden");
+
+  $("doc-id").value = doc?.id || "";
+  $("doc-type").value = doc?.document_type || "receipt";
+  $("doc-type").disabled = !!doc;
+  $("doc-record-type").value = doc?.record_type || "expense";
+  $("doc-record-type").disabled = !!doc;
+  populateDocCategorySelect();
+  if (doc?.category) $("doc-category").value = doc.category;
+  $("doc-date").value = doc?.date || new Date().toISOString().slice(0, 10);
+  $("doc-amount").value = doc?.amount ?? "";
+  $("doc-counterparty").value = doc?.counterparty || "";
+  $("doc-payment-status").value = doc?.payment_status || (($("doc-type").value === "receipt") ? "paid" : "unpaid");
+  $("doc-payment-date").value = doc?.payment_date || "";
+  $("doc-reference").value = doc?.reference || "";
+  $("doc-notes").value = doc?.notes || "";
+  docUpdatePaymentDateVisibility();
+  form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeDocForm() {
+  $("doc-form")?.classList.add("hidden");
+  $("doc-add-btn")?.classList.remove("hidden");
+  $("doc-form")?.reset();
+  $("doc-type").disabled = false;
+  $("doc-record-type").disabled = false;
+}
+
+async function submitDocForm(e) {
+  e.preventDefault();
+  const id = $("doc-id")?.value;
+  const paymentStatus = $("doc-payment-status").value;
+  const payload = {
+    document_type: $("doc-type").value,
+    record_type: $("doc-record-type").value,
+    date: $("doc-date").value,
+    category: $("doc-category").value,
+    amount: parseFloat($("doc-amount").value),
+    counterparty: $("doc-counterparty").value.trim(),
+    payment_status: paymentStatus,
+    payment_date: paymentStatus === "paid" ? ($("doc-payment-date").value || null) : null,
+    reference: $("doc-reference").value.trim() || null,
+    notes: $("doc-notes").value.trim() || null,
+  };
+  if (!payload.category || !payload.counterparty || !payload.date || !(payload.amount > 0)) {
+    showStatus("Please fill in date, category, supplier/customer and a positive amount.", "error");
+    return;
+  }
+  try {
+    if (id) {
+      const editPayload = { ...payload };
+      delete editPayload.document_type;
+      delete editPayload.record_type;
+      await api(`/farmer/documents/${id}${sectorsQuery()}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editPayload),
+      });
+      showStatus("Invoice/receipt updated.", "success");
+    } else {
+      await api(`/farmer/documents${sectorsQuery()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      showStatus("Invoice/receipt saved.", "success");
+    }
+    closeDocForm();
+    await loadDocuments();
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+async function deleteDocRecord(id) {
+  if (!confirm("Delete this invoice/receipt? This cannot be undone.")) return;
+  try {
+    await api(`/farmer/documents/${id}${sectorsQuery()}`, { method: "DELETE" });
+    showStatus("Invoice/receipt deleted.", "success");
+    await loadDocuments();
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
 async function loadHistoricalData() {
   $("historical-loading")?.classList.remove("hidden");
   $("historical-content")?.classList.add("hidden");
@@ -2306,6 +2483,13 @@ function setupNav() {
   $("cb-budget-form")?.addEventListener("submit", submitCbBudgetForm);
   $("cb-record-type")?.addEventListener("change", () => { $("cb-category").innerHTML = ieCategoryOptions($("cb-record-type").value); });
   $("cb-period-mode")?.addEventListener("change", cbUpdatePeriodFields);
+
+  $("doc-add-btn")?.addEventListener("click", () => openDocForm());
+  $("doc-cancel-btn")?.addEventListener("click", closeDocForm);
+  $("doc-form")?.addEventListener("submit", submitDocForm);
+  $("doc-record-type")?.addEventListener("change", populateDocCategorySelect);
+  $("doc-payment-status")?.addEventListener("change", docUpdatePaymentDateVisibility);
+  $("doc-type")?.addEventListener("change", () => { if (!$("doc-id").value) docApplyTypeDefaults(); });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

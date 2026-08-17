@@ -66,6 +66,13 @@ from models.category_budget import (
     CategoryBudgetUpdate,
     CategoryBudgetVsActualResponse,
 )
+from models.document import (
+    DocumentCreate,
+    DocumentDeleteResponse,
+    DocumentListResponse,
+    DocumentResponse,
+    DocumentUpdate,
+)
 from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
 from services.financial_intelligence_service import ask_farm_advisor, get_financial_intelligence
@@ -112,6 +119,13 @@ from services.category_budget_service import (
     update_category_budget,
 )
 from services.category_variance_service import build_category_budget_vs_actual
+from services.document_service import (
+    DocumentNotFoundError,
+    add_document,
+    delete_document,
+    list_documents,
+    update_document,
+)
 
 router = APIRouter()
 
@@ -334,6 +348,94 @@ def farmer_delete_financial_record(
         return FinancialRecordDeleteResponse(success=True, deleted_id=record_id)
     except FinancialRecordNotFoundError as error:
         raise HTTPException(status_code=404, detail=f"Financial record not found: {error}") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/farmer/documents",
+    response_model=DocumentListResponse,
+    tags=["Farmer Edition"],
+    summary="List invoices and receipts (P1.2)",
+)
+def farmer_list_documents(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
+    document_type: Optional[str] = Query(default=None, description="invoice or receipt"),
+    payment_status: Optional[str] = Query(default=None, description="unpaid or paid"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        documents = list_documents(
+            farm_file,
+            sectors=_parse_sectors_query(sectors),
+            document_type=document_type,
+            payment_status=payment_status,
+        )
+        return DocumentListResponse(success=True, farm_file=farm_file, documents=documents, count=len(documents))
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post(
+    "/farmer/documents",
+    response_model=DocumentResponse,
+    tags=["Farmer Edition"],
+    summary="Add an invoice or receipt (P1.2)",
+)
+def farmer_add_document(
+    document: DocumentCreate,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        created = add_document(farm_file, document.model_dump())
+        return DocumentResponse(success=True, document=created)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.put(
+    "/farmer/documents/{document_id}",
+    response_model=DocumentResponse,
+    tags=["Farmer Edition"],
+    summary="Edit an invoice or receipt (P1.2)",
+)
+def farmer_update_document(
+    document_id: str,
+    changes: DocumentUpdate,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        updated = update_document(farm_file, document_id, changes.model_dump(exclude_unset=True))
+        return DocumentResponse(success=True, document=updated)
+    except DocumentNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Document not found: {error}") from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.delete(
+    "/farmer/documents/{document_id}",
+    response_model=DocumentDeleteResponse,
+    tags=["Farmer Edition"],
+    summary="Delete an invoice or receipt (P1.2)",
+)
+def farmer_delete_document(
+    document_id: str,
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+):
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        delete_document(farm_file, document_id)
+        return DocumentDeleteResponse(success=True, deleted_id=document_id)
+    except DocumentNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"Document not found: {error}") from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
