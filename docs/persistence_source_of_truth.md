@@ -82,6 +82,38 @@ review the reconciliation output, re-run with `--apply`, then flip only
 that domain's `PERSISTENCE_BACKEND_<DOMAIN>` variable. Take a backup first
 (see `docs/backup_and_recovery.md`).
 
+## SQLite/PostgreSQL portability review
+
+Every ORM type in `db/orm_models.py` (`Numeric`, `String`, `Text`, `Date`,
+`DateTime(timezone=True)`, `JSON`, `CheckConstraint`, `ForeignKey`,
+`UniqueConstraint`) is a generic SQLAlchemy type that compiles to the
+appropriate native PostgreSQL type - none of it is SQLite-specific. All
+SQLite-only code is isolated to two places, both intentional and
+documented at the point of use:
+
+* `db/session.py`'s `_connect_args` (`check_same_thread`) and the
+  pytest-only auto-`init_db()` guard;
+* `scripts/backup_database.py`, which is explicitly SQLite-only (see
+  `docs/backup_and_recovery.md` for why Postgres backup is intentionally
+  out of scope for this script).
+
+**One real gap found and fixed during this review:** SQLite does not
+enforce `FOREIGN KEY` constraints unless a connection explicitly turns it
+on; PostgreSQL always enforces them. `db/session.enable_sqlite_foreign_keys`
+now issues `PRAGMA foreign_keys=ON` on every new SQLite connection (a
+no-op for Postgres), so a bug that tries to insert an orphaned row (e.g. a
+`FinancialRecord.farm_id` or `FarmMembership.user_id` with no matching
+parent row) fails the same way in local dev/tests as it would in
+production, instead of silently succeeding locally and only surfacing
+after a production deploy. Fixing this immediately caught one instance of
+exactly that bug in a test's setup (a fabricated `RequestIdentity.user_id`
+with no backing `User` row - see `tests/test_farm_isolation.py`).
+
+No other SQLite-specific limitation is currently known. `UniqueConstraint`
+and `CheckConstraint` behave identically on both engines for the
+constraints actually defined here (simple column combinations and
+`IN (...)` value lists).
+
 ## Identity / access control
 
 `users`, `farms`, and `farm_memberships` are P3-native - they did not

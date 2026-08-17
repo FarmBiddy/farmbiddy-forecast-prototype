@@ -55,6 +55,14 @@ direction (see `config/settings.backend_for`), since the export format is
 just the repositories' own `load()` output - the same property that makes
 `scripts/migrate_json_to_db.py` possible.
 
+**API access:** `GET /api/farmer/farm-data/export?farm_file=<file>` exposes
+the same `export_farm()` function behind the standard
+`enforce_farm_access` gate - a caller can only export a farm they have
+membership on, exactly like every other farm-owned endpoint. The CLI form
+above is unauthenticated by design (an operator/admin tool run directly
+against the server's filesystem/database), so it is not exposed as a
+public route without that check.
+
 ## What is *not* covered
 
 * Automated/scheduled backups - there is no cron/CI job invoking either
