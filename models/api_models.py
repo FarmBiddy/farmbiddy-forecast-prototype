@@ -369,6 +369,10 @@ class ScenarioSandboxRequest(BaseModel):
     milking_cows: Optional[int] = None
     litres_per_cow: Optional[float] = None
     opening_cash_balance: Optional[float] = None
+    capital_purchase_amount: Optional[float] = Field(
+        default=None, ge=0,
+        description="One-off cash cost of a purchase (e.g. machinery), deducted from today's opening cash balance rather than an absolute override",
+    )
 
 
 class ScenarioSandboxResponse(BaseModel):

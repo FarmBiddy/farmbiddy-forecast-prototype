@@ -410,6 +410,73 @@ def run_forecast(
     return response
 
 
+def _rescale_precomputed_monthly_forecast(base_farm: dict, sandbox_farm: dict, changes: dict) -> None:
+    """
+    Rescale a multi-sector farm's precomputed seasonal `monthly_forecast`
+    (`services.multi_sector_farm._build_monthly_forecast`) to reflect
+    sandbox assumption changes.
+
+    `forecast_engine.cashflow.generate_monthly_forecast` always prefers a
+    farm's precomputed `monthly_forecast` over recalculating one from
+    scratch - correct for a real farm's actual monthly forecast, but it
+    means that, left alone, a sandbox change to milk price, a cost, loan
+    repayments, or opening cash would leave every month's cash position
+    completely unchanged: annual `forecast_summary` figures (calculated
+    fresh from the flat fields every time) would move, while "Lowest cash",
+    "Year-end cash", and cash-shortage months silently would not.
+
+    Rather than recomputing the seasonal shape from scratch - a second,
+    parallel monthly-forecast calculation this module deliberately avoids -
+    this rescales the EXISTING precomputed months by the same ratio the
+    sandbox's own annual revenue/cost totals moved by (via the same
+    `calculate_revenue`/`calculate_costs` the rest of this module already
+    uses), preserving the farm's real seasonal pattern while responding
+    correctly to the scenario, then rebuilds the running-balance columns
+    from the (possibly overridden) opening cash balance. A no-op whenever
+    nothing that affects revenue, costs, or opening cash actually changed.
+    """
+    months = sandbox_farm.get("monthly_forecast")
+    if not (isinstance(months, list) and len(months) == 12) or not changes:
+        return
+
+    old_revenue = calculate_revenue(base_farm)
+    new_revenue = calculate_revenue(sandbox_farm)
+    old_costs = calculate_costs(base_farm)
+    new_costs = calculate_costs(sandbox_farm)
+    revenue_ratio = (new_revenue / old_revenue) if old_revenue else 1.0
+    cost_ratio = (new_costs / old_costs) if old_costs else 1.0
+
+    if revenue_ratio == 1.0 and cost_ratio == 1.0 and "opening_cash_balance" not in changes:
+        return
+
+    running = float(sandbox_farm.get("opening_cash_balance", 0))
+    farm_running = running
+    household_running = 0.0
+    rescaled = []
+    for month in months:
+        revenue = round(month.get("revenue", 0) * revenue_ratio, 2)
+        costs = round(month.get("costs", 0) * cost_ratio, 2)
+        cashflow = round(revenue - costs, 2)
+        running += cashflow
+        household_net = month.get("household_net", 0)
+        transfer_in = month.get("household_transfer_in", 0)
+        farm_cashflow = round(cashflow - transfer_in, 2)
+        farm_running += farm_cashflow
+        household_running += household_net
+        rescaled.append({
+            **month,
+            "revenue": revenue,
+            "costs": costs,
+            "cashflow": cashflow,
+            "running_balance": round(running, 2),
+            "farm_cashflow": farm_cashflow,
+            "farm_running_balance": round(farm_running, 2),
+            "combined_cashflow": round(farm_cashflow + household_net, 2),
+            "combined_running_balance": round(farm_running + household_running, 2),
+        })
+    sandbox_farm["monthly_forecast"] = rescaled
+
+
 def apply_sandbox_changes(farm: dict, changes: dict) -> Tuple[dict, dict]:
     """
     Copy the farm and apply sandbox assumption changes.
@@ -444,6 +511,8 @@ def apply_sandbox_changes(farm: dict, changes: dict) -> Tuple[dict, dict]:
         old_value = sandbox_farm.get(field)
         sandbox_farm[field] = new_value
         changes_applied[field] = {"from": old_value, "to": new_value}
+
+    _rescale_precomputed_monthly_forecast(farm, sandbox_farm, changes)
 
     return sandbox_farm, changes_applied
 

@@ -64,6 +64,16 @@ def build_absolute_changes(farm: dict, inputs: dict) -> dict[str, Any]:
             val = inputs[field]
             changes[field] = int(val) if field == "milking_cows" else float(val)
 
+    # "Buy machinery": a one-off cash purchase is a delta off TODAY's opening
+    # cash, not a farmer-guessed absolute figure - so it stays correct
+    # regardless of what the farmer's actual current cash position is, and
+    # composes with an explicit opening_cash_balance override above (e.g. "my
+    # cash is really €X, and I also buy machinery for €Y" nets to X-Y).
+    capital_purchase = inputs.get("capital_purchase_amount") or 0
+    if capital_purchase:
+        base_cash = changes.get("opening_cash_balance", farm.get("opening_cash_balance", 0))
+        changes["opening_cash_balance"] = round(float(base_cash) - float(capital_purchase), 2)
+
     return changes
 
 
@@ -98,7 +108,14 @@ def build_scenario_recommendations(
                 "description": "Review suppliers, ration efficiency, and grazing plans.",
             })
 
-    if comparison.get("monthly_cashflow_scenario", 0) < 0 or comparison.get("min_cash_scenario", 0) < 0:
+    if comparison.get("additional_funding_pressure"):
+        month = comparison.get("min_cash_month_scenario")
+        when = f" around month {month}" if month else ""
+        recs.append({
+            "title": "This scenario adds cash-shortage pressure",
+            "description": f"Cash is projected to run short{when}. Talk to your lender before committing to this change.",
+        })
+    elif comparison.get("monthly_cashflow_scenario", 0) < 0 or comparison.get("min_cash_scenario", 0) < 0:
         recs.append({
             "title": "Cashflow may become negative",
             "description": "Delay machinery purchases and monitor monthly bills closely.",
@@ -175,8 +192,32 @@ def run_scenario_sandbox(
 
     base_monthly = base_result.get("monthly_forecast") or []
     scenario_monthly = scenario_result.get("monthly_forecast") or []
-    min_cash_base = min((m.get("running_balance", 0) for m in base_monthly), default=0)
-    min_cash_scenario = min((m.get("running_balance", 0) for m in scenario_monthly), default=0)
+
+    def _min_balance_and_month(months: list[dict]) -> tuple[float, Any]:
+        if not months:
+            return 0.0, None
+        worst = min(months, key=lambda m: m.get("running_balance", 0))
+        return worst.get("running_balance", 0), worst.get("month")
+
+    def _deficit_months(months: list[dict]) -> int:
+        return sum(1 for m in months if m.get("running_balance", 0) < 0)
+
+    def _year_end_cash(months: list[dict], opening: float) -> float:
+        return months[-1].get("running_balance", opening) if months else opening
+
+    min_cash_base, min_cash_month_base = _min_balance_and_month(base_monthly)
+    min_cash_scenario, min_cash_month_scenario = _min_balance_and_month(scenario_monthly)
+    deficit_months_base = _deficit_months(base_monthly)
+    deficit_months_scenario = _deficit_months(scenario_monthly)
+    year_end_cash_base = _year_end_cash(base_monthly, farm.get("opening_cash_balance", 0))
+    year_end_cash_scenario = _year_end_cash(scenario_monthly, farm.get("opening_cash_balance", 0))
+
+    # A scenario adds genuine funding pressure only when it pushes the farm
+    # into a cash shortfall it did not already have, or deepens one it did -
+    # never merely because the scenario happens to be worse in some other
+    # respect (e.g. lower profit with cash always positive is not "funding
+    # pressure").
+    additional_funding_pressure = min_cash_scenario < 0 and min_cash_scenario < min_cash_base
 
     comparison = {
         "revenue_base": base_summary.get("annual_revenue", 0),
@@ -191,6 +232,13 @@ def run_scenario_sandbox(
         "monthly_cashflow_scenario": scenario_kpis.get("monthly_cashflow", 0),
         "min_cash_base": min_cash_base,
         "min_cash_scenario": min_cash_scenario,
+        "min_cash_month_base": min_cash_month_base,
+        "min_cash_month_scenario": min_cash_month_scenario,
+        "deficit_months_base": deficit_months_base,
+        "deficit_months_scenario": deficit_months_scenario,
+        "year_end_cash_base": year_end_cash_base,
+        "year_end_cash_scenario": year_end_cash_scenario,
+        "additional_funding_pressure": additional_funding_pressure,
         "risk_base": base_result.get("risk_level"),
         "risk_scenario": scenario_result.get("risk_level"),
         "period": scenario_result_period(),
