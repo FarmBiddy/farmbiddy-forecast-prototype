@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+import services.financial_record_service as record_svc
+from models.multi_sector_farm import compute_household_month
 from services.dashboard_summary import (
     build_cash_position_series,
     build_current_period_summary,
@@ -10,6 +14,7 @@ from services.dashboard_summary import (
     calculate_dashboard_kpis,
     calculate_sector_performance,
     compute_actual_cash_flow,
+    dataset_coverage_cutoff,
     generate_dashboard_alerts,
     get_budget_entries,
     get_historical_data,
@@ -18,6 +23,12 @@ from services.dashboard_summary import (
     sum_loan_principal,
     sum_outstanding_debt,
 )
+
+
+@pytest.fixture(autouse=True)
+def isolated_records_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(record_svc, "FINANCIAL_RECORDS_DIR", str(tmp_path))
+    yield tmp_path
 
 
 def test_sector_status_label():
@@ -256,6 +267,71 @@ def test_compute_actual_cash_flow_and_budget_entries_available_from_dashboard_su
     assert len(budget_entries) > 0
     years_months = [(e["year"], e["month"]) for e in budget_entries]
     assert years_months == sorted(years_months)
+
+
+FARM = "multi_sector_farm.json"
+
+
+def test_dataset_coverage_cutoff_is_last_dataset_month():
+    filtered = get_selected_sector_data(FARM, ["dairy", "beef", "lamb"])
+    cutoff = dataset_coverage_cutoff(filtered)
+    assert cutoff == (2025, 12)
+
+
+def test_compute_actual_cash_flow_ignores_manual_record_inside_dataset_coverage():
+    """P0.4: a manual record dated inside the dataset's own covered window
+    must not be added on top of it - the dataset's monthly figures are
+    already a complete total for that month, so adding a manual record too
+    would double-count it."""
+    filtered = get_selected_sector_data(FARM, ["dairy", "beef", "lamb"])
+    farm_summary = filtered.get("farm_summary") or {}
+    without_manual = compute_actual_cash_flow(filtered, farm_summary, months=12)
+
+    record_svc.add_financial_record(FARM, {
+        "record_type": "expense", "date": "2025-06-15", "category": "feed",
+        "amount": 5000.0, "description": "Extra feed", "counterparty": None,
+        "notes": None, "sector": None,
+    })
+    with_manual = compute_actual_cash_flow(filtered, farm_summary, months=12, farm_file=FARM)
+    assert with_manual[(2025, 6)]["actual_cash_out"] == without_manual[(2025, 6)]["actual_cash_out"]
+    assert len(with_manual) == len(without_manual)
+
+
+def test_compute_actual_cash_flow_adds_manual_record_after_dataset_coverage():
+    """A manual record dated after the dataset's last covered month is
+    genuinely new activity - the dataset has no figure for it at all, so it
+    is safe to add in full, and it extends "actual" into a new month."""
+    filtered = get_selected_sector_data(FARM, ["dairy", "beef", "lamb"])
+    farm_summary = filtered.get("farm_summary") or {}
+    without_manual = compute_actual_cash_flow(filtered, farm_summary, months=12)
+    assert (2026, 1) not in without_manual
+
+    record_svc.add_financial_record(FARM, {
+        "record_type": "income", "date": "2026-01-10", "category": "milk",
+        "amount": 8000.0, "description": "Milk cheque", "counterparty": None,
+        "notes": None, "sector": "dairy",
+    })
+    with_manual = compute_actual_cash_flow(filtered, farm_summary, months=12, farm_file=FARM)
+    assert (2026, 1) in with_manual
+    # Recurring household income/outgoings still apply to a manual-only
+    # month (they are calendar-month recurring figures, not part of the
+    # dataset's per-sector monthly line items) - the milk cheque is on top.
+    household_jan = compute_household_month((farm_summary or {}).get("household") or {}, 1)
+    assert with_manual[(2026, 1)]["actual_cash_in"] == round(8000.0 + household_jan["income"], 2)
+
+
+def test_build_current_period_summary_advances_with_new_manual_records():
+    filtered = get_selected_sector_data(FARM, ["dairy", "beef", "lamb"])
+    without_manual = build_current_period_summary(filtered)
+    assert without_manual["period"]["label"] == "Dec 2025"
+
+    record_svc.add_financial_record(FARM, {
+        "record_type": "income", "date": "2026-01-10", "category": "milk",
+        "amount": 8000.0, "description": "Milk cheque", "counterparty": None,
+        "notes": None, "sector": "dairy",
+    })
+    with_manual = build_current_period_summary(filtered, farm_file=FARM)
+    assert with_manual["period"]["label"] == "Jan 2026"
 
 
 def test_build_current_period_summary_returns_latest_actual_month():

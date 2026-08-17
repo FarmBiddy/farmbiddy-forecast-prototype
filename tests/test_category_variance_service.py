@@ -108,9 +108,11 @@ def test_reconciliation_categories_plus_unbudgeted_cover_all_seen_categories(fil
     assert ("income", "milk") in all_seen_ids  # never disappears just because it's unbudgeted
 
 
-def test_manual_records_feed_into_actuals_for_budgeted_category(filtered):
-    # A category with no dataset-derived actual at all — only manual entries —
-    # must still be comparable once a budget exists for it.
+def test_manual_records_inside_dataset_coverage_are_not_double_counted(filtered):
+    # The dataset already has a complete, aggregated insurance figure for
+    # June 2025. A manual entry dated inside that same covered month must
+    # NOT be added on top of it - that would double-count a cost the
+    # dataset already totals up.
     record_svc.add_financial_record(FARM, {
         "record_type": "expense", "date": "2025-06-15", "category": "insurance",
         "amount": 500.0, "description": "Top-up policy", "counterparty": None,
@@ -123,10 +125,30 @@ def test_manual_records_feed_into_actuals_for_budgeted_category(filtered):
 
     result = build_category_budget_vs_actual(FARM, SECTORS, filtered_raw=filtered)
     insurance_row = next(r for r in result["categories"] if r["category_id"] == "insurance")
-    # Dataset already has some insurance cost in June; the manual EUR500 must
-    # be additive on top of it, not silently dropped or replacing it.
     dataset_june_insurance = dataset_monthly_category_totals(filtered, months=12).get((2025, 6, "expense", "insurance"), 0.0)
-    assert insurance_row["actual_total"] == round(dataset_june_insurance + 500.0, 2)
+    assert insurance_row["actual_total"] == round(dataset_june_insurance, 2)
+
+
+def test_manual_records_after_dataset_coverage_extend_the_window(filtered):
+    # The dataset's own coverage ends 2025-12 (see services/income_expense_
+    # service.py window fixture). A manual entry dated after that is
+    # genuinely new activity the dataset has no figure for, so it is safe
+    # to add in full and should extend the comparison into that new month.
+    record_svc.add_financial_record(FARM, {
+        "record_type": "expense", "date": "2026-01-10", "category": "insurance",
+        "amount": 500.0, "description": "New policy", "counterparty": None,
+        "notes": None, "sector": None,
+    })
+    budget_svc.set_monthly_budget(FARM, {
+        "record_type": "expense", "category": "insurance", "year": 2026, "month": 1,
+        "amount": 500.0, "sector": None, "notes": None,
+    })
+
+    result = build_category_budget_vs_actual(FARM, SECTORS, filtered_raw=filtered)
+    insurance_row = next(r for r in result["categories"] if r["category_id"] == "insurance")
+    assert insurance_row["actual_total"] == 500.0
+    assert insurance_row["status"] == "on_budget"
+    assert insurance_row["months_in_window"] > insurance_row["months_with_budget"]
 
 
 def test_overall_summary_reflects_status(filtered):

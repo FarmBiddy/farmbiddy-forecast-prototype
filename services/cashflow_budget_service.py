@@ -9,7 +9,12 @@ introduced (`combined_cashflow` in services/multi_sector_farm.py), so
 `compute_actual_cash_flow` and `get_budget_entries` live in
 `services.dashboard_summary` (not here) so the Overview's current-period
 and cash-position figures can share the exact same "actual" definition
-without a circular import between the two modules.
+without a circular import between the two modules. Since P0.4,
+`compute_actual_cash_flow` also folds in the farmer's manual
+`FinancialRecord` ledger for months after the dataset's own coverage ends
+(see `dashboard_summary.dataset_coverage_cutoff`), so this comparison
+keeps moving forward as new actuals are recorded rather than staying
+frozen at the dataset's last historical month.
 """
 
 from __future__ import annotations
@@ -105,7 +110,7 @@ def compare_budget_vs_actual(
     filtered = filtered_raw or get_selected_sector_data(farm_file, sectors)
     farm_summary = filtered.get("farm_summary") or {}
 
-    actual_by_period = compute_actual_cash_flow(filtered, farm_summary, months=months)
+    actual_by_period = compute_actual_cash_flow(filtered, farm_summary, months=months, farm_file=farm_file)
     budget_entries = get_budget_entries(filtered)
 
     entries = []

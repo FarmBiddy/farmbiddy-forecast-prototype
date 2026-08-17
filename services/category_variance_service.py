@@ -18,6 +18,15 @@ Budgets come only from `services/category_budget_service.py` - a category
 with no budget entry for a given month is simply excluded from that
 month's comparison; a category with *no* budget anywhere in the window is
 reported with `status="no_budget_set"`, never a fabricated zero variance.
+
+Double-counting guard (P0.4): the dataset's monthly figures are already
+complete, aggregated totals for the months they cover. A manual record
+dated inside that coverage window is therefore NOT added into Actuals
+here (it would double-count against a figure the dataset already
+includes) - only records dated after `dataset_coverage_cutoff` are folded
+in, and the comparison window is extended to include those newer,
+manual-only months. See `services.dashboard_summary.compute_actual_cash_flow`
+for the identical rule applied to the Overview/whole-farm Budget vs Actual.
 """
 
 from __future__ import annotations
@@ -27,7 +36,7 @@ from models.financial_record import category_label
 from services.category_budget_service import budget_lookup
 from services.financial_record_service import list_financial_records, monthly_category_totals as manual_monthly_category_totals
 from services.income_expense_service import dataset_monthly_category_totals, window_months
-from services.dashboard_summary import get_selected_sector_data
+from services.dashboard_summary import dataset_coverage_cutoff, get_selected_sector_data
 
 TOLERANCE_FLOOR = 10.0
 TOLERANCE_RATE = 0.03
@@ -58,22 +67,31 @@ def build_category_budget_vs_actual(
     filtered = filtered_raw or get_selected_sector_data(farm_file, sectors)
     selected = filtered.get("selected_sectors") or sectors or []
 
-    window = window_months(filtered, months=months)
-    window_set = set(window)
-
+    dataset_window = window_months(filtered, months=months)
+    cutoff = dataset_coverage_cutoff(filtered)
     dataset_actuals = dataset_monthly_category_totals(filtered, months=months)
 
-    def _in_window(record: dict) -> bool:
+    def _record_year_month(record: dict) -> tuple | None:
         date = record.get("date") or ""
         if len(date) < 7:
-            return False
+            return None
         try:
-            return (int(date[0:4]), int(date[5:7])) in window_set
+            return (int(date[0:4]), int(date[5:7]))
         except ValueError:
-            return False
+            return None
 
-    manual_records = [r for r in list_financial_records(farm_file, sectors=selected) if _in_window(r)]
-    manual_actuals = manual_monthly_category_totals(manual_records)
+    # Only records dated after the dataset's own coverage are added to
+    # Actuals - a record inside that coverage would double-count against a
+    # month the dataset already totals up (see module docstring).
+    manual_records_new = [
+        r for r in list_financial_records(farm_file, sectors=selected)
+        if (ym := _record_year_month(r)) is not None and (cutoff is None or ym > cutoff)
+    ]
+    manual_actuals = manual_monthly_category_totals(manual_records_new)
+
+    manual_only_months = sorted({(y, m) for (y, m, _rt, _cat) in manual_actuals.keys()})
+    window = sorted(set(dataset_window) | set(manual_only_months))
+    window_set = set(window)
 
     actual_totals: dict[tuple, float] = dict(dataset_actuals)
     for key, value in manual_actuals.items():

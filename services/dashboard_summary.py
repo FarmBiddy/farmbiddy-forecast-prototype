@@ -35,6 +35,7 @@ from services.multi_sector_farm import (
     filter_farm_by_sectors,
     load_multi_sector_farm,
 )
+from services.financial_record_service import list_financial_records
 
 ALERT_PRIORITY = {
     "negative profit": 1,
@@ -486,7 +487,45 @@ def get_budget_entries(farm: dict) -> list[dict]:
     return sorted(entries, key=lambda e: (e.get("year", 0), e.get("month", 0)))
 
 
-def compute_actual_cash_flow(filtered_raw: dict, farm_summary: dict, months: int = 24) -> dict[tuple, dict]:
+def dataset_coverage_cutoff(filtered_raw: dict) -> tuple[int, int] | None:
+    """The last (year, month) the canonical dataset has structured monthly
+    figures for, across all sectors.
+
+    This is the boundary used to decide whether a farmer-entered
+    `FinancialRecord` (P0.2) is safe to add on top of the dataset's own
+    actuals: a record dated at or before this month may already be
+    reflected in that dataset's aggregate figures, so it is excluded from
+    combined Actuals to avoid double-counting (it still appears in the
+    farmer's own manual-entry ledger, see `services/income_expense_service.py`).
+    A record dated after it is genuinely new activity the dataset has no
+    figure for yet, so it is safe to add in full - see `compute_actual_cash_flow`.
+    """
+    latest: tuple[int, int] | None = None
+    for sector_data in (filtered_raw.get("sectors") or {}).values():
+        for entry in sector_data.get("monthly") or []:
+            year, month = int(entry.get("year") or 0), int(entry.get("month") or 0)
+            if not year or not month:
+                continue
+            if latest is None or (year, month) > latest:
+                latest = (year, month)
+    return latest
+
+
+def _record_year_month(date_str: str | None) -> tuple[int, int] | None:
+    if not date_str or len(date_str) < 7:
+        return None
+    try:
+        return int(date_str[0:4]), int(date_str[5:7])
+    except ValueError:
+        return None
+
+
+def compute_actual_cash_flow(
+    filtered_raw: dict,
+    farm_summary: dict,
+    months: int = 24,
+    farm_file: str | None = None,
+) -> dict[tuple, dict]:
     """Actual farm+household cash in/out per (year, month), keyed by period tuple.
 
     Mirrors the `combined_cashflow` definition from
@@ -495,6 +534,17 @@ def compute_actual_cash_flow(filtered_raw: dict, farm_summary: dict, months: int
     repayments. This is the single source of truth for "actual" cash flow,
     reused by cashflow_budget_service (Budget vs Actual) and the Overview's
     current-period/cash-position figures, so none of them can disagree.
+
+    When `farm_file` is given (P0.4), the farmer's manual `FinancialRecord`
+    ledger is folded in for any calendar month *after*
+    `dataset_coverage_cutoff` - i.e. real activity the dataset does not (and,
+    being a fixed snapshot, cannot yet) contain. This is what lets the
+    Overview and Budget vs Actual keep moving forward as a farmer records
+    new income/expenses, instead of staying frozen at the dataset's last
+    historical month. Records dated at or before the cutoff are
+    deliberately NOT added here, since the dataset's monthly figures are
+    already-aggregated totals for that month and adding a manual entry on
+    top would double-count it.
     """
     household = (farm_summary or {}).get("household") or {}
     loan_monthly = _loan_monthly_total(farm_summary)
@@ -515,20 +565,63 @@ def compute_actual_cash_flow(filtered_raw: dict, farm_summary: dict, months: int
             "actual_cash_out": cash_out,
             "actual_net": round(cash_in - cash_out, 2),
         }
+
+    if not farm_file:
+        return actual
+
+    cutoff = dataset_coverage_cutoff(filtered_raw)
+    sectors = filtered_raw.get("selected_sectors")
+    manual_by_period: dict[tuple, dict] = defaultdict(lambda: {"income": 0.0, "expense": 0.0})
+    for record in list_financial_records(farm_file, sectors=sectors):
+        year_month = _record_year_month(record.get("date"))
+        if year_month is None or (cutoff is not None and year_month <= cutoff):
+            continue
+        key = "income" if record.get("record_type") == "income" else "expense"
+        manual_by_period[year_month][key] += float(record.get("amount") or 0)
+
+    for (year, month), amounts in manual_by_period.items():
+        period_key = (year, month)
+        if period_key in actual:
+            # Cannot happen while manual months are strictly after the
+            # dataset's cutoff (dataset months are all <= cutoff by
+            # definition) - kept as a conservative, additive fallback only.
+            entry = actual[period_key]
+            entry["actual_cash_in"] = round(entry["actual_cash_in"] + amounts["income"], 2)
+            entry["actual_cash_out"] = round(entry["actual_cash_out"] + amounts["expense"], 2)
+            entry["actual_net"] = round(entry["actual_cash_in"] - entry["actual_cash_out"], 2)
+            continue
+
+        hh = compute_household_month(household, month)
+        scheme_income = _scheme_payment_for_month(filtered_raw, month)
+        cash_in = round(amounts["income"] + scheme_income + hh["income"], 2)
+        cash_out = round(amounts["expense"] + loan_monthly + hh["outgoings"], 2)
+        actual[period_key] = {
+            "year": year,
+            "month": month,
+            "period": f"{year}-{month:02d}",
+            "actual_cash_in": cash_in,
+            "actual_cash_out": cash_out,
+            "actual_net": round(cash_in - cash_out, 2),
+        }
+
     return actual
 
 
-def build_current_period_summary(filtered_raw: dict | None) -> dict | None:
+def build_current_period_summary(filtered_raw: dict | None, farm_file: str | None = None) -> dict | None:
     """Income / Costs / Difference for the most recent actual month (Home Dashboard).
 
     Uses the same farm+household-aware actual cash-flow definition as
     Budget vs Actual, so "this period" on the Overview can never disagree
     with that page. Returns None when there is no actual data yet.
+
+    Passing `farm_file` (P0.4) lets "most recent" advance past the
+    dataset's own last historical month once the farmer has logged newer
+    manual income/expense records - see `compute_actual_cash_flow`.
     """
     if not filtered_raw:
         return None
     farm_summary = filtered_raw.get("farm_summary") or {}
-    actual_by_period = compute_actual_cash_flow(filtered_raw, farm_summary, months=1)
+    actual_by_period = compute_actual_cash_flow(filtered_raw, farm_summary, months=1, farm_file=farm_file)
     if not actual_by_period:
         return None
     latest = actual_by_period[max(actual_by_period.keys())]
@@ -552,6 +645,7 @@ def build_cash_position_series(
     farm_enriched: dict,
     monthly_forecast: list[dict],
     history_months: int = 6,
+    farm_file: str | None = None,
 ) -> dict | None:
     """Monthly cash-position series for the Overview's primary chart.
 
@@ -579,7 +673,9 @@ def build_cash_position_series(
         return None
 
     farm_summary = filtered_raw.get("farm_summary") or {}
-    actual_by_period = compute_actual_cash_flow(filtered_raw, farm_summary, months=max(history_months, 1))
+    actual_by_period = compute_actual_cash_flow(
+        filtered_raw, farm_summary, months=max(history_months, 1), farm_file=farm_file,
+    )
     budget_net_by_period = {
         (entry.get("year"), entry.get("month")): round(
             float(entry.get("expected_cash_in") or 0) - float(entry.get("expected_cash_out") or 0), 2,
@@ -637,6 +733,7 @@ def build_overview_summary(
     alerts: list[dict],
     forecast_summary: dict | None = None,
     filtered_raw: dict | None = None,
+    farm_file: str | None = None,
 ) -> dict:
     """The headline figures for the reworked Overview page (UX items 1/9):
     position, trajectory, concern, and next step, all in one place, so a
@@ -652,8 +749,8 @@ def build_overview_summary(
     top_alert = (alerts or [{}])[0]
     no_critical = top_alert.get("severity") == "info"
 
-    current_period = build_current_period_summary(filtered_raw)
-    cash_position = build_cash_position_series(filtered_raw, farm, monthly_forecast)
+    current_period = build_current_period_summary(filtered_raw, farm_file=farm_file)
+    cash_position = build_cash_position_series(filtered_raw, farm, monthly_forecast, farm_file=farm_file)
     annual_profit = (forecast_summary or {}).get("annual_profit")
     expected_annual_farm_profit = {
         "value": format_currency(annual_profit) if annual_profit is not None else "—",
@@ -756,7 +853,7 @@ def build_executive_dashboard(
         "overview_header": build_overview_header(profile, selected_sectors, generated_at),
         "overview_summary": build_overview_summary(
             farm_enriched, monthly_forecast, alerts,
-            forecast_summary=summary, filtered_raw=filtered_raw,
+            forecast_summary=summary, filtered_raw=filtered_raw, farm_file=farm_file,
         ),
         "executive_kpis": calculate_dashboard_kpis(
             summary, farm_enriched, monthly_forecast, forecast.get("risk_level", "Low"),
