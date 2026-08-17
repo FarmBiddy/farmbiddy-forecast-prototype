@@ -1,4 +1,11 @@
-"""Shared pytest fixtures for the P3 database-backed test suites."""
+"""Shared pytest fixtures.
+
+`isolated_db` is autouse: every test gets its own temporary SQLite file
+instead of the shared development database. Combined with P4.1's default
+`PERSISTENCE_BACKEND=db`, this is what keeps concurrent pytest processes
+from locking `outputs/farmbiddy.db` and what makes the suite exercise the
+same persistence path the running application uses.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 import db.session as db_session
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def isolated_db(tmp_path, monkeypatch):
     """A fresh SQLite database, isolated per test, wired into `db.session` so
     every repository/service under test (via `session_scope`/`get_db`) uses

@@ -134,3 +134,19 @@ def test_tax_month_increases_household_outgoings(farm):
     tax_month = monthly[11]
     non_tax_month = monthly[10]
     assert tax_month["household_outgoings"] > non_tax_month["household_outgoings"]
+
+
+def test_persisted_loans_overlay_dataset_loans_when_db_rows_exist(isolated_db):
+    from repositories.loans import DbLoanRepository
+
+    farm = load_multi_sector_farm(MULTI_SECTOR_FILE)
+    assert farm["farm_summary"]["loans"][0]["lender"] == "AIB Agri Finance"
+
+    DbLoanRepository().save(MULTI_SECTOR_FILE, [
+        {"lender": "Demo Credit Union", "principal": 10000, "monthly_repayment": 200, "rate": 5.0, "maturity": "2028-01"},
+    ])
+    overlaid = load_multi_sector_farm(MULTI_SECTOR_FILE)
+    loans = overlaid["farm_summary"]["loans"]
+    assert len(loans) == 1
+    assert loans[0]["lender"] == "Demo Credit Union"
+    assert loans[0]["principal"] == pytest.approx(10000.0)

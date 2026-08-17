@@ -44,11 +44,11 @@ IS_SQLITE = DATABASE_URL.startswith("sqlite")
 # for just that domain, e.g. PERSISTENCE_BACKEND_DOCUMENTS=db to cut over
 # just documents while everything else stays on JSON.
 #
-# The shipped default is "json" - i.e. P3 adds real, tested, parity-checked
-# relational persistence for every domain without silently changing what a
-# fresh checkout or the existing test suite does. An operator flips this to
-# "db" (after running `scripts/migrate_json_to_db.py`) to make the database
-# authoritative; see the P3 completion report for the recommended rollout.
+# P4.1: the shipped default is "db" - the database is the normal persistence
+# path for mutable farmer-owned data. JSON implementations remain in the
+# repository layer as migration/rollback support: set PERSISTENCE_BACKEND=json
+# (or PERSISTENCE_BACKEND_<DOMAIN>=json) to revert a domain without a code
+# deploy. See docs/persistence_source_of_truth.md.
 #
 # Read live (not cached at import) so tests and ops tooling can flip a
 # domain's backend by setting an environment variable without reimporting
@@ -65,9 +65,9 @@ _DOMAINS = (
 def backend_for(domain: str) -> str:
     """'json' or 'db' for one persistence domain (see _DOMAINS above)."""
     domain = domain.upper()
-    global_default = os.environ.get("PERSISTENCE_BACKEND", "json").strip().lower()
+    global_default = os.environ.get("PERSISTENCE_BACKEND", "db").strip().lower()
     if global_default not in ("json", "db"):
-        global_default = "json"
+        global_default = "db"
     value = os.environ.get(f"PERSISTENCE_BACKEND_{domain}", global_default).strip().lower()
     return value if value in ("json", "db") else global_default
 

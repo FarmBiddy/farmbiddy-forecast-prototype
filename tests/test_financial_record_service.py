@@ -65,11 +65,14 @@ def test_add_and_list_financial_record():
     assert records[0]["id"] == record["id"]
 
 
-def test_records_persist_atomically_no_temp_files_left(tmp_path):
+def test_records_persist_atomically_no_temp_files_left(tmp_path, monkeypatch):
+    """JSON-backend rollback path: temp-file + atomic replace leaves no leftovers."""
+    monkeypatch.setenv("PERSISTENCE_BACKEND_FINANCIAL_RECORDS", "json")
     svc.add_financial_record(FARM, _expense())
     svc.add_financial_record(FARM, _income())
-    files = os.listdir(tmp_path)
-    assert files == [f"{os.path.splitext(FARM)[0]}.json"]
+    json_name = f"{os.path.splitext(FARM)[0]}.json"
+    assert json_name in os.listdir(tmp_path)
+    assert not any(name.startswith(".tmp_records_") for name in os.listdir(tmp_path))
 
 
 def test_get_financial_record_not_found_raises():

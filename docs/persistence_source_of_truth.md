@@ -1,48 +1,43 @@
-# Persistence source-of-truth rules (P3.10)
+# Persistence source-of-truth rules (P3.10 / P4.1)
 
 This is the authoritative answer to "where does this data actually live
 right now, and under what condition would that change?" for every mutable
-farm-data domain, after P3's database/repository/identity work.
+farm-data domain.
 
-## Current default: JSON remains authoritative
+## Current default: the database is authoritative for mutable farm data
 
-`config/settings.backend_for(domain)` defaults every domain to `"json"`.
-**No file has been deleted or deprecated by P3.** The relational schema,
-migration script, and DB-backed repositories exist, are tested, and are
-proven to behave identically to the JSON path (`tests/test_repository_backend_parity.py`) - they are *available*, not yet *load-bearing*. This is
-deliberate: the brief for this phase was explicit that legacy JSON paths
-must not be removed "merely because a database exists", only once
-migration is verified, no production path depends on them, and rollback
-implications are understood. Today, JSON is still the production path.
+`config/settings.backend_for(domain)` defaults every domain to `"db"`
+(P4.1). JSON repository implementations remain in the codebase as
+migration/rollback support - they are **not** deleted. Set
+`PERSISTENCE_BACKEND=json` (or `PERSISTENCE_BACKEND_<DOMAIN>=json`) to
+revert a domain without a code deploy. JSON files are never deleted by
+cutting a domain over to `db`.
+
+Parity with the previous JSON path is covered by
+`tests/test_repository_backend_parity.py`.
 
 ## Per-domain status
 
-| Domain | JSON location (authoritative today) | DB table (tested, not yet default) | Migration | Parity tests | Cutover flag |
+| Domain | Authoritative store (P4.1) | JSON rollback location | Migration | Parity tests | Cutover flag |
 |---|---|---|---|---|---|
-| Financial records | `outputs/farm_events/financial_records/<farm>.json` | `financial_records` | `scripts/migrate_json_to_db.py` | `test_repository_backend_parity.py::TestFinancialRecordsParity` | `PERSISTENCE_BACKEND_FINANCIAL_RECORDS` |
-| Documents | `outputs/farm_events/documents/<farm>.json` | `documents` | `scripts/migrate_json_to_db.py` | `TestDocumentsParity` | `PERSISTENCE_BACKEND_DOCUMENTS` |
-| Category budgets | `outputs/farm_events/category_budgets/<farm>.json` | `category_budgets` | `scripts/migrate_json_to_db.py` | `TestCategoryBudgetsParity` | `PERSISTENCE_BACKEND_CATEGORY_BUDGETS` |
-| Onboarding profile | `outputs/farm_events/onboarding/<farm>.json` | `onboarding_profiles` | `scripts/migrate_json_to_db.py` | `TestOnboardingParity` | `PERSISTENCE_BACKEND_ONBOARDING` |
-| Loans | *(none - see below)* | `loans` | `scripts/migrate_json_to_db.py` (dataset-embedded loans only) | covered indirectly via migration reconciliation | `PERSISTENCE_BACKEND_LOANS` |
-| Users / Farms / Memberships | *(none - always DB, P3-native)* | `users`, `farms`, `farm_memberships` | n/a - created directly by `identity/seed.py` on first touch | `test_farm_isolation.py` | always active |
+| Financial records | `financial_records` table | `outputs/farm_events/financial_records/<farm>.json` | `scripts/migrate_json_to_db.py` | `TestFinancialRecordsParity` | `PERSISTENCE_BACKEND_FINANCIAL_RECORDS` |
+| Documents | `documents` table | `outputs/farm_events/documents/<farm>.json` | `scripts/migrate_json_to_db.py` | `TestDocumentsParity` | `PERSISTENCE_BACKEND_DOCUMENTS` |
+| Category budgets | `category_budgets` table | `outputs/farm_events/category_budgets/<farm>.json` | `scripts/migrate_json_to_db.py` | `TestCategoryBudgetsParity` | `PERSISTENCE_BACKEND_CATEGORY_BUDGETS` |
+| Onboarding profile | `onboarding_profiles` table | `outputs/farm_events/onboarding/<farm>.json` | `scripts/migrate_json_to_db.py` | `TestOnboardingParity` | `PERSISTENCE_BACKEND_ONBOARDING` |
+| Loans | `loans` table when rows exist; otherwise dataset-embedded `farm_summary.loans` | *(none - never a writable JSON store)* | `scripts/migrate_json_to_db.py` (dataset-embedded loans only) | migration reconciliation | `PERSISTENCE_BACKEND_LOANS` |
+| Users / Farms / Memberships | `users`, `farms`, `farm_memberships` | *(none - always DB)* | n/a | `test_farm_isolation.py` | always active |
 
-Setting `PERSISTENCE_BACKEND=db` overrides the default for every domain at
-once; `PERSISTENCE_BACKEND_<DOMAIN>` overrides just one. Either can be
-rolled back by unsetting/resetting the variable - no code deploy required,
-no data is destroyed by flipping the flag back (the JSON files are never
-deleted by cutting a domain over to `db`).
+Rollback: `PERSISTENCE_BACKEND=json` or `PERSISTENCE_BACKEND_<DOMAIN>=json`.
+No code deploy required; existing JSON files are left in place.
 
 ### Loans - the one true exception, not a gap
 
 The **canonical sample dataset**'s embedded `loans` array
-(`datasets/multi_sector_farm.json`) has always been the sole source for a
-dataset-backed demo farm's loans - farmers have never been able to edit
-it, and there never was a writable JSON store for loans to migrate away
-from. `JsonLoanRepository.load()` therefore intentionally returns `None`
-(distinct from `[]`) as an explicit "no DB rows recorded, keep using the
-dataset" sentinel. A farm only gets real, farmer-editable loan rows once
-`PERSISTENCE_BACKEND_LOANS=db` **and** it has DB rows (from the migration
-script, or from `services/loans_service.py` going forward).
+(`datasets/multi_sector_farm.json`) remains the fallback when a farm has
+no `loans` table rows. `JsonLoanRepository.load()` / empty-DB
+`DbLoanRepository.load()` return `None` (distinct from `[]`) as that
+sentinel. Once DB rows exist they overlay the dataset via
+`_overlay_persisted_loans` in `services/multi_sector_farm.py`.
 
 ## The canonical sample dataset is not "data to migrate"
 
@@ -57,30 +52,24 @@ farmer-entered Actuals begin - P3 does not change or replace it. The
 migration script only pulls the dataset's embedded `loans` array into the
 `loans` table (see above), and only when `PERSISTENCE_BACKEND_LOANS=db`.
 
-## Recommended cutover order (not yet executed)
+## Cutover (executed in P4.1)
 
-For a real deployment, the safest order - least to most behaviourally
-sensitive - is:
+All five mutable domains default to `"db"`. JSON paths remain as rollback.
 
-1. **Category budgets** - simplest shape, no cross-references to another
-   domain, upsert semantics already schema-enforced via the unique
-   constraint on `(farm_id, sector, record_type, category, year, month)`.
-2. **Financial records** - the `origin_document_id` uniqueness constraint
-   is schema-enforced; no other domain's rows reference a financial
-   record's id from the JSON side, so cutover is low-risk in isolation.
-3. **Documents** - depends on (2) being already cut over first in the
-   same environment, since a document's `linked_financial_record_id`
-   should point at a DB financial record once documents are DB-backed.
-4. **Onboarding** - low risk (one row per farm, no cross-references).
-5. **Loans** - only after running `scripts/migrate_json_to_db.py` for the
-   farm(s) in question and reconciling loan totals; until then, leave
-   `PERSISTENCE_BACKEND_LOANS=json` so dataset-embedded loans keep working.
+Loans stay dual-source by design: `DbLoanRepository.load()` returns `None`
+when a farm has no loan rows, and `services.multi_sector_farm` then keeps
+using the sample dataset's embedded loans. Once
+`scripts/migrate_json_to_db.py --apply` (or a farmer-owned write) creates
+loan rows, those DB rows overlay the dataset.
 
-Before flipping any domain's flag in production: run
-`python -m scripts.migrate_json_to_db --farm-file <file> --dry-run`,
-review the reconciliation output, re-run with `--apply`, then flip only
-that domain's `PERSISTENCE_BACKEND_<DOMAIN>` variable. Take a backup first
-(see `docs/backup_and_recovery.md`).
+Existing JSON farm-event files (if any) can still be imported with:
+
+```bash
+python -m scripts.migrate_json_to_db --farm-file multi_sector_farm.json --dry-run
+python -m scripts.migrate_json_to_db --farm-file multi_sector_farm.json --apply
+```
+
+Take a backup first (see `docs/backup_and_recovery.md`).
 
 ## SQLite/PostgreSQL portability review
 

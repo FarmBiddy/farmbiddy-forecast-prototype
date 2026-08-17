@@ -59,7 +59,27 @@ def _read_farm_json(farm_file: str) -> dict:
         farm = json.load(fh)
     if not isinstance(farm, dict) or "farm_name" not in farm:
         raise ValueError(f"Farm file is missing required fields: {farm_file}")
-    return farm
+    return _overlay_persisted_loans(farm, farm_file)
+
+
+def _overlay_persisted_loans(farm: dict, farm_file: str) -> dict:
+    """If the loans domain has first-class DB rows for this farm, those
+    replace the dataset-embedded `farm_summary.loans`. `None` from the
+    repository is the explicit "no DB rows recorded" sentinel - keep using
+    the sample dataset's loans rather than treating the farm as debt-free.
+    An empty list is a real "this farm has zero loans" and does replace.
+    """
+    try:
+        from repositories.loans import get_repository
+
+        persisted = get_repository().load(farm_file)
+    except Exception:
+        return farm
+    if persisted is None:
+        return farm
+    summary = dict(farm.get("farm_summary") or {})
+    summary["loans"] = persisted
+    return {**farm, "farm_summary": summary}
 
 
 def is_multi_sector(farm: dict) -> bool:

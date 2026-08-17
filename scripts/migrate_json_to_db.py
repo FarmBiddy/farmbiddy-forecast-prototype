@@ -38,8 +38,6 @@ from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-os.environ.setdefault("PERSISTENCE_BACKEND", "json")  # read source data via the JSON path below
-
 from config.paths import (  # noqa: E402
     CATEGORY_BUDGETS_DIR,
     DATASETS_DIR,

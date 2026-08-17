@@ -26,6 +26,7 @@ FARM = "migration_test_farm.json"
 
 @pytest.fixture(autouse=True)
 def isolated_json_dirs(tmp_path, monkeypatch):
+    monkeypatch.setenv("PERSISTENCE_BACKEND", "json")
     monkeypatch.setattr(records_repo, "FINANCIAL_RECORDS_DIR", str(tmp_path / "records"))
     monkeypatch.setattr(documents_repo, "DOCUMENTS_DIR", str(tmp_path / "documents"))
     monkeypatch.setattr(budgets_repo, "CATEGORY_BUDGETS_DIR", str(tmp_path / "budgets"))

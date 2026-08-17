@@ -53,6 +53,10 @@ def _seed_json_backed_farm(farm_file: str) -> None:
 
 
 class TestFarmDataExportJsonBackend:
+    @pytest.fixture(autouse=True)
+    def json_backend(self, monkeypatch):
+        monkeypatch.setenv("PERSISTENCE_BACKEND", "json")
+
     def test_export_captures_records_documents_and_budgets(self):
         _seed_json_backed_farm(FARM)
 
