@@ -62,23 +62,61 @@ without `enforce_farm_access`.
 If the identity has one farm, enter it automatically (prototype default).
 Multiple farms: pass `farm_file`.
 
+## Who does what
+
+### Main FarmBiddy platform (intended)
+
+- Real authentication and session/JWT
+- User directory / organisation membership in the wider product
+- Broader FarmBiddy navigation (this UI is the financial prototype shell)
+- Supplying identity + authorised farm + role into this API
+
+This prototype does **not** implement those.
+
+### This financial service
+
+- Financial records (income/expense)
+- Documents (invoices/receipts; farmer confirms before Actuals)
+- Category budgets and Budget vs Actual
+- Cash flow, dashboard overview, profitability, historical comparison
+- Forecasting and What If? via `forecast_engine`
+- Financial alerts (“Needs Your Attention”)
+- Financial reports (including accountant/advisor summary)
+- Farm-scoped persistence of the above
+- Enforcing farm membership on requests once identity is resolved
+
+### Integration decisions (not settled here)
+
+Do not assign these until the platform wiring is designed:
+
+- Whether farm master data (name, land, herd identifiers) lives only here, only on the platform, or is synced
+- Whether `users` / `farm_memberships` in this database remain the access source of truth or become a cache of platform grants
+- Billing, notifications, and document file storage vs attachment references
+- Who owns processor/dairy-statement credentials when a real provider is added
+
+Until then: this API is the **financial system of record** for money data it stores; the platform is the **identity and product shell**.
+
 ## Main endpoints (prefer `/api/...`)
+
+Paths below are relative to `/api`. OpenAPI: `/docs`.
 
 | Domain | READ | WRITE | CALCULATION | EXPORT |
 |---|---|---|---|---|
-| Farm profile / sectors | `/farmer/profile`, `/farmer/sectors` | Farm Setup `/farmer/onboarding` | — | `/farmer/farm-data/export` |
-| Financial records | `/farmer/financial-records` | POST/PUT/DELETE same | — | export |
-| Documents | `/farmer/documents` | POST/PUT/DELETE | paid+confirmed → linked record | export |
-| Category budgets | `/farmer/category-budgets` | monthly/annual POST, PUT, DELETE | — | export |
-| Budget vs Actual | `/farmer/category-variance`, `/farmer/cashflow-budget` | — | comparison | reports |
-| Cash flow / dashboard | `/farmer/dashboard`, `/farmer/analysis` | — | forecast_engine | reports |
-| Loans | dashboard / loans summary | via onboarding / DB overlay | debt register | export |
-| Forecast / What If? | forecast routes, `/farmer/scenario-sandbox` | — | yes | scenario report |
-| Alerts | dashboard / Action Plan | — | yes | reports |
-| Reports | `/farmer/reports/...` | generate | yes | download |
+| Farm profile / sectors | `GET /farmer/profile`, `GET /farmer/sectors`, `GET /farmer/onboarding` | Farm Setup `POST /farmer/onboarding` | — | `GET /farmer/farm-data/export` |
+| Financial records | `GET /farmer/financial-records` | POST/PUT/DELETE same path | — | export |
+| Documents | `GET /farmer/documents` | POST/PUT/DELETE same | paid+confirmed → linked record | export |
+| Category budgets | `GET /farmer/category-budgets` | `.../monthly`, `.../annual`, PUT, DELETE | — | export |
+| Budget vs Actual | `GET /farmer/category-budget-vs-actual`, `GET /farmer/cashflow-budget` | — | comparison | reports |
+| Cash flow / dashboard | `GET /farmer/dashboard`, `POST /farmer/run-analysis` | analysis saves forecast artefacts, not Actuals | `forecast_engine` | reports |
+| Loans | dashboard / loans summary on analysis | via onboarding / DB overlay (UI CRUD limited) | debt register | export |
+| Forecast / What If? | `POST /farmer/scenario-sandbox`, `GET /farmer/cashflow-actions` | — | yes | What If? report |
+| Alerts | analysis `needs_attention` / Action Plan | — | yes | reports |
+| Reports | `GET /farmer/report` (preview) | `POST /farmer/report` (PDF) | yes | download |
 
 Legacy: the same router is also mounted **without** `/api` for old clients.
 New integrations should use `/api`.
+
+One-page map: `docs/prototype_v1_technical_overview.md`.
 
 ## Financial semantics
 
