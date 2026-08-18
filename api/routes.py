@@ -86,7 +86,6 @@ from services.chart_service import get_chart_info, list_chart_files
 from services.comparison_service import benchmark_forecasts, compare_forecasts, list_forecast_history
 from services.financial_intelligence_service import ask_farm_advisor, get_financial_intelligence
 from services.advisor_service import ask_farm_intelligence
-from services.report_service import generate_farmer_report, get_report_preview
 from services.farmer_dashboard_service import (
     get_farmer_dashboard_preview,
     get_farmer_profile,
@@ -889,6 +888,8 @@ def farmer_report_preview(
     sectors: Optional[str] = Query(default=None, description="Comma-separated: dairy,beef,lamb"),
 ):
     try:
+        from services.report_service import get_report_preview
+
         return FarmerReportPreviewResponse(**get_report_preview(
             farm_id,
             report_type,
@@ -909,6 +910,8 @@ def farmer_report_preview(
 )
 def farmer_generate_report(request: FarmerReportRequest):
     try:
+        from services.report_service import generate_farmer_report
+
         return FarmerReportResponse(**generate_farmer_report(
             request.farm_file,
             request.report_type,

@@ -52,9 +52,14 @@ def _next_month(year: int, month: int) -> tuple[int, int]:
 
 def seed_demo_farm(farm_file: str = DEFAULT_FARM) -> dict:
     """Write demo farmer-owned data through live services. Safe to re-run."""
+    from config.settings import IS_SQLITE
+    from db.session import init_db
     from services.category_budget_service import list_category_budgets, set_monthly_budget
     from services.document_service import add_document, list_documents
     from services.financial_record_service import add_financial_record
+
+    if IS_SQLITE:
+        init_db()
 
     if _already_seeded(farm_file):
         return {"farm_file": farm_file, "seeded": False, "reason": "already seeded"}

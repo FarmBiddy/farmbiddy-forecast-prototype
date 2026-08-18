@@ -19,6 +19,10 @@ services:
         value: dev
       - key: FARMBIDDY_SEED_DEMO
         value: "1"
+      - key: MPLBACKEND
+        value: Agg
+      - key: MPLCONFIGDIR
+        value: /tmp/farmbiddy-mpl
     # DATABASE_URL is intentionally unset: default SQLite at {repo}/outputs/farmbiddy.db
     # (directory is created at startup). Instance disk is ephemeral — data resets
     # on deploy/restart. Do not set STORAGE_PATH unless a disk is actually mounted.

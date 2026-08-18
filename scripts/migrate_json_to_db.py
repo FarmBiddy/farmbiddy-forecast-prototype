@@ -205,8 +205,12 @@ def migrate_farm(farm_file: str, apply: bool = False) -> FarmMigrationReport:
     transaction open while each domain's repository opens its own nested
     connection would deadlock against it.
     """
-    from db.session import session_scope
+    from config.settings import IS_SQLITE
+    from db.session import init_db, session_scope
     from identity.seed import ensure_dev_owner, get_or_create_farm
+
+    if IS_SQLITE:
+        init_db()
 
     dataset_path = os.path.join(DATASETS_DIR, farm_file)
     has_dataset = os.path.exists(dataset_path)

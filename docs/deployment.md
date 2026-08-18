@@ -3,8 +3,8 @@
 This is the FarmBiddy **financial prototype**, not a paid production estate.
 Use it for demos and integration evaluation.
 
-Local SQLite creates tables on app startup (`init_db`). Import-time auto-init
-still respects `FARMBIDDY_AUTO_INIT_DB` (tests set this to `0`).
+Local SQLite creates tables during FastAPI lifespan (`init_db`), after the
+app module is imported and before Uvicorn binds the port.
 
 ## Local development
 
@@ -58,12 +58,18 @@ Do **not** set `STORAGE_PATH=/opt/render/project/data` unless a Render disk is a
 
 ### Startup sequence (SQLite demo)
 
-1. Resolve `DATABASE_URL`; for file SQLite, create the parent directory and use an absolute path.
-2. Import-time `init_db()` (`create_all`) so a fresh file has tables. Skip under pytest.
-3. FastAPI startup: `ensure_output_dirs()`, `init_db()` again (idempotent), then `maybe_seed_on_startup()` if `FARMBIDDY_SEED_DEMO=1`.
-4. Sample farm JSON comes from committed `datasets/`; farmer-owned demo rows are seeded through normal services.
+Uvicorn binds `$PORT` only **after** the app is imported and FastAPI lifespan finishes.
+
+1. Import `api.main` (engine constructed; **no** `create_all`; matplotlib not imported).
+2. Lifespan: `ensure_output_dirs()`, SQLite `init_db()` (`create_all`), optional demo seed if `FARMBIDDY_SEED_DEMO=1`.
+3. Bind `0.0.0.0:$PORT`.
+4. `/api/status` is available (no forecast/report/seed on that route).
+
+PDF report charts load matplotlib on first report request, not at startup.
 
 No pre-created `farmbiddy.db` is required. **Alembic is not run on this SQLite demo.** Use `alembic upgrade head` only for Postgres.
+
+Keep `startCommand`: `uvicorn api.main:app --host 0.0.0.0 --port $PORT` (Render supplies `$PORT`).
 
 ### Persistence is ephemeral
 
@@ -73,7 +79,7 @@ For **durable** data later (needs approval / paid plan): mount a disk and set `S
 
 ## Database migrations
 
-Local / Render SQLite: tables via `init_db()` (`create_all`) on import and startup (`FARMBIDDY_AUTO_INIT_DB=1`). Tests set this to `0` and use an isolated temp file.
+Local / Render SQLite: tables via `init_db()` (`create_all`) in FastAPI lifespan. Tests use an isolated temp file.
 
 Production Postgres:
 
@@ -99,9 +105,11 @@ python -m scripts.migrate_json_to_db --apply
 | `PERSISTENCE_BACKEND` | `db` (default) or `json` rollback |
 | `PERSISTENCE_BACKEND_<DOMAIN>` | Per-domain override |
 | `IDENTITY_PROVIDER` | `dev` today |
-| `FARMBIDDY_AUTO_INIT_DB` | `1` (default) SQLite `create_all`; `0` in migration tests |
+| `FARMBIDDY_AUTO_INIT_DB` | unused for import; SQLite `create_all` runs in FastAPI lifespan |
 | `FARMBIDDY_SEED_DEMO` | `1` to seed demo farmer-owned data on startup |
 | `FARMBIDDY_DEMO_FARM` | farm file for that seed (default `multi_sector_farm.json`) |
+| `MPLBACKEND` | `Agg` on Render (headless charts) |
+| `MPLCONFIGDIR` | writable matplotlib cache (`/tmp/farmbiddy-mpl` on Render) |
 
 See `.env.example`. Never commit secrets.
 

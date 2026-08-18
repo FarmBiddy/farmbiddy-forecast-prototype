@@ -5,9 +5,21 @@ Serves the visual web interface at GET / and exposes JSON API routes
 under /api/... (legacy root API paths remain for backward compatibility).
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
+
+# Headless hosts (Render): pin Agg and a writable cache *before* any later
+# matplotlib import. Font discovery against a missing/read-only home can
+# block Uvicorn from binding $PORT.
+os.environ.setdefault("MPLBACKEND", "Agg")
+os.environ.setdefault(
+    "MPLCONFIGDIR",
+    os.path.join(os.environ.get("TMPDIR") or os.environ.get("TEMP") or "/tmp", "farmbiddy-mpl"),
+)
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -21,6 +33,25 @@ from services.forecast_service import (
     ForecastFileNotFoundError,
     InvalidFarmDataError,
 )
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Required bootstrap only — Uvicorn binds the listen port *after* this
+    completes. Keep it short: directories, SQLite schema, optional demo rows.
+    """
+    ensure_output_dirs()
+    os.makedirs(FRONTEND_DIR, exist_ok=True)
+    os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+    from config.settings import IS_SQLITE
+    from db.session import init_db
+    from scripts.seed_demo_farm import maybe_seed_on_startup
+
+    if IS_SQLITE and "pytest" not in sys.modules:
+        init_db()
+    maybe_seed_on_startup()
+    yield
+
 
 app = FastAPI(
     title="FarmBiddy Financial Platform API",
@@ -45,6 +76,7 @@ app = FastAPI(
     ),
     version="1.0.0",
     contact={"name": "FarmBiddy"},
+    lifespan=lifespan,
     openapi_tags=[
         {"name": "System", "description": "Health and application status."},
         {"name": "Farmer Edition", "description": "Farm-scoped farmer workflows: records, documents, budgets, dashboard, What If?, reports."},
@@ -61,23 +93,6 @@ app = FastAPI(
 # Create writable/output folders before StaticFiles mounts (required on fresh deploy).
 ensure_output_dirs()
 os.makedirs(FRONTEND_DIR, exist_ok=True)
-
-
-@app.on_event("startup")
-def startup():
-    """Re-ensure folders exist after redeploy or storage path changes."""
-    ensure_output_dirs()
-    os.makedirs(FRONTEND_DIR, exist_ok=True)
-    from config.settings import IS_SQLITE
-    from db.session import init_db
-    from scripts.seed_demo_farm import maybe_seed_on_startup
-
-    # Local SQLite: create tables if this is a fresh file. Production Postgres
-    # uses `alembic upgrade head` instead (init_db is a no-op for existing tables).
-    # Skip under pytest — tests use the isolated_db fixture's temp file.
-    if IS_SQLITE and "pytest" not in sys.modules:
-        init_db()
-    maybe_seed_on_startup()
 
 
 # ---------------------------------------------------------------------------

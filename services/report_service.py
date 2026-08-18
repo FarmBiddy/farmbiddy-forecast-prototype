@@ -13,10 +13,6 @@ import tempfile
 from datetime import datetime
 from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -575,8 +571,27 @@ def collect_report_data(
 # ---------------------------------------------------------------------------
 # Chart generation (matplotlib → temp PNG for ReportLab)
 # ---------------------------------------------------------------------------
+# Matplotlib is imported lazily. Importing pyplot at module load scans fonts
+# on headless Linux and can block Uvicorn from binding a port (Render timeout).
+
+def _pyplot():
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    cache = os.path.join(
+        os.environ.get("TMPDIR") or os.environ.get("TEMP") or "/tmp",
+        "farmbiddy-mpl",
+    )
+    os.environ.setdefault("MPLCONFIGDIR", cache)
+    os.makedirs(cache, exist_ok=True)
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    import matplotlib.pyplot as plt
+
+    return plt
+
 
 def _save_chart(fig, prefix: str) -> str:
+    plt = _pyplot()
     path = os.path.join(tempfile.gettempdir(), f"farmbiddy_{prefix}_{os.getpid()}.png")
     fig.savefig(path, dpi=150, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -584,6 +599,7 @@ def _save_chart(fig, prefix: str) -> str:
 
 
 def _chart_revenue_costs(monthly: list[dict]) -> str:
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
     months = [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
     rev = [m.get("revenue", 0) for m in monthly]
@@ -598,6 +614,7 @@ def _chart_revenue_costs(monthly: list[dict]) -> str:
 
 
 def _chart_cost_breakdown(breakdown: dict) -> str:
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(7, 4))
     labels = [k for k, v in breakdown.items() if v]
     values = [v for v in breakdown.values() if v]
@@ -609,6 +626,7 @@ def _chart_cost_breakdown(breakdown: dict) -> str:
 
 
 def _chart_cashflow(monthly: list[dict]) -> str:
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
     months = [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
     cf = [m.get("cashflow", 0) for m in monthly]
@@ -621,6 +639,7 @@ def _chart_cashflow(monthly: list[dict]) -> str:
 
 
 def _chart_reserve(monthly: list[dict]) -> str:
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
     months = [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
     bal = [m.get("running_balance", 0) for m in monthly]
@@ -632,6 +651,7 @@ def _chart_reserve(monthly: list[dict]) -> str:
 
 
 def _chart_forecast_cases(scenarios: list[dict]) -> str:
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(7, 4))
     names = [s.get("name", "") for s in scenarios]
     profits = [s.get("profit", 0) for s in scenarios]
@@ -643,6 +663,7 @@ def _chart_forecast_cases(scenarios: list[dict]) -> str:
 
 
 def _chart_monte(profits: list[float]) -> str:
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.hist(profits, bins=30, color="#2d9f5f", edgecolor="white", alpha=0.85)
     ax.axvline(sum(profits) / len(profits), color="#0f2744", linestyle="--", label="Expected")
@@ -653,6 +674,7 @@ def _chart_monte(profits: list[float]) -> str:
 
 
 def _chart_scenarios(scenarios: list[dict]) -> str:
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
     labels = [s["scenario"][:18] for s in scenarios]
     profits = [s["profit"] for s in scenarios]
