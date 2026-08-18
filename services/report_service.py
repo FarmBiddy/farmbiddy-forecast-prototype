@@ -39,8 +39,13 @@ from forecast_engine.revenue import calculate_revenue
 from forecast_engine.risk_level import calculate_risk_level
 from forecast_engine.scenarios import calculate_scenarios
 from models.api_models import ForecastOutputs, SandboxOutputs
+from models.multi_sector_farm import SECTOR_LABELS
 from services.category_variance_service import build_category_budget_vs_actual
-from services.dashboard_summary import generate_dashboard_alerts
+from services.dashboard_summary import (
+    calculate_sector_performance,
+    generate_dashboard_alerts,
+    get_selected_sector_data,
+)
 from services.farmer_dashboard_service import get_farmer_profile, resolve_farm_file, resolve_sectors
 from services.financial_intelligence_service import get_financial_intelligence
 from services.forecast_service import run_forecast, run_sandbox_forecast
@@ -48,6 +53,7 @@ from services.historical_performance_service import build_year_over_year_compari
 from services.income_expense_service import build_income_expense_summary
 from services.loans_service import build_loans_summary
 from services.multi_sector_farm import load_farm_for_analysis
+from services.scenario_sandbox_service import run_scenario_sandbox
 
 SOFTWARE_VERSION = "1.0.0"
 
@@ -82,20 +88,78 @@ PAGE_SETS: dict[str, list[str]] = {
     "investment": [
         "cover", "executive", "snapshot", "investment", "advisor", "closing",
     ],
-    # Actual recorded figures an accountant/advisor needs (Income & Expenses,
-    # category Budget vs Actual, Loans & Finance, year-over-year) rather than
-    # the farmer's own forecast/scenario/Monte Carlo planning tools - built
-    # entirely from the same P0-P1 Actuals services the live app uses, never
-    # a second copy of that logic.
+    # Meeting pack for a bank or advisor: Actuals first, then a labelled
+    # cash forecast, one milk-price sensitivity, and enterprise contribution.
+    # No Monte Carlo, health scores, or investment-readiness theatre.
     "accountant": [
-        "cover", "executive", "income_expenses_actual", "budget_variance",
-        "loans_finance", "year_over_year", "closing",
+        "cover", "meeting", "income_expenses_actual", "budget_variance",
+        "loans_finance", "cash_forecast", "milk_down", "sector_contribution",
+        "year_over_year", "closing",
     ],
 }
 
 
 def _safe_pct(part: float, whole: float) -> float:
     return round(part / whole * 100, 1) if whole else 0.0
+
+
+def _month_cash(month: dict | None, opening: float = 0) -> float:
+    """Farm + household cash when present; else farm-only running balance."""
+    if not month:
+        return float(opening or 0)
+    value = month.get("combined_running_balance")
+    if value is None:
+        value = month.get("running_balance")
+    if value is None:
+        return float(opening or 0)
+    return float(value)
+
+
+def _lowest_cash(monthly: list[dict], opening: float = 0) -> dict:
+    if not monthly:
+        return {"value": float(opening or 0), "month": None, "month_label": "—"}
+    worst = min(monthly, key=lambda m: _month_cash(m, opening))
+    month = worst.get("month")
+    return {
+        "value": _month_cash(worst, opening),
+        "month": month,
+        "month_label": f"Month {month}" if month else "—",
+    }
+
+
+def _period_caption(period: Any) -> str:
+    if isinstance(period, dict):
+        label = period.get("label") or "Trailing 12 Months"
+        start = period.get("start_date")
+        end = period.get("end_date")
+        if start and end:
+            return f"{label} ({start} to {end})"
+        return label
+    return str(period or "Trailing 12 Months")
+
+
+def _enterprise_line(selected: list[str]) -> str:
+    return " · ".join(SECTOR_LABELS.get(s, s.title()) for s in selected)
+
+
+def _build_preview_kpis(data: dict) -> list[dict]:
+    """Cards for Preview and Generate — never omit numbers after PDF download."""
+    if data.get("report_type") == "accountant":
+        meeting = data.get("meeting") or {}
+        return [
+            {"label": "Cash now", "value": meeting.get("cash_now"), "kind": "currency"},
+            {"label": "Last 12 months net", "value": meeting.get("actual_net"), "kind": "currency"},
+            {"label": "Lowest expected cash", "value": meeting.get("lowest_cash"), "kind": "currency"},
+            {"label": "Total debt", "value": meeting.get("total_debt"), "kind": "currency"},
+        ]
+    k = data.get("kpis") or {}
+    lowest = data.get("lowest_cash") or {}
+    return [
+        {"label": "Cash now", "value": k.get("cash_now"), "kind": "currency"},
+        {"label": "Lowest expected cash", "value": lowest.get("value"), "kind": "currency"},
+        {"label": "Annual profit", "value": k.get("annual_profit"), "kind": "currency"},
+        {"label": "Risk level", "value": k.get("risk_level"), "kind": "text"},
+    ]
 
 
 def _risk_light(value: str) -> colors.Color:
@@ -402,7 +466,8 @@ def collect_report_data(
     selected = resolve_sectors(sectors, farm_id)
     farm = load_farm_for_analysis(farm_file, selected)
     profile = get_farmer_profile(farm_id, selected)
-    intel = get_financial_intelligence(farm_id, sectors=selected)
+    is_accountant = report_type == "accountant"
+    intel = {} if is_accountant else get_financial_intelligence(farm_id, sectors=selected)
 
     outputs = ForecastOutputs(
         forecast_summary=True,
@@ -459,38 +524,47 @@ def collect_report_data(
     risk = forecast_run.get("risk_level", "Medium")
     health = intel.get("health_score", {})
 
-    monte = run_monte_carlo(farm, iterations=1000)
-    profits, monte_extra = _monte_distribution(farm)
-    monte.update(monte_extra)
-    monte["summary"] = (
-        f"The simulation indicates a {monte['probability_of_profit'] * 100:.0f}% probability "
-        f"that the farm will remain profitable during the next twelve months."
-    )
+    if is_accountant:
+        monte: dict[str, Any] = {}
+        profits: list[float] = []
+        scenarios: list[dict] = []
+        forecast_scenarios: list[dict] = []
+        investment: dict[str, Any] = {}
+        actions: list[dict] = []
+        action_plan: dict[str, Any] = {}
+        risk_rows: list[dict] = []
+    else:
+        monte = run_monte_carlo(farm, iterations=1000)
+        profits, monte_extra = _monte_distribution(farm)
+        monte.update(monte_extra)
+        monte["summary"] = (
+            f"The simulation indicates a {monte['probability_of_profit'] * 100:.0f}% probability "
+            f"that the farm will remain profitable during the next twelve months."
+        )
+        scenarios = _build_scenario_table(farm_file, farm, risk)
+        forecast_scenarios = calculate_scenarios(farm)
+        investment = _investment_readiness(
+            {
+                "annual_revenue": revenue,
+                "annual_profit": profit,
+                "profit_margin": margin,
+                "monthly_cashflow": monthly_cf,
+                "risk_level": risk,
+                "feed_cost_ratio": feed_pct,
+            },
+            farm,
+            health,
+        )
+        actions = _enhanced_actions(intel, {**summary, "feed_cost_ratio": feed_pct, "monthly_cashflow": monthly_cf}, farm)
+        action_plan = _action_plan(intel, actions)
+        risk_rows = _risk_dashboard(
+            {**summary, "monthly_cashflow": monthly_cf, "feed_cost_ratio": feed_pct, "risk_level": risk},
+            farm,
+            health,
+        )
 
-    scenarios = _build_scenario_table(farm_file, farm, risk)
-    forecast_scenarios = calculate_scenarios(farm)
-    investment = _investment_readiness(
-        {
-            "annual_revenue": revenue,
-            "annual_profit": profit,
-            "profit_margin": margin,
-            "monthly_cashflow": monthly_cf,
-            "risk_level": risk,
-            "feed_cost_ratio": feed_pct,
-        },
-        farm,
-        health,
-    )
-    actions = _enhanced_actions(intel, {**summary, "feed_cost_ratio": feed_pct, "monthly_cashflow": monthly_cf}, farm)
-    action_plan = _action_plan(intel, actions)
-    risk_rows = _risk_dashboard(
-        {**summary, "monthly_cashflow": monthly_cf, "feed_cost_ratio": feed_pct, "risk_level": risk},
-        farm,
-        health,
-    )
-
-    opening = farm.get("opening_cash_balance", 0)
-    end_cash = monthly[-1].get("running_balance", opening) if monthly else opening
+    opening = float(farm.get("opening_cash_balance") or 0)
+    lowest = _lowest_cash(monthly, opening)
 
     income_expense_actual = build_income_expense_summary(farm_file, selected)
     budget_variance = build_category_budget_vs_actual(farm_file, selected)
@@ -505,6 +579,50 @@ def collect_report_data(
     loans_summary = build_loans_summary(debt_register, dashboard_alerts)
     year_over_year = build_year_over_year_comparison(farm_file, selected)
 
+    milk_down: dict[str, Any] = {}
+    sector_performance: list[dict] = []
+    if is_accountant:
+        try:
+            milk_down = run_scenario_sandbox(
+                farm_file, {"milk_price_cents_change": -5}, sectors=selected
+            )
+        except Exception:
+            milk_down = {"success": False, "comparison": {}}
+        try:
+            sector_performance = calculate_sector_performance(
+                get_selected_sector_data(farm_file, selected)
+            )
+        except Exception:
+            sector_performance = []
+
+    period_label = _period_caption(income_expense_actual.get("period"))
+    meeting = {
+        "cash_now": opening,
+        "actual_income": income_expense_actual.get("income_total", 0),
+        "actual_costs": income_expense_actual.get("expense_total", 0),
+        "actual_net": income_expense_actual.get("difference", 0),
+        "total_debt": loans_summary.get("total_outstanding_debt", 0),
+        "annual_repayments": loans_summary.get("total_annual_repayments", 0),
+        "lowest_cash": lowest["value"],
+        "lowest_cash_month": lowest["month"],
+        "lowest_cash_month_label": lowest["month_label"],
+        "period_label": period_label,
+        "enterprises": _enterprise_line(selected),
+    }
+
+    if is_accountant:
+        executive_summary = (
+            f"Unaudited management information for {profile.get('farm_name', 'this farm')} "
+            f"covering {period_label}. Not statutory accounts. Cash now, debt, and "
+            "last-12-month totals are recorded figures. Lowest expected cash is a forecast."
+        )
+        advisor_summary = ""
+    else:
+        executive_summary = _executive_narrative(
+            {**summary, "risk_level": risk}, health, intel
+        )
+        advisor_summary = _advisor_page(intel, {**summary, "risk_level": risk}, health)
+
     cost_breakdown = {
         "Feed": farm.get("feed", 0),
         "Fertiliser": farm.get("fertiliser", 0),
@@ -518,7 +636,7 @@ def collect_report_data(
     }
 
     generated = report_date or datetime.now().strftime("%d %B %Y")
-    return {
+    payload = {
         "farm_file": farm_file,
         "farm_name": profile.get("farm_name", farm.get("farm_name")),
         "report_type": report_type,
@@ -526,19 +644,24 @@ def collect_report_data(
         "report_date": generated,
         "generated_at": datetime.now().isoformat(),
         "software_version": SOFTWARE_VERSION,
+        "is_sample_data": bool(profile.get("is_sample_data")),
+        "selected_sectors": selected,
         "profile": profile,
         "farm": farm,
         "forecast_summary": summary,
         "monthly_forecast": monthly,
+        "lowest_cash": lowest,
+        "meeting": meeting,
         "kpis": {
-            "cash_available": end_cash,
+            "cash_now": opening,
+            "cash_available": opening,
             "annual_profit": profit,
             "risk_level": risk,
             "health_score": health.get("score", 70),
             "revenue": revenue,
             "operating_costs": costs,
             "net_profit": profit,
-            "debt": farm.get("loan_repayments", 0),
+            "debt": loans_summary.get("total_outstanding_debt", farm.get("loan_repayments", 0)),
             "feed_pct": feed_pct,
             "labour_pct": _safe_pct(farm.get("labour", 0), revenue),
             "vet_pct": _safe_pct(farm.get("vet", 0), revenue),
@@ -547,9 +670,7 @@ def collect_report_data(
         },
         "cost_breakdown": cost_breakdown,
         "health_score": health,
-        "executive_summary": _executive_narrative(
-            {**summary, "risk_level": risk}, health, intel
-        ),
+        "executive_summary": executive_summary,
         "financial_intelligence": intel,
         "monte_carlo": monte,
         "monte_profits": profits,
@@ -557,7 +678,7 @@ def collect_report_data(
         "forecast_scenarios": forecast_scenarios,
         "recommended_actions": actions,
         "action_plan": action_plan,
-        "advisor_summary": _advisor_page(intel, {**summary, "risk_level": risk}, health),
+        "advisor_summary": advisor_summary,
         "risk_dashboard": risk_rows,
         "investment_readiness": investment,
         "alerts": forecast_run.get("alerts", []),
@@ -565,7 +686,12 @@ def collect_report_data(
         "budget_variance": budget_variance,
         "loans_summary": loans_summary,
         "year_over_year": year_over_year,
+        "milk_down": milk_down,
+        "sector_performance": sector_performance,
+        "period_label": period_label,
     }
+    payload["preview_kpis"] = _build_preview_kpis(payload)
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -629,7 +755,7 @@ def _chart_cashflow(monthly: list[dict]) -> str:
     plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
     months = [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
-    cf = [m.get("cashflow", 0) for m in monthly]
+    cf = [m.get("combined_cashflow", m.get("cashflow", 0)) for m in monthly]
     colors_bars = ["#2d9f5f" if v >= 0 else "#dc2626" for v in cf]
     ax.bar(months, cf, color=colors_bars)
     ax.axhline(0, color="#64748b", linewidth=0.8)
@@ -642,7 +768,7 @@ def _chart_reserve(monthly: list[dict]) -> str:
     plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
     months = [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
-    bal = [m.get("running_balance", 0) for m in monthly]
+    bal = [_month_cash(m) for m in monthly]
     ax.fill_between(range(len(months)), bal, alpha=0.3, color="#2d9f5f")
     ax.plot(months, bal, color="#0f2744", linewidth=2.5, marker="o")
     ax.set_title("Cash Reserve Trend", fontsize=14, fontweight="bold", color="#0f2744")
@@ -692,9 +818,15 @@ def _generate_report_charts(data: dict) -> dict[str, str]:
         costs = data["forecast_summary"].get("annual_costs", 0)
         monthly = [
             {"month": i, "revenue": revenue / 12, "costs": costs / 12,
-             "cashflow": (revenue - costs) / 12, "running_balance": data["kpis"]["cash_available"]}
+             "cashflow": (revenue - costs) / 12, "running_balance": data["kpis"].get("cash_now", 0)}
             for i in range(1, 13)
         ]
+    if data.get("report_type") == "accountant":
+        charts = {}
+        if monthly:
+            charts["cashflow"] = _chart_cashflow(monthly)
+            charts["reserve"] = _chart_reserve(monthly)
+        return charts
     charts = {}
     charts["revenue_costs"] = _chart_revenue_costs(monthly)
     charts["cost_breakdown"] = _chart_cost_breakdown(data["cost_breakdown"])
@@ -741,11 +873,17 @@ def _header_footer(canvas, doc):
     canvas.setFont("Helvetica-Bold", 9)
     canvas.drawString(20 * mm, h - 12 * mm, "FarmBiddy")
     canvas.setFont("Helvetica", 8)
-    canvas.drawRightString(w - 20 * mm, h - 12 * mm, data.get("farm_name", "Farm Report"))
+    right = data.get("farm_name", "Farm Report")
+    if data.get("is_sample_data"):
+        right = f"SAMPLE / DEMO  ·  {right}"
+    canvas.drawRightString(w - 20 * mm, h - 12 * mm, right)
     canvas.setFillColor(MUTED)
     canvas.setFont("Helvetica", 7)
-    canvas.drawCentredString(w / 2, 10 * mm, f"FarmBiddy Farmer Edition  ·  {data.get('report_date', '')}  ·  Page {doc.page}")
-    canvas.drawCentredString(w / 2, 6 * mm, "Confidential — For farm management purposes only")
+    canvas.drawCentredString(w / 2, 10 * mm, f"FarmBiddy  ·  {data.get('report_date', '')}  ·  Page {doc.page}")
+    footer = "Confidential — Unaudited management information, not statutory accounts"
+    if data.get("is_sample_data"):
+        footer = "SAMPLE / DEMO DATA  ·  " + footer
+    canvas.drawCentredString(w / 2, 6 * mm, footer)
     canvas.restoreState()
 
 
@@ -781,16 +919,40 @@ def _kpi_cards(rows: list[tuple], cols: int = 2) -> Table:
 
 
 def _page_cover(data: dict, st: dict) -> list:
-    story = [Spacer(1, 4 * cm)]
-    story.append(Paragraph("FarmBiddy Farmer Edition", st["cover_sub"]))
-    story.append(Spacer(1, 0.5 * cm))
+    story = [Spacer(1, 2.2 * cm)]
+    story.append(Paragraph("FarmBiddy", st["cover_sub"]))
+    story.append(Spacer(1, 0.3 * cm))
     story.append(Paragraph("Farm Financial Report", st["cover_title"]))
     story.append(Paragraph(data["report_type_label"], st["cover_sub"]))
-    story.append(Spacer(1, 1.5 * cm))
+    if data.get("is_sample_data"):
+        story.append(Paragraph(
+            "<b>SAMPLE / DEMO DATA</b>",
+            ParagraphStyle("sample", fontSize=12, alignment=TA_CENTER, textColor=RED, spaceAfter=8),
+        ))
+    story.append(Spacer(1, 0.8 * cm))
     story.append(Paragraph(f"<b>{data['farm_name']}</b>", ParagraphStyle("fn", fontSize=20, alignment=TA_CENTER, textColor=NAVY)))
-    story.append(Spacer(1, 0.5 * cm))
+    p = data.get("profile") or {}
+    if data.get("report_type") == "accountant":
+        meeting = data.get("meeting") or {}
+        identity = [
+            p.get("owner_name"),
+            p.get("county") or p.get("location"),
+            f"Herd no. {p['herd_number']}" if p.get("herd_number") else None,
+            f"{p['total_hectares']} hectares" if p.get("total_hectares") is not None else None,
+            meeting.get("enterprises"),
+            meeting.get("period_label"),
+        ]
+        for line in identity:
+            if line:
+                story.append(Paragraph(str(line), st["center"]))
+        story.append(Spacer(1, 0.5 * cm))
+        story.append(Paragraph(
+            "Unaudited management information — not statutory accounts.",
+            st["center"],
+        ))
+    story.append(Spacer(1, 0.6 * cm))
     story.append(Paragraph(data["report_date"], st["center"]))
-    story.append(Spacer(1, 2 * cm))
+    story.append(Spacer(1, 1.2 * cm))
     story.append(Paragraph("<b>Confidential</b>", ParagraphStyle("conf", fontSize=11, alignment=TA_CENTER, textColor=RED)))
     story.append(PageBreak())
     return story
@@ -799,11 +961,12 @@ def _page_cover(data: dict, st: dict) -> list:
 def _page_executive(data: dict, st: dict) -> list:
     k = data["kpis"]
     h = data["health_score"]
+    lowest = data.get("lowest_cash") or {}
     cards = _kpi_cards([
-        ("Cash Available", format_currency(k['cash_available']), NAVY),
+        ("Cash now", format_currency(k.get("cash_now", k.get("cash_available"))), NAVY),
+        ("Lowest expected cash", format_currency(lowest.get("value", k.get("cash_available"))), NAVY),
         ("Expected Annual Profit", format_currency(k['annual_profit']), GREEN),
         ("Risk Level", k["risk_level"], _risk_light(k["risk_level"])),
-        ("Farm Health Score", f"{h.get('score', k['health_score'])}/100", GREEN),
     ])
     return [
         Paragraph("Executive Summary", st["title"]),
@@ -812,6 +975,45 @@ def _page_executive(data: dict, st: dict) -> list:
         Paragraph(data["executive_summary"], st["body"]),
         PageBreak(),
     ]
+
+
+def _page_meeting(data: dict, st: dict) -> list:
+    meeting = data.get("meeting") or {}
+    cards = _kpi_cards([
+        ("Cash now (Actual)", format_currency(meeting.get("cash_now", 0)), NAVY),
+        ("Outstanding debt (Actual)", format_currency(meeting.get("total_debt", 0)), NAVY),
+        ("Annual repayments (Actual)", format_currency(meeting.get("annual_repayments", 0)), NAVY),
+        (
+            "Lowest expected cash (Forecast)",
+            format_currency(meeting.get("lowest_cash", 0)),
+            RED if float(meeting.get("lowest_cash") or 0) < 0 else GREEN,
+        ),
+    ])
+    net_colour = GREEN if float(meeting.get("actual_net") or 0) >= 0 else RED
+    actuals = _kpi_cards([
+        ("Income — last 12 months (Actual)", format_currency(meeting.get("actual_income", 0)), GREEN),
+        ("Costs — last 12 months (Actual)", format_currency(meeting.get("actual_costs", 0)), NAVY),
+        ("Net — last 12 months (Actual)", format_currency(meeting.get("actual_net", 0)), net_colour),
+        ("Lowest cash month (Forecast)", meeting.get("lowest_cash_month_label") or "—", AMBER),
+    ])
+    story = [
+        Paragraph("Meeting summary", st["title"]),
+        Paragraph(
+            "Figures a lender or advisor can read in a minute. Actual means recorded. "
+            "Forecast means the engine looking ahead — it is not a bank statement.",
+            st["muted"],
+        ),
+        Spacer(1, 0.2 * cm),
+        Paragraph(meeting.get("period_label") or data.get("period_label") or "", st["body"]),
+        Spacer(1, 0.3 * cm),
+        cards,
+        Spacer(1, 0.35 * cm),
+        actuals,
+        Spacer(1, 0.4 * cm),
+        Paragraph(data.get("executive_summary") or "", st["body"]),
+        PageBreak(),
+    ]
+    return story
 
 
 def _page_farm(data: dict, st: dict) -> list:
@@ -1105,7 +1307,7 @@ def _page_income_expenses_actual(data: dict, st: dict) -> list:
     story = [
         Paragraph("Income & Expenses — Actual", st["title"]),
         Paragraph(
-            "Recorded income and expenses for the last 12 months, combining the farm's "
+            _period_caption(ie.get("period")) + ". Recorded income and expenses, combining the farm's "
             "records with any transactions the farmer has logged directly in FarmBiddy.",
             st["muted"],
         ),
@@ -1141,6 +1343,7 @@ def _page_budget_variance(data: dict, st: dict) -> list:
     story = [
         Paragraph("Budget vs Actual — By Category", st["title"]),
         Paragraph(bv.get("overall_summary", "No category budgets have been set yet."), st["body"]),
+        Paragraph(_period_caption(bv.get("period") or data.get("period_label")), st["muted"]),
         Spacer(1, 0.3 * cm),
     ]
     categories = bv.get("categories") or []
@@ -1180,23 +1383,35 @@ def _page_loans_finance(data: dict, st: dict) -> list:
     loans = data.get("loans_summary") or {}
     next_loan = loans.get("next_loan_to_clear")
     story = [Paragraph("Loans & Finance", st["title"])]
+    story.append(Paragraph("Outstanding balances, rates and remaining term from the farm's debt register.", st["muted"]))
     cards = _kpi_cards([
         ("Total Outstanding Debt", format_currency(loans.get("total_outstanding_debt", 0)), NAVY),
         ("Annual Repayments", format_currency(loans.get("total_annual_repayments", 0)), NAVY),
         ("Next Loan to Clear", next_loan.get("lender", "—") if next_loan else "None outstanding", GREEN),
     ])
     story += [cards, Spacer(1, 0.4 * cm)]
+    clash = loans.get("low_cash_interaction")
+    if clash:
+        story.append(Paragraph(
+            f"<b>Cash warning:</b> {clash.get('what') or clash.get('message') or 'Loan repayments land in an already low-cash month.'}",
+            st["body"],
+        ))
+        story.append(Spacer(1, 0.25 * cm))
     register = loans.get("loans") or []
     if register:
-        rows = [["Lender", "Outstanding", "Monthly Repayment", "Months Remaining"]]
+        rows = [["Lender", "Outstanding", "Rate", "Monthly", "Maturity", "Months left"]]
         for loan in register:
+            rate = loan.get("rate")
+            rate_text = f"{rate:.2f}%" if isinstance(rate, (int, float)) else "—"
             rows.append([
                 loan.get("lender", "—"),
                 format_currency(loan.get("outstanding_balance", 0)),
+                rate_text,
                 format_currency(loan.get("monthly_repayment", 0)),
+                str(loan.get("maturity") or "—"),
                 str(loan.get("months_remaining", "—")),
             ])
-        table = Table(rows, colWidths=[5 * cm, 3.5 * cm, 3.8 * cm, 3.7 * cm])
+        table = Table(rows, colWidths=[3.4 * cm, 2.6 * cm, 2.1 * cm, 2.6 * cm, 2.4 * cm, 2.5 * cm])
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), NAVY),
             ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
@@ -1220,6 +1435,10 @@ def _page_year_over_year(data: dict, st: dict) -> list:
     partial, exactly as the app's Previous Performance page does."""
     yoy = data.get("year_over_year") or {}
     story = [Paragraph("Previous Performance — Year on Year", st["title"])]
+    story.append(Paragraph(
+        "Like-for-like months only when a year is partial. Farm profit is income minus costs, not a forecast.",
+        st["muted"],
+    ))
     years = yoy.get("years") or []
     if years:
         rows = [["Year", "Income", "Costs", "Farm Profit", "Cash Generated", "Coverage"]]
@@ -1273,16 +1492,154 @@ def _page_year_over_year(data: dict, st: dict) -> list:
 
 
 def _page_closing(data: dict, st: dict) -> list:
-    return [
-        Spacer(1, 5 * cm),
-        Paragraph("FarmBiddy Farmer Edition", st["cover_sub"]),
-        Spacer(1, 0.5 * cm),
-        Paragraph("Helping Dairy Farmers Make Better Financial Decisions", st["center"]),
+    lines = [
+        Spacer(1, 4.5 * cm),
+        Paragraph("FarmBiddy", st["cover_sub"]),
+        Spacer(1, 0.4 * cm),
+        Paragraph(
+            "Automatically generated. Unaudited management information — not statutory accounts.",
+            st["center"],
+        ),
+    ]
+    if data.get("is_sample_data"):
+        lines.append(Paragraph("<b>SAMPLE / DEMO DATA</b>", ParagraphStyle("sc", fontSize=11, alignment=TA_CENTER, textColor=RED, spaceBefore=8)))
+    lines += [
         Spacer(1, 1 * cm),
-        Paragraph("Automatically Generated Report", st["center"]),
         Paragraph(data["report_date"], st["center"]),
         Paragraph(f"Software Version {data.get('software_version', SOFTWARE_VERSION)}", st["muted"]),
     ]
+    return lines
+
+
+def _page_cash_forecast(data: dict, st: dict, charts: dict) -> list:
+    monthly = data.get("monthly_forecast") or []
+    lowest = data.get("lowest_cash") or {}
+    story = [
+        Paragraph("Expected cash — Forecast", st["title"]),
+        Paragraph(
+            "This is a 12-month forecast, not recorded Actuals. It includes farm cash and household drawings. "
+            "Use it to see when cash is tight; do not treat it as a bank statement.",
+            st["muted"],
+        ),
+        Spacer(1, 0.25 * cm),
+        Paragraph(
+            f"Lowest expected cash: <b>{format_currency(lowest.get('value', 0))}</b> "
+            f"({lowest.get('month_label') or '—'}).",
+            st["body"],
+        ),
+        Spacer(1, 0.3 * cm),
+    ]
+    if charts.get("reserve"):
+        story += [Image(charts["reserve"], width=16 * cm, height=7 * cm), Spacer(1, 0.3 * cm)]
+    if charts.get("cashflow"):
+        story += [Image(charts["cashflow"], width=16 * cm, height=7 * cm), Spacer(1, 0.3 * cm)]
+    if monthly:
+        rows = [["Month", "Cash movement", "Running cash"]]
+        for month in monthly:
+            mark = " ← lowest" if month.get("month") == lowest.get("month") else ""
+            rows.append([
+                f"{month.get('month')}{mark}",
+                format_currency(month.get("combined_cashflow", month.get("cashflow", 0))),
+                format_currency(_month_cash(month)),
+            ])
+        table = Table(rows, colWidths=[4 * cm, 6 * cm, 6 * cm])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(table)
+    story.append(PageBreak())
+    return story
+
+
+def _page_milk_down(data: dict, st: dict) -> list:
+    comparison = (data.get("milk_down") or {}).get("comparison") or {}
+    story = [
+        Paragraph("If milk falls 5c/L", st["title"]),
+        Paragraph(
+            "Same What If? engine as the app. Nothing here is saved as a real farm figure. "
+            "Beef and sheep are not directly changed by a milk-price move; whole-farm cash still is.",
+            st["muted"],
+        ),
+        Spacer(1, 0.3 * cm),
+    ]
+    if not comparison:
+        story.append(Paragraph("This comparison could not be calculated for this farm.", st["body"]))
+        story.append(PageBreak())
+        return story
+    cards = _kpi_cards([
+        ("Income change", format_currency(comparison.get("revenue_difference", 0)), NAVY),
+        ("Profit change", format_currency(comparison.get("profit_difference", 0)), NAVY),
+        ("Lowest cash now", format_currency(comparison.get("min_cash_base", 0)), GREEN),
+        ("Lowest cash if milk −5c", format_currency(comparison.get("min_cash_scenario", 0)), RED),
+    ])
+    story += [cards, Spacer(1, 0.4 * cm)]
+    rows = [
+        ["Figure", "Now", "Milk −5c/L", "Change"],
+        ["Income", format_currency(comparison.get("revenue_base", 0)), format_currency(comparison.get("revenue_scenario", 0)), format_currency(comparison.get("revenue_difference", 0))],
+        ["Farm profit", format_currency(comparison.get("profit_base", 0)), format_currency(comparison.get("profit_scenario", 0)), format_currency(comparison.get("profit_difference", 0))],
+        ["Lowest cash", format_currency(comparison.get("min_cash_base", 0)), format_currency(comparison.get("min_cash_scenario", 0)), "—"],
+        ["Year-end cash", format_currency(comparison.get("year_end_cash_base", 0)), format_currency(comparison.get("year_end_cash_scenario", 0)), "—"],
+    ]
+    table = Table(rows, colWidths=[4 * cm, 4 * cm, 4 * cm, 4 * cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(table)
+    story.append(PageBreak())
+    return story
+
+
+def _page_sector_contribution(data: dict, st: dict) -> list:
+    rows_data = data.get("sector_performance") or []
+    story = [
+        Paragraph("Contribution by enterprise", st["title"]),
+        Paragraph(
+            "How Dairy, Beef and Sheep contribute on recorded figures. "
+            "Cash and bills are still whole-farm — shared costs are not a clean split.",
+            st["muted"],
+        ),
+        Spacer(1, 0.3 * cm),
+    ]
+    if not rows_data:
+        story.append(Paragraph("No enterprise breakdown is available for this farm.", st["body"]))
+        story.append(PageBreak())
+        return story
+    rows = [["Enterprise", "Income", "Farm profit", "Margin"]]
+    for row in rows_data:
+        rows.append([
+            row.get("label") or SECTOR_LABELS.get(row.get("sector"), row.get("sector", "—")),
+            format_currency(row.get("revenue", 0)),
+            format_currency(row.get("profit", 0)),
+            format_percent(row.get("margin_pct", 0)),
+        ])
+    table = Table(rows, colWidths=[4 * cm, 4 * cm, 4 * cm, 4 * cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(table)
+    story.append(PageBreak())
+    return story
 
 
 PAGE_BUILDERS = {
@@ -1305,6 +1662,10 @@ PAGE_BUILDERS = {
     "budget_variance": lambda d, s, c: _page_budget_variance(d, s),
     "loans_finance": lambda d, s, c: _page_loans_finance(d, s),
     "year_over_year": lambda d, s, c: _page_year_over_year(d, s),
+    "meeting": lambda d, s, c: _page_meeting(d, s),
+    "cash_forecast": lambda d, s, c: _page_cash_forecast(d, s, c),
+    "milk_down": lambda d, s, c: _page_milk_down(d, s),
+    "sector_contribution": lambda d, s, c: _page_sector_contribution(d, s),
     "closing": lambda d, s, c: _page_closing(d, s),
 }
 
@@ -1346,6 +1707,7 @@ def get_report_preview(
 ) -> dict:
     """JSON preview for the Reports UI before download."""
     data = collect_report_data(farm_id, report_type, report_date, sectors=sectors)
+    kpis = data.get("kpis") or {}
     return {
         "success": True,
         "farm_file": data["farm_file"],
@@ -1356,11 +1718,13 @@ def get_report_preview(
         "executive_summary": data["executive_summary"],
         "health_score": data["health_score"],
         "kpis": {
-            "cash_available": data["kpis"]["cash_available"],
-            "annual_profit": data["kpis"]["annual_profit"],
-            "risk_level": data["kpis"]["risk_level"],
-            "health_score": data["kpis"]["health_score"],
+            "cash_now": kpis.get("cash_now"),
+            "cash_available": kpis.get("cash_available"),
+            "annual_profit": kpis.get("annual_profit"),
+            "risk_level": kpis.get("risk_level"),
+            "health_score": kpis.get("health_score"),
         },
+        "preview_kpis": data.get("preview_kpis") or [],
         "page_count_estimate": len(PAGE_SETS.get(report_type, PAGE_SETS["full"])),
         "sections": PAGE_SETS.get(report_type, PAGE_SETS["full"]),
     }
@@ -1403,4 +1767,7 @@ def generate_farmer_report(
         "page_count": len(pages),
         "executive_summary": data["executive_summary"],
         "generated_at": data["generated_at"],
+        "health_score": data.get("health_score") or {},
+        "kpis": data.get("kpis") or {},
+        "preview_kpis": data.get("preview_kpis") or [],
     }

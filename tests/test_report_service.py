@@ -54,12 +54,29 @@ def test_collect_report_data_includes_actuals_budget_loans_and_yoy_sections():
     assert yoy["success"] is True
     assert isinstance(yoy["years"], list)
 
+    assert data["is_sample_data"] is True
+    meeting = data["meeting"]
+    assert isinstance(meeting["cash_now"], (int, float))
+    assert isinstance(meeting["actual_net"], (int, float))
+    assert isinstance(meeting["lowest_cash"], (int, float))
+    assert isinstance(meeting["total_debt"], (int, float))
+    assert "Sheep" in meeting["enterprises"]
+    assert data["monte_carlo"] == {}
+    assert data["sector_performance"]
+    assert any(row.get("label") == "Sheep" or row.get("sector") == "lamb" for row in data["sector_performance"])
+    assert (data.get("milk_down") or {}).get("comparison")
+
 
 def test_get_report_preview_for_accountant_report():
     preview = report_service.get_report_preview(FARM, "accountant", sectors=SECTORS)
     assert preview["success"] is True
     assert preview["report_type"] == "accountant"
     assert preview["sections"] == report_service.PAGE_SETS["accountant"]
+    cards = preview["preview_kpis"]
+    assert len(cards) == 4
+    for card in cards:
+        assert card["kind"] == "currency"
+        assert isinstance(card["value"], (int, float))
 
 
 def test_generate_accountant_report_produces_a_pdf_file():
@@ -70,6 +87,30 @@ def test_generate_accountant_report_produces_a_pdf_file():
     filepath = os.path.join(report_service.REPORTS_DIR, result["filename"])
     assert os.path.exists(filepath)
     assert os.path.getsize(filepath) > 0
+    cards = result["preview_kpis"]
+    assert len(cards) == 4
+    for card in cards:
+        assert card["kind"] == "currency"
+        assert isinstance(card["value"], (int, float))
+
+
+def test_accountant_page_set_is_a_meeting_pack_not_monte_carlo():
+    pages = report_service.PAGE_SETS["accountant"]
+    assert "meeting" in pages
+    assert "cash_forecast" in pages
+    assert "milk_down" in pages
+    assert "sector_contribution" in pages
+    assert "loans_finance" in pages
+    for excluded in ("monte_carlo", "investment", "advisor", "executive"):
+        assert excluded not in pages
+
+
+def test_loans_register_includes_rate_and_maturity():
+    data = report_service.collect_report_data(FARM, "accountant", sectors=SECTORS)
+    loans = data["loans_summary"]["loans"]
+    assert loans
+    assert loans[0].get("rate") is not None
+    assert loans[0].get("maturity")
 
 
 def test_unbudgeted_categories_never_show_a_fabricated_variance_in_the_pdf_data():

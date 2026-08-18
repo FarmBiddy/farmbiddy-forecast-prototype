@@ -12,7 +12,7 @@ VALID_SECTORS = ("dairy", "beef", "lamb")
 SECTOR_LABELS = {
     "dairy": "Dairy",
     "beef": "Beef",
-    "lamb": "Lamb",
+    "lamb": "Sheep",
 }
 
 DEFAULT_SECTORS = list(VALID_SECTORS)

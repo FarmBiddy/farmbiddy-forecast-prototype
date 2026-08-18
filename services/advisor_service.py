@@ -20,7 +20,7 @@ from services.financial_intelligence_service import (
     _plain_summary,
     get_financial_intelligence,
 )
-from models.multi_sector_farm import VALID_SECTORS
+from models.multi_sector_farm import SECTOR_LABELS, VALID_SECTORS
 from services.multi_sector_farm import load_farm_for_analysis
 from services.scenario_sandbox_service import run_scenario_sandbox
 
@@ -162,8 +162,7 @@ def _empty_overall_impact() -> dict[str, Any]:
 
 
 def _sector_label(sector_id: str) -> str:
-    labels = {"dairy": "Dairy", "beef": "Beef", "lamb": "Lamb"}
-    return labels.get(sector_id, sector_id.title())
+    return SECTOR_LABELS.get(sector_id, sector_id.title())
 
 
 def _unaffected_note(affected: list[str], unaffected: list[str]) -> str:

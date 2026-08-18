@@ -516,6 +516,9 @@ class FarmerReportResponse(BaseModel):
     page_count: int
     executive_summary: str
     generated_at: str
+    health_score: Dict[str, Any] = Field(default_factory=dict)
+    kpis: Dict[str, Any] = Field(default_factory=dict)
+    preview_kpis: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class FarmerReportPreviewResponse(BaseModel):
@@ -528,6 +531,7 @@ class FarmerReportPreviewResponse(BaseModel):
     executive_summary: str
     health_score: Dict[str, Any] = Field(default_factory=dict)
     kpis: Dict[str, Any] = Field(default_factory=dict)
+    preview_kpis: List[Dict[str, Any]] = Field(default_factory=list)
     page_count_estimate: int
     sections: List[str] = Field(default_factory=list)
 

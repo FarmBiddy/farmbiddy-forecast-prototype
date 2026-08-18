@@ -25,11 +25,11 @@ function showStatus(msg, type = "info") {
   bar.classList.remove("hidden");
 }
 
-function getSelectedSectorsFromUI() {
-  const checked = [...document.querySelectorAll("#sector-select input[data-sector]:checked")]
-    .map((el) => el.dataset.sector);
-  return checked.length ? checked : ["dairy", "beef", "lamb"];
-}
+const SECTOR_LABELS = {
+  dairy: "Dairy",
+  beef: "Beef",
+  lamb: "Sheep",
+};
 
 function sectorsQuery() {
   const params = new URLSearchParams();
@@ -79,26 +79,34 @@ function setGreeting() {
 }
 
 function renderSectorSelect(sectors) {
+  const list = Array.isArray(sectors) ? sectors : [];
+  state.availableSectors = list;
+  const ids = list.map((s) => s.id).filter(Boolean);
+  state.selectedSectors = ids.length ? ids : ["dairy", "beef", "lamb"];
+
   const box = $("sector-select");
-  if (!box || !sectors?.length) return;
-  state.availableSectors = sectors;
-  box.querySelectorAll("input[data-sector]").forEach((input) => {
-    const info = sectors.find((s) => s.id === input.dataset.sector);
-    if (info) {
-      input.checked = info.selected;
-      input.parentElement.querySelector("span").textContent = info.label;
-    }
-  });
-  state.selectedSectors = getSelectedSectorsFromUI();
+  if (box) {
+    box.replaceChildren();
+    state.selectedSectors.forEach((id) => {
+      const info = list.find((s) => s.id === id);
+      const chip = document.createElement("span");
+      chip.className = "sector-chip sector-chip-readonly";
+      chip.textContent = info?.label || SECTOR_LABELS[id] || id;
+      box.appendChild(chip);
+    });
+  }
 }
 
 function sectorSummaryLabel() {
-  const labels = {
-    dairy: "Dairy",
-    beef: "Beef",
-    lamb: "Lamb",
-  };
-  return state.selectedSectors.map((id) => labels[id] || id).join(", ");
+  return state.selectedSectors.map((id) => SECTOR_LABELS[id] || id).join(" · ");
+}
+
+function renderFarmEnterprisesNote(profile) {
+  const note = $("farm-enterprises-note");
+  if (!note) return;
+  const name = profile?.farm_name || "This farm";
+  const sample = profile?.is_sample_data ? "SAMPLE / DEMO DATA. " : "";
+  note.textContent = `${name} — ${sample}Dairy is the main cheque; beef and sheep use the rest of the land. Cash, bills and What If? stay whole-farm.`;
 }
 
 function renderSidebar(profile) {
@@ -108,18 +116,21 @@ function renderSidebar(profile) {
   if (sampleBadge) {
     sampleBadge.classList.toggle("hidden", !profile.is_sample_data);
   }
-  const sectors = sectorSummaryLabel();
+  $("sf-herd").textContent = sectorSummaryLabel() || "—";
   if (state.selectedSectors.includes("dairy") && profile.milking_cows) {
-    $("sf-herd").textContent = `${profile.milking_cows} Milking Cows`;
-    $("sf-milk").textContent = `Milk Price: ${formatCurrency(profile.milk_price, { decimals: 2 })}/L`;
-    $("sf-processor").textContent = `Processor: ${profile.milk_processor || "—"}`;
+    $("sf-milk").textContent = `${profile.milking_cows} Milking Cows`;
+    const price = formatCurrency(profile.milk_price, { decimals: 2 });
+    const processor = profile.milk_processor ? ` · ${profile.milk_processor}` : "";
+    $("sf-processor").textContent = `Milk ${price}/L${processor}`;
+    $("sf-processor").classList.remove("hidden");
   } else {
-    $("sf-herd").textContent = `Sectors: ${sectors}`;
     $("sf-milk").textContent = profile.farm_type ? `Type: ${profile.farm_type}` : "Mixed enterprise";
-    $("sf-processor").textContent = `${state.selectedSectors.length} sector(s) selected`;
+    $("sf-processor").textContent = "";
+    $("sf-processor").classList.add("hidden");
   }
   $("sf-updated").textContent = `Last Updated: ${profile.last_updated || "Today"}`;
   if ($("settings-farm")) $("settings-farm").textContent = profile.farm_name;
+  renderFarmEnterprisesNote(profile);
 }
 
 function profileItem(label, value) {
@@ -222,7 +233,7 @@ function renderProfileDetail(profile) {
   const landRows = [
     selected.includes("dairy") && land.dairy != null ? profileItem("Dairy land", `${land.dairy} ha`) : "",
     selected.includes("beef") && land.beef != null ? profileItem("Beef land", `${land.beef} ha`) : "",
-    selected.includes("lamb") && land.lamb != null ? profileItem("Lamb land", `${land.lamb} ha`) : "",
+    selected.includes("lamb") && land.lamb != null ? profileItem("Sheep land", `${land.lamb} ha`) : "",
   ].filter(Boolean).join("");
   const landSection = landRows ? profileSection("Land use", landRows) : "";
 
@@ -230,7 +241,7 @@ function renderProfileDetail(profile) {
     profileSection("General", general),
     profileSection("Dairy", dairy),
     profileSection("Beef", beef),
-    profileSection("Lamb / Sheep", lamb),
+    profileSection("Sheep", lamb),
     landSection,
   ].filter(Boolean).join("");
 }
@@ -1058,10 +1069,13 @@ const REPORT_SECTIONS = {
     "AI advisor summary for banks and investors",
   ],
   accountant: [
-    "Cover page and summary",
+    "Cover, farm identity, and unaudited disclaimer",
+    "Meeting page — cash now, debt, lowest expected cash, last 12 months",
     "Income & Expenses — actual recorded figures",
     "Budget vs Actual by category",
-    "Loans & Finance summary",
+    "Loans — outstanding, rate, maturity",
+    "Expected cash (forecast) and milk −5c/L",
+    "Contribution by enterprise (Dairy · Beef · Sheep)",
     "Previous Performance — year on year",
   ],
 };
@@ -1107,14 +1121,14 @@ function renderReportPreview(data, downloadUrl) {
   if ($("report-preview-headline")) {
     $("report-preview-headline").textContent = `${data.report_type_label} — ${data.farm_name}`;
   }
-  const k = data.kpis || {};
-  const h = data.health_score || {};
+  const cards = data.preview_kpis || [];
   if ($("report-preview-kpis")) {
-    $("report-preview-kpis").innerHTML = `
-      <div class="kpi-card"><span class="kpi-label">Cash Available</span><span class="kpi-value">${formatCurrency(k.cash_available)}</span></div>
-      <div class="kpi-card"><span class="kpi-label">Annual Profit</span><span class="kpi-value">${formatCurrency(k.annual_profit)}</span></div>
-      <div class="kpi-card"><span class="kpi-label">Risk Level</span><span class="kpi-value">${k.risk_level || "—"}</span></div>
-      <div class="kpi-card"><span class="kpi-label">Health Score</span><span class="kpi-value">${h.score ?? k.health_score ?? "—"}/100</span></div>`;
+    $("report-preview-kpis").innerHTML = cards.map((card) => {
+      const value = card.kind === "text"
+        ? (card.value || "—")
+        : formatCurrency(card.value);
+      return `<div class="kpi-card"><div class="kpi-title">${card.label || ""}</div><div class="kpi-value">${value}</div></div>`;
+    }).join("");
   }
   if ($("report-preview-summary")) {
     $("report-preview-summary").textContent = data.executive_summary || "";
@@ -1203,10 +1217,8 @@ async function ensureAdvancedForecast(showMsg = false) {
 }
 
 function updateWhatIfSectorVisibility() {
-  // Milk price only means anything for a dairy enterprise - hide it for a
-  // farm that hasn't selected dairy rather than showing a preset/field that
-  // can never have a real effect (Multi-Sector Check: sector-specific
-  // functionality should only appear where applicable).
+  // Dairy presets stay visible because dairy is on this farm, not because
+  // a sector checkbox is ticked.
   const hasDairy = (state.selectedSectors || []).includes("dairy");
   document.querySelectorAll('[data-preset="milk_down"], [data-preset="milk_up"]').forEach((btn) => {
     btn.classList.toggle("hidden", !hasDairy);
@@ -1234,7 +1246,7 @@ let fiHistory = [];
 let fiLastQuestion = "";
 let fiLastResponse = null;
 
-const FI_SECTOR_LABELS = { dairy: "Dairy", beef: "Beef", lamb: "Lamb" };
+const FI_SECTOR_LABELS = { dairy: "Dairy", beef: "Beef", lamb: "Sheep" };
 
 function fiSectorLabel(sectorId) {
   return FI_SECTOR_LABELS[sectorId] || sectorId.charAt(0).toUpperCase() + sectorId.slice(1);
@@ -1605,6 +1617,10 @@ async function navigate(view) {
   if (defaultSubtab) await runSubtabLoader(defaultSubtab);
   if (view === "advanced-analysis") await ensureAdvancedForecast();
   if (view === "settings") await loadOnboarding();
+
+  const greeting = $("dash-greeting-block");
+  if (greeting) greeting.classList.toggle("hidden", view !== "overview");
+  document.querySelector(".dash-header")?.classList.toggle("dash-header-compact", view !== "overview");
 }
 
 function renderFinancialIntelligence(data) {
@@ -2565,7 +2581,6 @@ async function askAdvisor() {
 async function refreshFarmData() {
   const data = await api(`/farmer/dashboard${sectorsQuery()}`);
   state.profile = data.profile;
-  state.selectedSectors = data.selected_sectors || state.selectedSectors;
   renderSectorSelect(data.available_sectors);
   setGreeting();
   renderSidebar(data.profile);
@@ -2575,33 +2590,8 @@ async function refreshFarmData() {
   if (state.analysis) await runAnalysis(false);
 }
 
-async function onSectorChange(changedInput) {
-  const selected = getSelectedSectorsFromUI();
-  if (!selected.length) {
-    changedInput.checked = true;
-    showStatus("At least one sector must be selected.", "error");
-    return;
-  }
-  state.selectedSectors = selected;
-  invalidateAdvancedForecast();
-  showStatus("Updating analysis for selected sectors…", "info");
-  try {
-    await refreshFarmData();
-    if (state.activeSubtab === "ap-recommendations") await loadFinancialIntelligence();
-    if (state.activeSubtab === "ap-ask") clearFiChat(true);
-    if (state.activeSubtab === "cashflow-forecast" || state.view === "advanced-analysis") await ensureAdvancedForecast();
-    if (state.activeSubtab === "fp-historical") await loadHistoricalData();
-    if (state.activeSubtab === "cashflow-budget") { await loadCashflowBudget(); await loadCategoryBudgets(); }
-    if (state.activeSubtab === "ap-reports") $("report-preview")?.classList.add("hidden");
-    showStatus(`Analyzing: ${sectorSummaryLabel()}`, "success");
-  } catch (err) {
-    showStatus(err.message, "error");
-  }
-}
-
 async function loadInitial() {
   const data = await api(`/farmer/dashboard${sectorsQuery()}`);
-  state.selectedSectors = data.selected_sectors || state.selectedSectors;
   renderSectorSelect(data.available_sectors);
   state.profile = data.profile;
   setGreeting();
@@ -2619,7 +2609,6 @@ async function runAnalysis(showMsg = true) {
     state.analysis = data;
     invalidateAdvancedForecast();
     state.profile = data.profile;
-    state.selectedSectors = data.selected_sectors || state.selectedSectors;
     renderSidebar(data.profile);
     renderExecutiveDashboard(data);
     if (showMsg) showStatus("Analysis complete.", "success");
@@ -2804,9 +2793,6 @@ function setupNav() {
   });
   $("test-all-actions-btn")?.addEventListener("click", testAllCashflowActions);
   $("test-one-action-btn")?.addEventListener("click", testOneCashflowAction);
-  $("sector-select")?.querySelectorAll("input[data-sector]").forEach((input) => {
-    input.addEventListener("change", () => onSectorChange(input));
-  });
   $("ask-advisor-btn")?.addEventListener("click", askAdvisor);
   $("advisor-question")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") askAdvisor();

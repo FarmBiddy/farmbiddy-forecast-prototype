@@ -35,7 +35,7 @@ def isolated_records_dir(tmp_path, monkeypatch):
 def test_sector_status_label():
     assert sector_status_label(["dairy", "beef", "lamb"]) == "Combined Overview"
     assert sector_status_label(["dairy"]) == "Dairy Only"
-    assert sector_status_label(["dairy", "lamb"]) == "Dairy + Lamb Overview"
+    assert sector_status_label(["dairy", "lamb"]) == "Dairy + Sheep Overview"
 
 
 def test_sum_loan_principal():

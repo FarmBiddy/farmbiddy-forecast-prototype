@@ -249,7 +249,7 @@ def build_dataset() -> dict:
                 "monthly": monthly_beef,
             },
             "lamb": {
-                "display_name": "Lamb / Sheep",
+                "display_name": "Sheep",
                 "flock": {"ewes": 228, "lambs": 180, "rams": 6},
                 "monthly": monthly_lamb,
             },

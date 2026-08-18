@@ -13,7 +13,7 @@ Remind them this is sample data, not their farm. We are testing whether the **pr
 ## Setup
 
 1. App running (`FARMBIDDY_SEED_DEMO=1`), Overview loaded, analysis finished.
-2. Sectors: Dairy + Beef + Lamb.
+2. Enterprises: Dairy + Beef + Sheep (read-only; analysis is whole-farm).
 3. Facilitation machine: tablet or laptop (the prototype is demonstrated primarily on desktop/tablet).
 4. Do not hover over the mouse unless they are stuck for more than ~20 seconds — then give the smallest hint and mark the task **hinted**.
 

@@ -10,7 +10,7 @@ set FARMBIDDY_SEED_DEMO=1
 python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000. Leave Dairy, Beef and Lamb selected. The app runs analysis on load — wait until **Your Farm at a Glance** fills in.
+Open http://127.0.0.1:8000. The farm is mixed (Dairy, Beef and Sheep) and analysis is always whole-farm. Wait until **Your Farm at a Glance** fills in.
 
 Keep the story on farmer problems, not modules. Do not mention Monte Carlo, SQL, or APIs until the last 60 seconds.
 
@@ -92,7 +92,7 @@ On the seeded demo the **overall category position is slightly ahead** (milk inc
 
 ## F. Profitability / previous performance (≈1.5 min)
 
-**Farm Performance → Sector Performance** — dairy / beef / lamb contribution.
+**Farm Performance → Sector Performance** — dairy / beef / sheep contribution.
 
 **Farm Performance → Previous Years** — income, costs, farm profit, cash generated, like-for-like months. The demo has full 2024 and 2025 history plus a seeded later month.
 
@@ -131,9 +131,9 @@ The Overview card already tees this up; this screen is the list they would actua
 
 **Action Plan → Reports**
 
-Select **Accountant / Advisor Summary** → **Preview Report**. Optionally **Generate & Download PDF**.
+Select **Accountant / Advisor Summary** → **Preview Report**. Cards should show cash now, last-12-months net, lowest expected cash, and total debt — not dashes. Optionally **Generate & Download PDF**.
 
-Same organised farm information, in a form that can sit on the table with an advisor. This is not a statutory accounts pack.
+This is the pack for a bank or advisor table: Actuals, loans with rate and maturity, a labelled cash forecast, milk −5c/L, and enterprise contribution. It is **not** statutory accounts. Do not generate Full or Investment for this beat.
 
 ---
 
