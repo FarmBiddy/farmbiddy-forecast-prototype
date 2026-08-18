@@ -35,27 +35,45 @@ Or set `FARMBIDDY_SEED_DEMO=1` in the environment so startup seeds once.
 
 ## Demo deployment (Render)
 
-`render.yaml` describes a Python web service:
+Current intended mode: **ephemeral SQLite on the instance filesystem**.
+There is **no** persistent disk and **no** Postgres on the free demo.
+
+`render.yaml`:
 
 - `buildCommand`: `pip install -r requirements.txt`
 - `startCommand`: `uvicorn api.main:app --host 0.0.0.0 --port $PORT`
 - health check: `/api/status`
 
-Recommended env on a demo instance:
+### Required / recommended env (already in `render.yaml`)
 
-| Variable | Example |
-|---|---|
-| `STORAGE_PATH` | persistent disk mount (otherwise history/charts reset) |
-| `DATABASE_URL` | omit for SQLite on the disk, or set Postgres URL |
-| `PERSISTENCE_BACKEND` | `db` (default) |
-| `FARMBIDDY_SEED_DEMO` | `1` for a richer demo farm |
-| `IDENTITY_PROVIDER` | `dev` until the main platform is wired |
+| Variable | Value | Notes |
+|---|---|---|
+| `PERSISTENCE_BACKEND` | `db` | Mutable farm data in SQLite |
+| `IDENTITY_PROVIDER` | `dev` | Prototype identity adapter |
+| `FARMBIDDY_SEED_DEMO` | `1` | Seed `[DEMO]` records on first start |
 
-Free Render disks are ephemeral. For a boss demo in one session that is fine.
+**Leave `DATABASE_URL` unset** unless you are pointing at Postgres. The default is SQLite at `{app}/outputs/farmbiddy.db` (absolute). The app creates `outputs/` if it is missing — that directory is not in git.
+
+Do **not** set `STORAGE_PATH=/opt/render/project/data` unless a Render disk is actually mounted at that path.
+
+### Startup sequence (SQLite demo)
+
+1. Resolve `DATABASE_URL`; for file SQLite, create the parent directory and use an absolute path.
+2. Import-time `init_db()` (`create_all`) so a fresh file has tables. Skip under pytest.
+3. FastAPI startup: `ensure_output_dirs()`, `init_db()` again (idempotent), then `maybe_seed_on_startup()` if `FARMBIDDY_SEED_DEMO=1`.
+4. Sample farm JSON comes from committed `datasets/`; farmer-owned demo rows are seeded through normal services.
+
+No pre-created `farmbiddy.db` is required. **Alembic is not run on this SQLite demo.** Use `alembic upgrade head` only for Postgres.
+
+### Persistence is ephemeral
+
+Render’s instance disk is **not durable**. SQLite, generated reports/charts, and seeded demo rows **reset on deploy, restart, or host move**. Dataset sample history is restored from git; `FARMBIDDY_SEED_DEMO=1` re-seeds extra demo records.
+
+For **durable** data later (needs approval / paid plan): mount a disk and set `STORAGE_PATH` to the mount, **or** set `DATABASE_URL` to Postgres and run `alembic upgrade head` as a deploy step.
 
 ## Database migrations
 
-Local SQLite auto-creates tables on first app import (`FARMBIDDY_AUTO_INIT_DB=1`).
+Local / Render SQLite: tables via `init_db()` (`create_all`) on import and startup (`FARMBIDDY_AUTO_INIT_DB=1`). Tests set this to `0` and use an isolated temp file.
 
 Production Postgres:
 

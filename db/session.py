@@ -41,6 +41,8 @@ def enable_sqlite_foreign_keys(target_engine: Engine) -> None:
         cursor.close()
 
 
+# DATABASE_URL has already been through prepare_database_url (config.settings):
+# file-backed SQLite parents exist and the path is absolute before connect.
 _connect_args = {"check_same_thread": False} if IS_SQLITE else {}
 engine = create_engine(DATABASE_URL, connect_args=_connect_args, future=True)
 enable_sqlite_foreign_keys(engine)

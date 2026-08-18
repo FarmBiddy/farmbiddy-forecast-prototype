@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from sqlalchemy.engine.url import make_url
+
 from config.paths import STORAGE_ROOT
 
 # ---------------------------------------------------------------------------
@@ -26,10 +28,41 @@ from config.paths import STORAGE_ROOT
 # on "sqlite vs postgres" beyond this one place plus the engine's
 # connect_args - all business logic goes through the same SQLAlchemy ORM.
 _default_sqlite_path = Path(STORAGE_ROOT) / "farmbiddy.db"
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    f"sqlite:///{_default_sqlite_path.as_posix()}",
-).strip()
+
+
+def prepare_database_url(url: str) -> str:
+    """Return a connectable database URL.
+
+    File-backed SQLite: resolve an absolute path and create the parent
+    directory *before* SQLAlchemy opens a connection. Postgres, SQLite
+    ``:memory:``, and empty URLs are returned unchanged — no filesystem
+    work.
+
+    Render's checkout does not include ``outputs/`` (the ``.db`` file is
+    gitignored and the folder is not committed). Without this, startup
+    fails with ``sqlite3.OperationalError: unable to open database file``.
+    """
+    url = (url or "").strip()
+    if not url:
+        return url
+    parsed = make_url(url)
+    if not parsed.drivername.startswith("sqlite"):
+        return url
+    database = parsed.database
+    if not database or database == ":memory:":
+        return url
+    path = Path(database).expanduser()
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(parsed.set(database=path.as_posix()))
+
+
+_raw_database_url = os.environ.get("DATABASE_URL", "").strip()
+DATABASE_URL = prepare_database_url(
+    _raw_database_url or f"sqlite:///{_default_sqlite_path.as_posix()}"
+)
 
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
 

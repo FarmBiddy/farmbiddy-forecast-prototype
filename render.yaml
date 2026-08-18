@@ -19,14 +19,19 @@ services:
         value: dev
       - key: FARMBIDDY_SEED_DEMO
         value: "1"
+    # DATABASE_URL is intentionally unset: default SQLite at {repo}/outputs/farmbiddy.db
+    # (directory is created at startup). Instance disk is ephemeral — data resets
+    # on deploy/restart. Do not set STORAGE_PATH unless a disk is actually mounted.
 
 # ---------------------------------------------------------------------------
-# OPTIONAL — persistent storage (Render Starter plan or higher, ~$7/month)
+# OPTIONAL — persistent storage (Render Starter plan or higher, paid)
 # Uncomment the disk block below and add this environment variable:
 #
 #   STORAGE_PATH=/opt/render/project/data
 #
-# This keeps forecast history and charts across restarts and redeploys.
+# Only set STORAGE_PATH when this disk is mounted. Otherwise SQLite cannot
+# open the database file. Durable alternative: managed Postgres + DATABASE_URL
+# + `alembic upgrade head`.
 # ---------------------------------------------------------------------------
 #
 #    disk:
