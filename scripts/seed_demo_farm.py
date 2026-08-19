@@ -30,12 +30,6 @@ DEMO_MARKER = "[DEMO]"
 DEFAULT_FARM = "multi_sector_farm.json"
 
 
-def _already_seeded(farm_file: str) -> bool:
-    from services.financial_record_service import list_financial_records
-
-    return any(DEMO_MARKER in (r.get("description") or "") for r in list_financial_records(farm_file))
-
-
 def _cutoff_year_month(farm_file: str) -> tuple[int, int]:
     from services.dashboard_summary import dataset_coverage_cutoff
     from services.multi_sector_farm import load_multi_sector_farm
@@ -50,76 +44,102 @@ def _next_month(year: int, month: int) -> tuple[int, int]:
     return (year + 1, 1) if month == 12 else (year, month + 1)
 
 
+def _has_record(records: list[dict], marker: str) -> bool:
+    """Check if a record with a specific marker string already exists."""
+    return any(marker in (r.get("description") or "") for r in records)
+
+
+def _has_document(documents: list[dict], marker: str) -> bool:
+    """Check if a document with a specific marker string already exists."""
+    return any(marker in (d.get("notes") or "") for d in documents)
+
+
+# ── Document definitions ────────────────────────────────────────────
+# Each tuple: (document_type, record_type, counterparty, amount, category, payment_status, notes_suffix)
+HOUSEHOLD_DOCUMENTS: list[tuple[str, str, str, float, str, str, str]] = [
+    ("receipt", "expense", "Electric Ireland", 285.0, "utilities",
+     "paid", "Household electricity Q1"),
+    ("receipt", "expense", "Dunnes Stores", 165.0, "other_expense",
+     "paid", "Household supplies"),
+    ("invoice", "expense", "Bord Gáis Energy", 310.0, "utilities",
+     "unpaid", "Household gas bill"),
+    ("invoice", "expense", "Home Maintenance Co", 420.0, "other_expense",
+     "unpaid", "Household plumbing repair"),
+]
+
+
 def seed_demo_farm(farm_file: str = DEFAULT_FARM) -> dict:
     """Write demo farmer-owned data through live services. Safe to re-run."""
     from config.settings import IS_SQLITE
     from db.session import init_db
     from services.category_budget_service import list_category_budgets, set_monthly_budget
     from services.document_service import add_document, list_documents
-    from services.financial_record_service import add_financial_record
+    from services.financial_record_service import add_financial_record, list_financial_records
 
     if IS_SQLITE:
         init_db()
 
-    if _already_seeded(farm_file):
-        return {"farm_file": farm_file, "seeded": False, "reason": "already seeded"}
-
     year, month = _next_month(*_cutoff_year_month(farm_file))
     date = f"{year:04d}-{month:02d}-12"
 
-    add_financial_record(farm_file, {
-        "record_type": "income", "date": date, "category": "milk",
-        "amount": 18500.0, "description": f"{DEMO_MARKER} Milk cheque",
-        "counterparty": "Lakeland Dairies",
-    })
-    add_financial_record(farm_file, {
-        "record_type": "income", "date": date, "category": "livestock",
-        "amount": 4200.0, "description": f"{DEMO_MARKER} Finished cattle sale",
-        "counterparty": "Mart",
-    })
-    add_financial_record(farm_file, {
-        "record_type": "expense", "date": date, "category": "feed",
-        "amount": 6200.0, "description": f"{DEMO_MARKER} Ration delivery",
-        "counterparty": "Co-op Store",
-    })
-    add_financial_record(farm_file, {
-        "record_type": "expense", "date": date, "category": "fertiliser",
-        "amount": 2100.0, "description": f"{DEMO_MARKER} Spring fertiliser",
-        "counterparty": "Co-op Store",
-    })
-    add_financial_record(farm_file, {
-        "record_type": "expense", "date": date, "category": "veterinary",
-        "amount": 480.0, "description": f"{DEMO_MARKER} Herd health visit",
-        "counterparty": "Cahir Vet",
-    })
+    created: dict[str, int] = {"records": 0, "documents": 0, "budgets": 0}
 
-    if not any(DEMO_MARKER in (d.get("notes") or "") for d in list_documents(farm_file)):
-        add_document(farm_file, {
-            "document_type": "receipt", "record_type": "expense", "date": date,
-            "counterparty": "Fuel Depot", "amount": 340.0, "category": "fuel",
-            "payment_status": "paid", "notes": f"{DEMO_MARKER} Diesel",
-        })
-        add_document(farm_file, {
-            "document_type": "invoice", "record_type": "expense", "date": date,
-            "counterparty": "Contractor Ltd", "amount": 1500.0, "category": "contractor",
-            "payment_status": "unpaid", "notes": f"{DEMO_MARKER} Silage contractor",
-        })
+    # ── Financial records (base demo data) ──────────────────────────
+    existing_records = list_financial_records(farm_file)
+    base_records = [
+        ("income", "milk", 18500.0, "Milk cheque", "Lakeland Dairies"),
+        ("income", "livestock", 4200.0, "Finished cattle sale", "Mart"),
+        ("expense", "feed", 6200.0, "Ration delivery", "Co-op Store"),
+        ("expense", "fertiliser", 2100.0, "Spring fertiliser", "Co-op Store"),
+        ("expense", "veterinary", 480.0, "Herd health visit", "Cahir Vet"),
+    ]
+    for rec_type, cat, amt, desc, cpty in base_records:
+        marker = f"{DEMO_MARKER} {desc}"
+        if not _has_record(existing_records, marker):
+            add_financial_record(farm_file, {
+                "record_type": rec_type, "date": date, "category": cat,
+                "amount": amt, "description": marker, "counterparty": cpty,
+            })
+            created["records"] += 1
 
+    # ── Documents (base + household) ────────────────────────────────
+    existing_docs = list_documents(farm_file)
+
+    base_documents = [
+        ("receipt", "expense", "Fuel Depot", 340.0, "fuel", "paid", "Diesel"),
+        ("invoice", "expense", "Contractor Ltd", 1500.0, "contractor", "unpaid", "Silage contractor"),
+    ]
+    all_documents = base_documents + [
+        (dt, rt, cp, amt, cat, ps, ns) for dt, rt, cp, amt, cat, ps, ns in HOUSEHOLD_DOCUMENTS
+    ]
+    for doc_type, rec_type, cpty, amt, cat, pay_st, notes_suffix in all_documents:
+        marker = f"{DEMO_MARKER} {notes_suffix}"
+        if not _has_document(existing_docs, marker):
+            add_document(farm_file, {
+                "document_type": doc_type, "record_type": rec_type, "date": date,
+                "counterparty": cpty, "amount": amt, "category": cat,
+                "payment_status": pay_st, "notes": marker,
+            })
+            created["documents"] += 1
+
+    # ── Category budgets ────────────────────────────────────────────
     if not list_category_budgets(farm_file, year=year):
-        set_monthly_budget(farm_file, {
-            "record_type": "income", "category": "milk", "year": year, "month": month,
-            "amount": 16000.0, "notes": f"{DEMO_MARKER} Milk budget",
-        })
-        set_monthly_budget(farm_file, {
-            "record_type": "expense", "category": "feed", "year": year, "month": month,
-            "amount": 4500.0, "notes": f"{DEMO_MARKER} Feed budget",
-        })
-        set_monthly_budget(farm_file, {
-            "record_type": "expense", "category": "fertiliser", "year": year, "month": month,
-            "amount": 1800.0, "notes": f"{DEMO_MARKER} Fertiliser budget",
-        })
+        for rec_type, cat, amt, label in [
+            ("income", "milk", 16000.0, "Milk budget"),
+            ("expense", "feed", 4500.0, "Feed budget"),
+            ("expense", "fertiliser", 1800.0, "Fertiliser budget"),
+        ]:
+            set_monthly_budget(farm_file, {
+                "record_type": rec_type, "category": cat, "year": year, "month": month,
+                "amount": amt, "notes": f"{DEMO_MARKER} {label}",
+            })
+            created["budgets"] += 1
 
-    return {"farm_file": farm_file, "seeded": True, "demo_month": f"{year:04d}-{month:02d}"}
+    seeded = any(v > 0 for v in created.values())
+    result = {"farm_file": farm_file, "seeded": seeded, "demo_month": f"{year:04d}-{month:02d}", "created": created}
+    if not seeded:
+        result["reason"] = "all demo data already present"
+    return result
 
 
 def maybe_seed_on_startup() -> None:

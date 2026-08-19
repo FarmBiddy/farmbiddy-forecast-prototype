@@ -64,14 +64,21 @@
       }
     ],
     "household": {
-      "drawings_monthly": 2200,
+      "drawings_monthly": 2500,
       "off_farm_income_monthly": 650,
-      "pension_insurance_monthly": 280,
-      "farm_to_household_transfer_monthly": 2200,
-      "tax_annual": 8400,
+      "pension_insurance_monthly": 350,
+      "farm_to_household_transfer_monthly": 2500,
+      "tax_annual": 9600,
       "tax_payment_months": [
+        1,
         11
-      ]
+      ],
+      "utilities_monthly": 320,
+      "groceries_monthly": 480,
+      "motor_expenses_monthly": 210,
+      "childcare_monthly": 400,
+      "health_insurance_annual": 2800,
+      "home_maintenance_annual": 1500
     },
     "notes": "Mixed enterprise \u2014 dairy, beef finishing, and sheep. Family labour with one part-time employee."
   },
