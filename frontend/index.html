@@ -130,6 +130,7 @@
             <button type="button" class="subtab-btn" data-subtab="cashflow-budget">Budget vs Actual</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-income-expenses">Income &amp; Expenses</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-documents">Invoices &amp; Receipts</button>
+            <button type="button" class="subtab-btn" data-subtab="cashflow-household">Household Costs</button>
             <button type="button" class="subtab-btn" data-subtab="cashflow-loans">Loans &amp; Finance</button>
           </div>
         </div>
@@ -345,6 +346,23 @@
             </form>
 
             <div id="doc-list" class="ie-records-list"></div>
+          </div>
+        </div>
+
+        <div class="subtab-panel hidden" data-subtab-panel="cashflow-household">
+          <div class="card">
+            <h3>Household Costs</h3>
+            <p class="muted">Monthly and annual household outgoings that are factored into your cashflow forecast.</p>
+            <div id="household-loading" class="muted">Loading household costs…</div>
+            <div id="household-summary" class="hidden">
+              <div class="metric-grid" id="household-kpis"></div>
+              <div id="household-breakdown" class="table-wrap"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Household Invoices &amp; Receipts</h3>
+            <p class="muted">Documents categorised as household-related expenses (utilities, other expenses).</p>
+            <div id="household-docs-list"></div>
           </div>
         </div>
 
@@ -695,6 +713,6 @@
       </section>
     </div>
   </div>
-  <script src="/assets/app.js?v=21"></script>
+  <script src="/assets/app.js?v=22"></script>
 </body>
 </html>

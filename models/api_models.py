@@ -583,3 +583,44 @@ class CashFlowBudgetResponse(BaseModel):
     long_term_deficit_months: int = 0
     short_term_deficit_months: int = 0
 
+
+# ---------------------------------------------------------------------------
+# Shell integration: capability discovery + dispatcher
+# ---------------------------------------------------------------------------
+
+class CapabilityInfo(BaseModel):
+    """Human/discovery metadata for a shell-callable calculation capability."""
+
+    key: str
+    description: str = ""
+    required_params: List[str] = Field(default_factory=list)
+    optional_params: List[str] = Field(default_factory=list)
+
+
+class CapabilityListResponse(BaseModel):
+    success: bool = True
+    capabilities: List[CapabilityInfo] = Field(default_factory=list)
+
+
+class CapabilityRunRequest(BaseModel):
+    """Generic shell request for any registered capability."""
+
+    farm_file: str = Field(
+        ...,
+        description="Farm JSON filename from datasets/, e.g. multi_sector_farm.json",
+    )
+    sectors: Optional[List[str]] = Field(
+        default=None,
+        description="Optional sector filter: dairy, beef, lamb.",
+    )
+    params: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Capability-specific parameters (shape depends on the capability).",
+    )
+
+
+class CapabilityRunResponse(BaseModel):
+    capability_key: str
+    meta: Dict[str, Any] = Field(default_factory=dict)
+    result: Dict[str, Any] = Field(default_factory=dict)
+

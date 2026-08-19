@@ -1563,6 +1563,7 @@ const SUBTAB_LOADERS = {
   "cashflow-budget": () => { loadCashflowBudget(); loadCategoryBudgets(); },
   "cashflow-income-expenses": () => loadIncomeExpenses(),
   "cashflow-documents": () => loadDocuments(),
+  "cashflow-household": () => loadHousehold(),
   "fp-historical": () => { loadHistoricalData(); loadYearOverYear(); },
   "ap-recommendations": () => loadFinancialIntelligence(),
   "ap-ask": () => initFarmIntelligencePage(),
@@ -2366,6 +2367,91 @@ async function deleteDocRecord(id) {
     await loadDocuments();
   } catch (err) {
     showStatus(err.message, "error");
+  }
+}
+
+// -----------------------------------------------------------------------
+// Household Costs
+// -----------------------------------------------------------------------
+
+const HOUSEHOLD_LABELS = {
+  drawings_monthly: ["Drawings (monthly)", "mo"],
+  pension_insurance_monthly: ["Pension & Insurance (monthly)", "mo"],
+  off_farm_income_monthly: ["Off-Farm Income (monthly)", "mo"],
+  farm_to_household_transfer_monthly: ["Farm → Household Transfer (monthly)", "mo"],
+  utilities_monthly: ["Utilities (monthly)", "mo"],
+  groceries_monthly: ["Groceries (monthly)", "mo"],
+  motor_expenses_monthly: ["Motor Expenses (monthly)", "mo"],
+  childcare_monthly: ["Childcare (monthly)", "mo"],
+  tax_annual: ["Tax (annual)", "yr"],
+  health_insurance_annual: ["Health Insurance (annual)", "yr"],
+  home_maintenance_annual: ["Home Maintenance (annual)", "yr"],
+};
+
+function euro(v) { return "€" + Number(v || 0).toLocaleString("en-IE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+
+async function loadHousehold() {
+  const loading = $("household-loading");
+  const summary = $("household-summary");
+  try {
+    const data = await api(`/farmer/household${sectorsQuery()}`);
+    const hh = data.household || {};
+    const docs = data.household_documents || [];
+
+    const monthlyTotal =
+      (hh.drawings_monthly || 0) +
+      (hh.pension_insurance_monthly || 0) +
+      (hh.utilities_monthly || 0) +
+      (hh.groceries_monthly || 0) +
+      (hh.motor_expenses_monthly || 0) +
+      (hh.childcare_monthly || 0);
+    const annualTotal =
+      monthlyTotal * 12 +
+      (hh.tax_annual || 0) +
+      (hh.health_insurance_annual || 0) +
+      (hh.home_maintenance_annual || 0);
+
+    $("household-kpis").innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Monthly Outgoings</div><div class="kpi-value">${euro(monthlyTotal)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Annual Estimated Total</div><div class="kpi-value">${euro(annualTotal)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Off-Farm Income</div><div class="kpi-value">${euro(hh.off_farm_income_monthly)}/mo</div></div>
+      <div class="kpi-card"><div class="kpi-label">Tax Payment Months</div><div class="kpi-value">${(hh.tax_payment_months || []).map(m => ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]).join(", ") || "—"}</div></div>
+    `;
+
+    let rows = "";
+    for (const [key, [label, period]] of Object.entries(HOUSEHOLD_LABELS)) {
+      if (hh[key] != null) {
+        rows += `<tr><td>${label}</td><td class="num">${euro(hh[key])}/${period}</td></tr>`;
+      }
+    }
+    if (hh.tax_payment_months?.length) {
+      rows += `<tr><td>Tax Payment Months</td><td class="num">${hh.tax_payment_months.map(m => ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]).join(", ")}</td></tr>`;
+    }
+    $("household-breakdown").innerHTML = rows
+      ? `<table class="data-table"><thead><tr><th>Item</th><th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<p class="muted">No household cost data in the farm dataset.</p>`;
+
+    let docHtml = "";
+    if (docs.length) {
+      docHtml = docs.map(d => `
+        <div class="doc-row">
+          <span class="doc-type-badge ${d.document_type}">${d.document_type}</span>
+          <strong>${d.counterparty || "—"}</strong>
+          <span class="num">${euro(d.amount)}</span>
+          <span class="badge ${d.payment_status === "paid" ? "badge-green" : "badge-amber"}">${d.payment_status}</span>
+          <span class="muted">${d.date || ""}</span>
+          <span class="muted">${d.notes || ""}</span>
+        </div>
+      `).join("");
+    } else {
+      docHtml = `<p class="muted">No household invoices or receipts yet.</p>`;
+    }
+    $("household-docs-list").innerHTML = docHtml;
+
+    loading.classList.add("hidden");
+    summary.classList.remove("hidden");
+  } catch (err) {
+    loading.textContent = "Failed to load household costs: " + err.message;
   }
 }
 

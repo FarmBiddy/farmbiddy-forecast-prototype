@@ -488,6 +488,38 @@ def farmer_delete_document(
 
 
 @router.get(
+    "/farmer/household",
+    tags=["Farmer Edition"],
+    summary="Household cost breakdown from farm dataset",
+)
+def farmer_household(
+    farm_id: Optional[str] = Query(default=None, alias="farm_file"),
+    identity: RequestIdentity = Depends(get_current_identity),
+):
+    from services.multi_sector_farm import load_multi_sector_farm
+
+    try:
+        farm_file = resolve_farm_file(farm_id)
+        enforce_farm_access(identity, farm_file)
+        farm = load_multi_sector_farm(farm_file)
+        household = (farm.get("farm_summary") or {}).get("household") or {}
+        documents = list_documents(farm_file)
+        household_cats = {"utilities", "other_expense"}
+        household_docs = [
+            d for d in documents
+            if d.get("category") in household_cats
+        ]
+        return {
+            "success": True,
+            "farm_file": farm_file,
+            "household": household,
+            "household_documents": household_docs,
+        }
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
     "/farmer/onboarding",
     response_model=OnboardingStatusResponse,
     tags=["Farmer Edition"],

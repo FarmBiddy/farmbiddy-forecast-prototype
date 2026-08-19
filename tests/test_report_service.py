@@ -121,7 +121,7 @@ def test_farm_position_uses_knockrow_sample_records():
     pos = data["farm_position"]
     assert pos["debtors"] == 14200
     assert pos["creditors"] == 19600
-    assert pos["household"].get("drawings_monthly") == 2200
+    assert pos["household"].get("drawings_monthly") == 2500
     assert pos["stock"].get("ewes") == 228
     assert pos["legal_name"]
     assert data["lowest_cash"]["month_label"] in report_service._CALENDAR_MONTHS

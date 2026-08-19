@@ -26,6 +26,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import router as api_router
+from api.capabilities_routes import router as capabilities_router
 from config.paths import CHARTS_DIR, FRONTEND_DIR, REPORTS_DIR, ensure_output_dirs
 from identity.access import FarmAccessDeniedError
 from services.forecast_service import (
@@ -164,3 +165,4 @@ def serve_frontend():
 
 app.include_router(api_router, prefix="/api")
 app.include_router(api_router)
+app.include_router(capabilities_router, prefix="/api")
