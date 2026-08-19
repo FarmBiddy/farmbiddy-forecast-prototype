@@ -1069,12 +1069,13 @@ const REPORT_SECTIONS = {
     "AI advisor summary for banks and investors",
   ],
   accountant: [
-    "Cover, farm identity, and unaudited disclaimer",
-    "Meeting page — cash now, debt, lowest expected cash, last 12 months",
+    "Cover — farm identity, VAT, processor, SAMPLE disclaimer",
+    "Meeting page — cash in the model, debt, lowest expected cash, last 12 months",
+    "Farm position — working capital, land, stock, household, schemes",
     "Income & Expenses — actual recorded figures",
     "Budget vs Actual by category",
-    "Loans — outstanding, rate, maturity",
-    "Expected cash (forecast) and milk −5c/L",
+    "Loans — principal, estimated outstanding, rate, maturity",
+    "Expected cash Jan–Dec (forecast) and milk −5c/L",
     "Contribution by enterprise (Dairy · Beef · Sheep)",
     "Previous Performance — year on year",
   ],
@@ -1088,7 +1089,7 @@ function initReportDate() {
 }
 
 function updateReportSections() {
-  const type = $("report-type")?.value || "full";
+  const type = $("report-type")?.value || "accountant";
   const list = $("report-sections");
   if (!list) return;
   list.innerHTML = (REPORT_SECTIONS[type] || REPORT_SECTIONS.full)
@@ -1102,7 +1103,7 @@ function formatReportDate(isoDate) {
 }
 
 function getReportParams() {
-  const reportType = $("report-type")?.value || "full";
+  const reportType = $("report-type")?.value || "accountant";
   const dateVal = $("report-date")?.value;
   const params = new URLSearchParams();
   params.set("farm_file", state.activeFarmFile);

@@ -7,6 +7,7 @@ services without modifying the forecast engine.
 
 from __future__ import annotations
 
+import json
 import os
 import random
 import tempfile
@@ -28,7 +29,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from config.paths import REPORTS_DIR, ensure_output_dirs
+from config.paths import DATASETS_DIR, REPORTS_DIR, ensure_output_dirs
 from forecast_engine.alerts import generate_alerts
 from forecast_engine.cashflow import calculate_monthly_cashflow, generate_monthly_forecast
 from forecast_engine.costs import calculate_costs
@@ -92,11 +93,90 @@ PAGE_SETS: dict[str, list[str]] = {
     # cash forecast, one milk-price sensitivity, and enterprise contribution.
     # No Monte Carlo, health scores, or investment-readiness theatre.
     "accountant": [
-        "cover", "meeting", "income_expenses_actual", "budget_variance",
+        "cover", "meeting", "farm_position", "income_expenses_actual", "budget_variance",
         "loans_finance", "cash_forecast", "milk_down", "sector_contribution",
         "year_over_year", "closing",
     ],
 }
+
+
+_CALENDAR_MONTHS = (
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+)
+
+
+def _calendar_month_label(month: Any) -> str:
+    try:
+        idx = int(month)
+        if 1 <= idx <= 12:
+            return _CALENDAR_MONTHS[idx - 1]
+    except (TypeError, ValueError):
+        pass
+    return str(month or "—")
+
+
+def _load_raw_farm(farm_file: str) -> dict:
+    path = os.path.join(DATASETS_DIR, farm_file)
+    if not os.path.exists(path):
+        return {}
+    with open(path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    return data if isinstance(data, dict) else {}
+
+
+def _build_farm_position(raw: dict, profile: dict, opening: float) -> dict:
+    """Working capital, land, stock and household from the sample dataset."""
+    identity = raw.get("identity") or {}
+    legal = identity.get("legal_entity") or {}
+    farmer = identity.get("farmer") or {}
+    location = identity.get("location") or {}
+    summary = raw.get("farm_summary") or {}
+    scheme = raw.get("scheme_payments") or {}
+    dairy_raw = (raw.get("sectors") or {}).get("dairy") or {}
+    beef_raw = (raw.get("sectors") or {}).get("beef") or {}
+    lamb_raw = (raw.get("sectors") or {}).get("lamb") or {}
+    sectors = profile.get("sector_profile") or {}
+    dairy = sectors.get("dairy") or {}
+    beef = sectors.get("beef") or {}
+    lamb = sectors.get("lamb") or {}
+    cash = float(summary.get("opening_cash_balance") if summary.get("opening_cash_balance") is not None else opening or 0)
+    debtors = float(summary.get("debtors") or 0)
+    creditors = float(summary.get("creditors") or 0)
+    scheme_months = scheme.get("scheme_payment_months") or {}
+    return {
+        "legal_name": legal.get("name"),
+        "legal_type": legal.get("type"),
+        "vat_number": legal.get("vat_number"),
+        "registration_number": legal.get("registration_number"),
+        "owner_name": farmer.get("name") or profile.get("owner_name"),
+        "address": farmer.get("address"),
+        "phone": farmer.get("phone"),
+        "email": farmer.get("email"),
+        "county": location.get("county") or profile.get("county"),
+        "herd_number": location.get("herd_number") or profile.get("herd_number"),
+        "processor": dairy_raw.get("processor") or profile.get("milk_processor"),
+        "total_hectares": summary.get("total_hectares") or profile.get("total_hectares"),
+        "land_by_sector": summary.get("land_by_sector") or profile.get("land_by_sector") or {},
+        "cash": cash,
+        "debtors": debtors,
+        "creditors": creditors,
+        "working_capital": round(cash + debtors - creditors, 2),
+        "supplier_credit": list(summary.get("supplier_credit") or []),
+        "household": dict(summary.get("household") or {}),
+        "schemes": {
+            "biss": scheme.get("biss"),
+            "acres": scheme.get("acres"),
+            "other_grants": scheme.get("other_grants"),
+            "scheme_payment_months": scheme_months,
+        },
+        "stock": {
+            "milking_cows": dairy.get("milking_cows") or (dairy_raw.get("herd") or {}).get("milking_cows"),
+            "cattle_on_farm": beef.get("cattle_on_farm") or (beef_raw.get("herd") or {}).get("cattle_on_farm"),
+            "ewes": lamb.get("ewes") or (lamb_raw.get("flock") or {}).get("ewes"),
+        },
+        "notes": summary.get("notes") or "",
+    }
 
 
 def _safe_pct(part: float, whole: float) -> float:
@@ -123,7 +203,7 @@ def _lowest_cash(monthly: list[dict], opening: float = 0) -> dict:
     return {
         "value": _month_cash(worst, opening),
         "month": month,
-        "month_label": f"Month {month}" if month else "—",
+        "month_label": _calendar_month_label(month) if month else "—",
     }
 
 
@@ -139,7 +219,7 @@ def _period_caption(period: Any) -> str:
 
 
 def _enterprise_line(selected: list[str]) -> str:
-    return " · ".join(SECTOR_LABELS.get(s, s.title()) for s in selected)
+    return " / ".join(SECTOR_LABELS.get(s, s.title()) for s in selected)
 
 
 def _build_preview_kpis(data: dict) -> list[dict]:
@@ -147,7 +227,7 @@ def _build_preview_kpis(data: dict) -> list[dict]:
     if data.get("report_type") == "accountant":
         meeting = data.get("meeting") or {}
         return [
-            {"label": "Cash now", "value": meeting.get("cash_now"), "kind": "currency"},
+            {"label": "Cash in the model", "value": meeting.get("cash_now"), "kind": "currency"},
             {"label": "Last 12 months net", "value": meeting.get("actual_net"), "kind": "currency"},
             {"label": "Lowest expected cash", "value": meeting.get("lowest_cash"), "kind": "currency"},
             {"label": "Total debt", "value": meeting.get("total_debt"), "kind": "currency"},
@@ -596,25 +676,41 @@ def collect_report_data(
             sector_performance = []
 
     period_label = _period_caption(income_expense_actual.get("period"))
+    raw_farm = _load_raw_farm(farm_file) if is_accountant else {}
+    farm_position = _build_farm_position(raw_farm, profile, opening) if is_accountant else {}
+    repay = float(loans_summary.get("total_annual_repayments") or 0)
+    actual_net = float(income_expense_actual.get("difference") or 0)
+    if actual_net < 0:
+        repayment_note = (
+            f"Last 12 months net is {format_currency(actual_net)} on recorded figures, "
+            f"so it does not cover annual loan repayments of {format_currency(repay)}."
+        )
+    else:
+        repayment_note = (
+            f"Last 12 months net is {format_currency(actual_net)} on recorded figures. "
+            f"Annual loan repayments are {format_currency(repay)}."
+        )
     meeting = {
         "cash_now": opening,
         "actual_income": income_expense_actual.get("income_total", 0),
         "actual_costs": income_expense_actual.get("expense_total", 0),
-        "actual_net": income_expense_actual.get("difference", 0),
+        "actual_net": actual_net,
         "total_debt": loans_summary.get("total_outstanding_debt", 0),
-        "annual_repayments": loans_summary.get("total_annual_repayments", 0),
+        "annual_repayments": repay,
         "lowest_cash": lowest["value"],
         "lowest_cash_month": lowest["month"],
         "lowest_cash_month_label": lowest["month_label"],
         "period_label": period_label,
         "enterprises": _enterprise_line(selected),
+        "repayment_note": repayment_note,
     }
 
     if is_accountant:
         executive_summary = (
             f"Unaudited management information for {profile.get('farm_name', 'this farm')} "
-            f"covering {period_label}. Not statutory accounts. Cash now, debt, and "
-            "last-12-month totals are recorded figures. Lowest expected cash is a forecast."
+            f"covering {period_label}. Not statutory accounts. Cash in the model is the "
+            "opening figure in FarmBiddy, not a live bank balance. Last-12-month totals "
+            "are recorded. Lowest expected cash is a seasonal forecast."
         )
         advisor_summary = ""
     else:
@@ -652,6 +748,7 @@ def collect_report_data(
         "monthly_forecast": monthly,
         "lowest_cash": lowest,
         "meeting": meeting,
+        "farm_position": farm_position,
         "kpis": {
             "cash_now": opening,
             "cash_available": opening,
@@ -751,10 +848,16 @@ def _chart_cost_breakdown(breakdown: dict) -> str:
     return _save_chart(fig, "costs")
 
 
-def _chart_cashflow(monthly: list[dict]) -> str:
+def _month_axis_labels(monthly: list[dict], calendar_names: bool = False) -> list[str]:
+    if calendar_names:
+        return [_calendar_month_label(m.get("month", i)) for i, m in enumerate(monthly, 1)]
+    return [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
+
+
+def _chart_cashflow(monthly: list[dict], calendar_names: bool = False) -> str:
     plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
-    months = [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
+    months = _month_axis_labels(monthly, calendar_names)
     cf = [m.get("combined_cashflow", m.get("cashflow", 0)) for m in monthly]
     colors_bars = ["#2d9f5f" if v >= 0 else "#dc2626" for v in cf]
     ax.bar(months, cf, color=colors_bars)
@@ -764,10 +867,10 @@ def _chart_cashflow(monthly: list[dict]) -> str:
     return _save_chart(fig, "cashflow")
 
 
-def _chart_reserve(monthly: list[dict]) -> str:
+def _chart_reserve(monthly: list[dict], calendar_names: bool = False) -> str:
     plt = _pyplot()
     fig, ax = plt.subplots(figsize=(8, 4))
-    months = [str(m.get("month", i)) for i, m in enumerate(monthly, 1)]
+    months = _month_axis_labels(monthly, calendar_names)
     bal = [_month_cash(m) for m in monthly]
     ax.fill_between(range(len(months)), bal, alpha=0.3, color="#2d9f5f")
     ax.plot(months, bal, color="#0f2744", linewidth=2.5, marker="o")
@@ -824,8 +927,8 @@ def _generate_report_charts(data: dict) -> dict[str, str]:
     if data.get("report_type") == "accountant":
         charts = {}
         if monthly:
-            charts["cashflow"] = _chart_cashflow(monthly)
-            charts["reserve"] = _chart_reserve(monthly)
+            charts["cashflow"] = _chart_cashflow(monthly, calendar_names=True)
+            charts["reserve"] = _chart_reserve(monthly, calendar_names=True)
         return charts
     charts = {}
     charts["revenue_costs"] = _chart_revenue_costs(monthly)
@@ -852,14 +955,31 @@ class _ReportDoc(SimpleDocTemplate):
 def _styles():
     base = getSampleStyleSheet()
     return {
-        "title": ParagraphStyle("Title", parent=base["Heading1"], fontSize=22, textColor=NAVY, spaceAfter=12),
-        "h2": ParagraphStyle("H2", parent=base["Heading2"], fontSize=16, textColor=NAVY, spaceBefore=8, spaceAfter=8),
-        "h3": ParagraphStyle("H3", parent=base["Heading3"], fontSize=12, textColor=GREEN, spaceAfter=6),
+        "title": ParagraphStyle(
+            "Title", parent=base["Heading1"], fontSize=18, leading=24,
+            textColor=NAVY, spaceBefore=0, spaceAfter=12,
+        ),
+        "h2": ParagraphStyle("H2", parent=base["Heading2"], fontSize=16, leading=20, textColor=NAVY, spaceBefore=8, spaceAfter=8),
+        "h3": ParagraphStyle("H3", parent=base["Heading3"], fontSize=12, leading=16, textColor=GREEN, spaceAfter=6),
         "body": ParagraphStyle("Body", parent=base["Normal"], fontSize=10, leading=14, textColor=colors.HexColor("#1a2332")),
         "muted": ParagraphStyle("Muted", parent=base["Normal"], fontSize=9, textColor=MUTED, leading=12),
-        "center": ParagraphStyle("Center", parent=base["Normal"], fontSize=11, alignment=TA_CENTER, textColor=MUTED),
-        "cover_title": ParagraphStyle("CoverTitle", parent=base["Heading1"], fontSize=28, textColor=NAVY, alignment=TA_CENTER, spaceAfter=16),
-        "cover_sub": ParagraphStyle("CoverSub", parent=base["Normal"], fontSize=14, textColor=GREEN, alignment=TA_CENTER, spaceAfter=8),
+        "center": ParagraphStyle("Center", parent=base["Normal"], fontSize=10, leading=18, alignment=TA_CENTER, textColor=MUTED, spaceAfter=6),
+        "cover_title": ParagraphStyle(
+            "CoverTitle", fontName="Helvetica-Bold", fontSize=22, leading=28,
+            textColor=NAVY, alignment=TA_CENTER, spaceBefore=0, spaceAfter=12,
+        ),
+        "cover_sub": ParagraphStyle(
+            "CoverSub", fontName="Helvetica", fontSize=13, leading=20,
+            textColor=GREEN, alignment=TA_CENTER, spaceBefore=0, spaceAfter=10,
+        ),
+        "cover_farm": ParagraphStyle(
+            "CoverFarm", fontName="Helvetica-Bold", fontSize=16, leading=22,
+            textColor=NAVY, alignment=TA_CENTER, spaceBefore=4, spaceAfter=12,
+        ),
+        "cover_sample": ParagraphStyle(
+            "CoverSample", fontName="Helvetica-Bold", fontSize=10, leading=16,
+            alignment=TA_CENTER, textColor=RED, spaceBefore=6, spaceAfter=10,
+        ),
     }
 
 
@@ -873,17 +993,24 @@ def _header_footer(canvas, doc):
     canvas.setFont("Helvetica-Bold", 9)
     canvas.drawString(20 * mm, h - 12 * mm, "FarmBiddy")
     canvas.setFont("Helvetica", 8)
-    right = data.get("farm_name", "Farm Report")
-    if data.get("is_sample_data"):
-        right = f"SAMPLE / DEMO  ·  {right}"
+    right = data.get("farm_name", "Farm Report") or "Farm Report"
+    brand_w = canvas.stringWidth("FarmBiddy", "Helvetica-Bold", 9)
+    max_right = w - 44 * mm - brand_w
+    if canvas.stringWidth(right, "Helvetica", 8) > max_right:
+        while right and canvas.stringWidth(right + "…", "Helvetica", 8) > max_right:
+            right = right[:-1]
+        right = right.rstrip() + "…"
     canvas.drawRightString(w - 20 * mm, h - 12 * mm, right)
+    if data.get("is_sample_data"):
+        canvas.setFont("Helvetica-Bold", 7)
+        canvas.drawCentredString(w / 2, h - 12 * mm, "SAMPLE / DEMO")
     canvas.setFillColor(MUTED)
     canvas.setFont("Helvetica", 7)
-    canvas.drawCentredString(w / 2, 10 * mm, f"FarmBiddy  ·  {data.get('report_date', '')}  ·  Page {doc.page}")
-    footer = "Confidential — Unaudited management information, not statutory accounts"
+    bits = [data.get("report_date", ""), f"Page {doc.page}"]
     if data.get("is_sample_data"):
-        footer = "SAMPLE / DEMO DATA  ·  " + footer
-    canvas.drawCentredString(w / 2, 6 * mm, footer)
+        bits.insert(0, "SAMPLE / DEMO")
+    bits.append("Unaudited - not statutory accounts")
+    canvas.drawCentredString(w / 2, 9 * mm, "  |  ".join(str(b) for b in bits if b))
     canvas.restoreState()
 
 
@@ -893,8 +1020,8 @@ def _kpi_cards(rows: list[tuple], cols: int = 2) -> Table:
     row_buf: list = []
     for label, value, colour in rows:
         cell = Table(
-            [[Paragraph(f"<b>{value}</b>", ParagraphStyle("v", fontSize=14, textColor=colour))],
-             [Paragraph(label, ParagraphStyle("l", fontSize=8, textColor=MUTED))]],
+            [[Paragraph(f"<b>{value}</b>", ParagraphStyle("v", fontSize=14, leading=18, textColor=colour))],
+             [Paragraph(label, ParagraphStyle("l", fontSize=8, leading=11, textColor=MUTED))]],
             colWidths=[cell_w],
         )
         cell.setStyle(TableStyle([
@@ -918,42 +1045,68 @@ def _kpi_cards(rows: list[tuple], cols: int = 2) -> Table:
     return t
 
 
+def _cover_identity_lines(data: dict) -> list[str]:
+    """Deduped cover lines so farm name, address and county do not stack twice."""
+    p = data.get("profile") or {}
+    pos = data.get("farm_position") or {}
+    meeting = data.get("meeting") or {}
+    farm_name = (data.get("farm_name") or "").strip()
+    legal_name = (pos.get("legal_name") or "").strip()
+    address = (pos.get("address") or "").strip()
+    county = (pos.get("county") or p.get("county") or p.get("location") or "").strip()
+    owner = (pos.get("owner_name") or p.get("owner_name") or "").strip()
+    ha = pos.get("total_hectares") if pos.get("total_hectares") is not None else p.get("total_hectares")
+    herd = pos.get("herd_number") or p.get("herd_number")
+
+    lines: list[str] = []
+    heading = legal_name or farm_name
+    if heading:
+        lines.append(heading)
+    if farm_name and legal_name and farm_name.lower() not in legal_name.lower():
+        lines.append(farm_name)
+    if address:
+        lines.append(address)
+    if county and county.lower() not in address.lower():
+        lines.append(county)
+    if pos.get("vat_number"):
+        lines.append(f"VAT {pos['vat_number']}")
+    if owner and owner.lower() not in heading.lower():
+        lines.append(owner)
+    if herd:
+        lines.append(f"Herd no. {herd}")
+    if pos.get("processor"):
+        lines.append(f"Processor: {pos['processor']}")
+    if ha is not None:
+        lines.append(f"{ha} hectares")
+    if meeting.get("enterprises"):
+        lines.append(str(meeting["enterprises"]))
+    if meeting.get("period_label"):
+        lines.append(str(meeting["period_label"]))
+    return lines
+
+
 def _page_cover(data: dict, st: dict) -> list:
-    story = [Spacer(1, 2.2 * cm)]
-    story.append(Paragraph("FarmBiddy", st["cover_sub"]))
-    story.append(Spacer(1, 0.3 * cm))
+    story = [Spacer(1, 1.4 * cm)]
     story.append(Paragraph("Farm Financial Report", st["cover_title"]))
     story.append(Paragraph(data["report_type_label"], st["cover_sub"]))
     if data.get("is_sample_data"):
-        story.append(Paragraph(
-            "<b>SAMPLE / DEMO DATA</b>",
-            ParagraphStyle("sample", fontSize=12, alignment=TA_CENTER, textColor=RED, spaceAfter=8),
-        ))
+        story.append(Paragraph("SAMPLE / DEMO DATA", st["cover_sample"]))
     story.append(Spacer(1, 0.8 * cm))
-    story.append(Paragraph(f"<b>{data['farm_name']}</b>", ParagraphStyle("fn", fontSize=20, alignment=TA_CENTER, textColor=NAVY)))
-    p = data.get("profile") or {}
     if data.get("report_type") == "accountant":
-        meeting = data.get("meeting") or {}
-        identity = [
-            p.get("owner_name"),
-            p.get("county") or p.get("location"),
-            f"Herd no. {p['herd_number']}" if p.get("herd_number") else None,
-            f"{p['total_hectares']} hectares" if p.get("total_hectares") is not None else None,
-            meeting.get("enterprises"),
-            meeting.get("period_label"),
-        ]
-        for line in identity:
-            if line:
-                story.append(Paragraph(str(line), st["center"]))
-        story.append(Spacer(1, 0.5 * cm))
+        identity = _cover_identity_lines(data)
+        if identity:
+            story.append(Paragraph(identity[0], st["cover_farm"]))
+            for line in identity[1:]:
+                story.append(Paragraph(line, st["center"]))
+        story.append(Spacer(1, 0.55 * cm))
         story.append(Paragraph(
-            "Unaudited management information — not statutory accounts.",
+            "Unaudited management information - not statutory accounts.",
             st["center"],
         ))
-    story.append(Spacer(1, 0.6 * cm))
-    story.append(Paragraph(data["report_date"], st["center"]))
-    story.append(Spacer(1, 1.2 * cm))
-    story.append(Paragraph("<b>Confidential</b>", ParagraphStyle("conf", fontSize=11, alignment=TA_CENTER, textColor=RED)))
+    else:
+        story.append(Paragraph(data.get("farm_name") or "", st["cover_farm"]))
+    story.append(Spacer(1, 0.7 * cm))
+    story.append(Paragraph(data["report_date"], st["cover_sub"]))
     story.append(PageBreak())
     return story
 
@@ -980,9 +1133,9 @@ def _page_executive(data: dict, st: dict) -> list:
 def _page_meeting(data: dict, st: dict) -> list:
     meeting = data.get("meeting") or {}
     cards = _kpi_cards([
-        ("Cash now (Actual)", format_currency(meeting.get("cash_now", 0)), NAVY),
-        ("Outstanding debt (Actual)", format_currency(meeting.get("total_debt", 0)), NAVY),
-        ("Annual repayments (Actual)", format_currency(meeting.get("annual_repayments", 0)), NAVY),
+        ("Cash in the model", format_currency(meeting.get("cash_now", 0)), NAVY),
+        ("Estimated outstanding debt", format_currency(meeting.get("total_debt", 0)), NAVY),
+        ("Annual repayments", format_currency(meeting.get("annual_repayments", 0)), NAVY),
         (
             "Lowest expected cash (Forecast)",
             format_currency(meeting.get("lowest_cash", 0)),
@@ -999,8 +1152,8 @@ def _page_meeting(data: dict, st: dict) -> list:
     story = [
         Paragraph("Meeting summary", st["title"]),
         Paragraph(
-            "Figures a lender or advisor can read in a minute. Actual means recorded. "
-            "Forecast means the engine looking ahead — it is not a bank statement.",
+            "Cash in the model is the opening figure in FarmBiddy as of this report date — not a live bank balance. "
+            "Actual means recorded. Forecast is a seasonal look-ahead, not a bank statement.",
             st["muted"],
         ),
         Spacer(1, 0.2 * cm),
@@ -1009,10 +1162,120 @@ def _page_meeting(data: dict, st: dict) -> list:
         cards,
         Spacer(1, 0.35 * cm),
         actuals,
-        Spacer(1, 0.4 * cm),
+        Spacer(1, 0.35 * cm),
+        Paragraph(meeting.get("repayment_note") or "", st["body"]),
+        Spacer(1, 0.3 * cm),
         Paragraph(data.get("executive_summary") or "", st["body"]),
         PageBreak(),
     ]
+    return story
+
+
+def _info_table(rows: list[tuple[str, str]], st: dict) -> Table:
+    table = Table(
+        [[Paragraph(f"<b>{a}</b>", st["body"]), Paragraph(str(b), st["body"])] for a, b in rows],
+        colWidths=[5.5 * cm, 10.5 * cm],
+    )
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), GREEN_LIGHT),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    return table
+
+
+def _page_farm_position(data: dict, st: dict) -> list:
+    pos = data.get("farm_position") or {}
+    land = pos.get("land_by_sector") or {}
+    stock = pos.get("stock") or {}
+    household = pos.get("household") or {}
+    schemes = pos.get("schemes") or {}
+    scheme_months = schemes.get("scheme_payment_months") or {}
+    story = [
+        Paragraph("Farm position", st["title"]),
+        Paragraph(
+            "Sample-farm records from Knockrow, not a balance sheet and not a live bank or lender statement.",
+            st["muted"],
+        ),
+        Spacer(1, 0.25 * cm),
+    ]
+    cards = _kpi_cards([
+        ("Cash in the model", format_currency(pos.get("cash", 0)), NAVY),
+        ("Debtors", format_currency(pos.get("debtors", 0)), GREEN),
+        ("Creditors", format_currency(pos.get("creditors", 0)), NAVY),
+        ("Working capital", format_currency(pos.get("working_capital", 0)), GREEN),
+    ])
+    story += [cards, Spacer(1, 0.3 * cm)]
+    story.append(Paragraph(
+        "Working capital here is cash in the model + debtors − creditors. Cash is the opening figure in FarmBiddy as of the report date.",
+        st["muted"],
+    ))
+    story.append(Spacer(1, 0.25 * cm))
+
+    land_bits = []
+    if land.get("dairy") is not None:
+        land_bits.append(f"Dairy {land['dairy']} ha")
+    if land.get("beef") is not None:
+        land_bits.append(f"Beef {land['beef']} ha")
+    if land.get("lamb") is not None:
+        land_bits.append(f"Sheep {land['lamb']} ha")
+    stock_bits = []
+    if stock.get("milking_cows") is not None:
+        stock_bits.append(f"{stock['milking_cows']} milking cows")
+    if stock.get("cattle_on_farm") is not None:
+        stock_bits.append(f"{stock['cattle_on_farm']} cattle")
+    if stock.get("ewes") is not None:
+        stock_bits.append(f"{stock['ewes']} ewes")
+    tax_months = household.get("tax_payment_months") or []
+    tax_when = ", ".join(_calendar_month_label(m) for m in tax_months) if tax_months else "—"
+    story.append(Paragraph("Land, stock, household", st["h3"]))
+    story.append(_info_table([
+        ("Land", f"{pos.get('total_hectares') or '—'} ha" + (f" ({' · '.join(land_bits)})" if land_bits else "")),
+        ("Stock on hand", ", ".join(stock_bits) if stock_bits else "—"),
+        ("Drawings", f"{format_currency(household.get('drawings_monthly') or 0)} / month"),
+        ("Off-farm income", f"{format_currency(household.get('off_farm_income_monthly') or 0)} / month"),
+        ("Tax", f"{format_currency(household.get('tax_annual') or 0)} / year, paid {tax_when}"),
+    ], st))
+    story.append(Spacer(1, 0.3 * cm))
+
+    suppliers = pos.get("supplier_credit") or []
+    if suppliers:
+        story.append(Paragraph("Supplier credit", st["h3"]))
+        rows = [["Supplier", "Balance", "Terms"]]
+        for row in suppliers:
+            terms = row.get("terms_days")
+            rows.append([
+                row.get("supplier") or "—",
+                format_currency(row.get("balance") or 0),
+                f"{terms} days" if terms is not None else "—",
+            ])
+        table = Table(rows, colWidths=[7 * cm, 4.5 * cm, 4.5 * cm])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREEN_LIGHT]),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story += [table, Spacer(1, 0.3 * cm)]
+
+    story.append(Paragraph("Schemes", st["h3"]))
+    story.append(_info_table([
+        ("BISS", f"{format_currency(schemes.get('biss') or 0)} in {_calendar_month_label(scheme_months.get('biss'))}"),
+        ("ACRES", f"{format_currency(schemes.get('acres') or 0)} in {_calendar_month_label(scheme_months.get('acres'))}"),
+        ("Other grants", f"{format_currency(schemes.get('other_grants') or 0)} in {_calendar_month_label(scheme_months.get('other_grants'))}"),
+    ], st))
+    if pos.get("notes"):
+        story.append(Spacer(1, 0.25 * cm))
+        story.append(Paragraph(pos["notes"], st["muted"]))
+    story.append(PageBreak())
     return story
 
 
@@ -1383,9 +1646,12 @@ def _page_loans_finance(data: dict, st: dict) -> list:
     loans = data.get("loans_summary") or {}
     next_loan = loans.get("next_loan_to_clear")
     story = [Paragraph("Loans & Finance", st["title"])]
-    story.append(Paragraph("Outstanding balances, rates and remaining term from the farm's debt register.", st["muted"]))
+    story.append(Paragraph(
+        "Outstanding is estimated from rate and remaining term, not a lender statement. Principal is the original amount on the farm record.",
+        st["muted"],
+    ))
     cards = _kpi_cards([
-        ("Total Outstanding Debt", format_currency(loans.get("total_outstanding_debt", 0)), NAVY),
+        ("Estimated outstanding", format_currency(loans.get("total_outstanding_debt", 0)), NAVY),
         ("Annual Repayments", format_currency(loans.get("total_annual_repayments", 0)), NAVY),
         ("Next Loan to Clear", next_loan.get("lender", "—") if next_loan else "None outstanding", GREEN),
     ])
@@ -1399,19 +1665,19 @@ def _page_loans_finance(data: dict, st: dict) -> list:
         story.append(Spacer(1, 0.25 * cm))
     register = loans.get("loans") or []
     if register:
-        rows = [["Lender", "Outstanding", "Rate", "Monthly", "Maturity", "Months left"]]
+        rows = [["Lender", "Principal", "Est. outstanding", "Rate", "Monthly", "Maturity"]]
         for loan in register:
             rate = loan.get("rate")
             rate_text = f"{rate:.2f}%" if isinstance(rate, (int, float)) else "—"
             rows.append([
                 loan.get("lender", "—"),
+                format_currency(loan.get("principal", 0)),
                 format_currency(loan.get("outstanding_balance", 0)),
                 rate_text,
                 format_currency(loan.get("monthly_repayment", 0)),
                 str(loan.get("maturity") or "—"),
-                str(loan.get("months_remaining", "—")),
             ])
-        table = Table(rows, colWidths=[3.4 * cm, 2.6 * cm, 2.1 * cm, 2.6 * cm, 2.4 * cm, 2.5 * cm])
+        table = Table(rows, colWidths=[3.4 * cm, 2.6 * cm, 3.0 * cm, 2.0 * cm, 2.4 * cm, 2.2 * cm])
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), NAVY),
             ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
@@ -1497,12 +1763,12 @@ def _page_closing(data: dict, st: dict) -> list:
         Paragraph("FarmBiddy", st["cover_sub"]),
         Spacer(1, 0.4 * cm),
         Paragraph(
-            "Automatically generated. Unaudited management information — not statutory accounts.",
+            "Automatically generated. Unaudited management information - not statutory accounts.",
             st["center"],
         ),
     ]
     if data.get("is_sample_data"):
-        lines.append(Paragraph("<b>SAMPLE / DEMO DATA</b>", ParagraphStyle("sc", fontSize=11, alignment=TA_CENTER, textColor=RED, spaceBefore=8)))
+        lines.append(Paragraph("SAMPLE / DEMO DATA", st["cover_sample"]))
     lines += [
         Spacer(1, 1 * cm),
         Paragraph(data["report_date"], st["center"]),
@@ -1517,8 +1783,8 @@ def _page_cash_forecast(data: dict, st: dict, charts: dict) -> list:
     story = [
         Paragraph("Expected cash — Forecast", st["title"]),
         Paragraph(
-            "This is a 12-month forecast, not recorded Actuals. It includes farm cash and household drawings. "
-            "Use it to see when cash is tight; do not treat it as a bank statement.",
+            "Seasonal 12-month forecast starting from cash in the model. Month names are calendar months "
+            "(January pattern first, BISS in October). This is not a dated bank statement.",
             st["muted"],
         ),
         Spacer(1, 0.25 * cm),
@@ -1538,7 +1804,7 @@ def _page_cash_forecast(data: dict, st: dict, charts: dict) -> list:
         for month in monthly:
             mark = " ← lowest" if month.get("month") == lowest.get("month") else ""
             rows.append([
-                f"{month.get('month')}{mark}",
+                f"{_calendar_month_label(month.get('month'))}{mark}",
                 format_currency(month.get("combined_cashflow", month.get("cashflow", 0))),
                 format_currency(_month_cash(month)),
             ])
@@ -1663,6 +1929,7 @@ PAGE_BUILDERS = {
     "loans_finance": lambda d, s, c: _page_loans_finance(d, s),
     "year_over_year": lambda d, s, c: _page_year_over_year(d, s),
     "meeting": lambda d, s, c: _page_meeting(d, s),
+    "farm_position": lambda d, s, c: _page_farm_position(d, s),
     "cash_forecast": lambda d, s, c: _page_cash_forecast(d, s, c),
     "milk_down": lambda d, s, c: _page_milk_down(d, s),
     "sector_contribution": lambda d, s, c: _page_sector_contribution(d, s),
@@ -1684,7 +1951,7 @@ def _build_pdf(data: dict, pages: list[str], charts: dict) -> str:
         rightMargin=20 * mm,
         leftMargin=20 * mm,
         topMargin=28 * mm,
-        bottomMargin=22 * mm,
+        bottomMargin=20 * mm,
         title=f"FarmBiddy Report — {data['farm_name']}",
         author="FarmBiddy",
     )

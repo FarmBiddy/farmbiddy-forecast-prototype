@@ -131,9 +131,9 @@ The Overview card already tees this up; this screen is the list they would actua
 
 **Action Plan → Reports**
 
-Select **Accountant / Advisor Summary** → **Preview Report**. Cards should show cash now, last-12-months net, lowest expected cash, and total debt — not dashes. Optionally **Generate & Download PDF**.
+Select **Accountant / Advisor Summary** → **Preview Report**. Cards should show cash in the model, last-12-months net, lowest expected cash, and total debt — not dashes. Optionally **Generate & Download PDF**.
 
-This is the pack for a bank or advisor table: Actuals, loans with rate and maturity, a labelled cash forecast, milk −5c/L, and enterprise contribution. It is **not** statutory accounts. Do not generate Full or Investment for this beat.
+Walk the pack: SAMPLE cover with legal name / VAT / processor; farm position (cash, debtors, creditors, land, stock, drawings); loans with principal and estimated outstanding; cash forecast as **Jan–Dec**, not “Month 12”. It is **not** statutory accounts. Do not generate Full or Investment for this beat.
 
 ---
 

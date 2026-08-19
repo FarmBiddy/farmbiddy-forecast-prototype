@@ -97,6 +97,8 @@ def test_generate_accountant_report_produces_a_pdf_file():
 def test_accountant_page_set_is_a_meeting_pack_not_monte_carlo():
     pages = report_service.PAGE_SETS["accountant"]
     assert "meeting" in pages
+    assert "farm_position" in pages
+    assert pages.index("farm_position") == pages.index("meeting") + 1
     assert "cash_forecast" in pages
     assert "milk_down" in pages
     assert "sector_contribution" in pages
@@ -111,6 +113,31 @@ def test_loans_register_includes_rate_and_maturity():
     assert loans
     assert loans[0].get("rate") is not None
     assert loans[0].get("maturity")
+    assert loans[0].get("principal") is not None
+
+
+def test_farm_position_uses_knockrow_sample_records():
+    data = report_service.collect_report_data(FARM, "accountant", sectors=SECTORS)
+    pos = data["farm_position"]
+    assert pos["debtors"] == 14200
+    assert pos["creditors"] == 19600
+    assert pos["household"].get("drawings_monthly") == 2200
+    assert pos["stock"].get("ewes") == 228
+    assert pos["legal_name"]
+    assert data["lowest_cash"]["month_label"] in report_service._CALENDAR_MONTHS
+    assert "principal" in data["loans_summary"]["loans"][0]
+
+
+def test_cover_identity_does_not_repeat_farm_name_or_county():
+    data = report_service.collect_report_data(FARM, "accountant", sectors=SECTORS)
+    lines = report_service._cover_identity_lines(data)
+    assert lines[0] == "Knockrow Mixed Farm Ltd"
+    assert "Knockrow Mixed Farm" not in lines
+    assert "Tipperary" not in lines
+    styles = report_service._styles()
+    for key in ("cover_title", "cover_sub", "cover_farm", "cover_sample"):
+        style = styles[key]
+        assert style.leading >= style.fontSize
 
 
 def test_unbudgeted_categories_never_show_a_fabricated_variance_in_the_pdf_data():
