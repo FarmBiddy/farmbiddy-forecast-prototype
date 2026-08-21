@@ -44,6 +44,19 @@ def test_capabilities_list_includes_mvp_keys():
     ):
         assert key in keys
 
+    # Phase C analytics additions
+    phase_c = {c["key"]: c for c in payload.get("capabilities", [])}
+    for key in (
+        "cashflow.budget_vs_actual",
+        "cashflow.actual_series",
+        "cashflow.current_period",
+        "loans.summary",
+        "budgets.variance",
+    ):
+        assert key in phase_c
+    assert "months" in phase_c["cashflow.actual_series"]["optional_params"]
+    assert "months" in phase_c["budgets.variance"]["optional_params"]
+
 
 def test_openapi_includes_new_capability_paths():
     openapi = app.openapi()
@@ -303,4 +316,75 @@ def test_dispatch_records_duplicate_check_missing_required_param_returns_422():
         },
     )
     assert resp.status_code == 422
+
+
+# ── Phase C: cashflow / loans / budget variance ───────────────────────────
+
+def test_dispatch_cashflow_budget_vs_actual():
+    resp = client.post(
+        "/api/v1/capabilities/cashflow.budget_vs_actual/run",
+        json={"farm_file": FARM, "sectors": ["dairy", "beef", "lamb"], "params": {}},
+    )
+    assert resp.status_code == 200
+    result = resp.json()["result"]
+    assert result["success"] is True
+    assert result["entries"]
+
+
+def test_dispatch_cashflow_actual_series():
+    resp = client.post(
+        "/api/v1/capabilities/cashflow.actual_series/run",
+        json={"farm_file": FARM, "sectors": ["dairy", "beef", "lamb"], "params": {"months": 6}},
+    )
+    assert resp.status_code == 200
+    result = resp.json()["result"]
+    assert result["success"] is True
+    assert result["months"] == 6
+    series = result["series"]
+    assert series
+    assert len(series) <= 6
+    row = series[0]
+    assert "year" in row and "month" in row
+    assert "actual_cash_in" in row and "actual_cash_out" in row and "actual_net" in row
+
+
+def test_dispatch_cashflow_current_period():
+    resp = client.post(
+        "/api/v1/capabilities/cashflow.current_period/run",
+        json={"farm_file": FARM, "sectors": ["dairy", "beef", "lamb"], "params": {}},
+    )
+    assert resp.status_code == 200
+    result = resp.json()["result"]
+    assert result["success"] is True
+    current = result["current_period"]
+    if current is not None:
+        assert "income" in current
+        assert "costs" in current
+        assert "difference" in current
+
+
+def test_dispatch_loans_summary():
+    resp = client.post(
+        "/api/v1/capabilities/loans.summary/run",
+        json={"farm_file": FARM, "sectors": ["dairy"], "params": {}},
+    )
+    assert resp.status_code == 200
+    result = resp.json()["result"]
+    assert result["success"] is True
+    assert "total_outstanding_debt" in result
+    assert "loan_count" in result
+    assert "loans" in result
+    assert result["loan_count"] >= 1
+
+
+def test_dispatch_budgets_variance():
+    resp = client.post(
+        "/api/v1/capabilities/budgets.variance/run",
+        json={"farm_file": FARM, "sectors": ["dairy", "beef", "lamb"], "params": {"months": 12}},
+    )
+    assert resp.status_code == 200
+    result = resp.json()["result"]
+    assert result["success"] is True
+    assert "overall_status" in result
+    assert "categories" in result
 

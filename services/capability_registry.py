@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from identity.context import RequestIdentity
+from models.multi_sector_farm import build_debt_register
 from services.document_service import get_document, list_documents
 from services.financial_record_service import (
     category_choices_payload,
@@ -22,10 +23,19 @@ from services.category_budget_service import (
     get_category_budget,
     list_category_budgets,
 )
+from services.category_variance_service import build_category_budget_vs_actual
+from services.dashboard_summary import (
+    build_current_period_summary,
+    compute_actual_cash_flow,
+    get_selected_sector_data,
+)
 from services.farmer_dashboard_service import (
+    get_cashflow_budget_comparison,
     get_farmer_dashboard_preview,
 )
 from services.income_expense_service import build_income_expense_summary
+from services.loans_service import build_loans_summary
+from services.multi_sector_farm import load_multi_sector_farm
 
 # Access control helpers live in identity/access.py. We keep enforcement
 # logic in the handler so the dispatcher stays generic.
@@ -214,6 +224,85 @@ def _handle_category_choices(
     return {"success": True, "income_categories": income, "expense_categories": expenses}
 
 
+def _handle_cashflow_budget_vs_actual(
+    farm_file: str,
+    sectors: List[str],
+    params: Dict[str, Any],
+    identity: RequestIdentity,
+) -> Dict[str, Any]:
+    enforce_farm_access(identity, farm_file)
+    _ = params
+    return get_cashflow_budget_comparison(farm_file, sectors)
+
+
+def _handle_cashflow_actual_series(
+    farm_file: str,
+    sectors: List[str],
+    params: Dict[str, Any],
+    identity: RequestIdentity,
+) -> Dict[str, Any]:
+    enforce_farm_access(identity, farm_file)
+    months = int(params.get("months") or 24)
+    filtered = get_selected_sector_data(farm_file, sectors)
+    farm_summary = filtered.get("farm_summary") or {}
+    actual_by_period = compute_actual_cash_flow(
+        filtered, farm_summary, months=months, farm_file=farm_file,
+    )
+    series = [
+        actual_by_period[key]
+        for key in sorted(actual_by_period.keys())
+    ]
+    return {
+        "success": True,
+        "farm_file": farm_file,
+        "months": months,
+        "series": series,
+    }
+
+
+def _handle_cashflow_current_period(
+    farm_file: str,
+    sectors: List[str],
+    params: Dict[str, Any],
+    identity: RequestIdentity,
+) -> Dict[str, Any]:
+    enforce_farm_access(identity, farm_file)
+    _ = params
+    filtered = get_selected_sector_data(farm_file, sectors)
+    summary = build_current_period_summary(filtered, farm_file=farm_file)
+    return {
+        "success": True,
+        "farm_file": farm_file,
+        "current_period": summary,
+    }
+
+
+def _handle_loans_summary(
+    farm_file: str,
+    sectors: List[str],
+    params: Dict[str, Any],
+    identity: RequestIdentity,
+) -> Dict[str, Any]:
+    enforce_farm_access(identity, farm_file)
+    _ = sectors, params
+    farm = load_multi_sector_farm(farm_file)
+    farm_summary = farm.get("farm_summary") or {}
+    debt_register = build_debt_register(farm_summary.get("loans") or [])
+    summary = build_loans_summary(debt_register, alerts=[])
+    return {"success": True, "farm_file": farm_file, **summary}
+
+
+def _handle_budgets_variance(
+    farm_file: str,
+    sectors: List[str],
+    params: Dict[str, Any],
+    identity: RequestIdentity,
+) -> Dict[str, Any]:
+    enforce_farm_access(identity, farm_file)
+    months = int(params.get("months") or 12)
+    return build_category_budget_vs_actual(farm_file, sectors, months=months)
+
+
 CAPABILITIES: Dict[str, CapabilityDefinition] = {
     "dashboard.preview": CapabilityDefinition(
         key="dashboard.preview",
@@ -292,6 +381,43 @@ CAPABILITIES: Dict[str, CapabilityDefinition] = {
         required_params=set(),
         optional_params=set(),
         handler=_handle_category_choices,
+    ),
+
+    # ── Phase C: Cashflow / loans / budget variance ───────────────────
+    "cashflow.budget_vs_actual": CapabilityDefinition(
+        key="cashflow.budget_vs_actual",
+        description="Monthly cash-flow budget vs actual comparison.",
+        required_params=set(),
+        optional_params=set(),
+        handler=_handle_cashflow_budget_vs_actual,
+    ),
+    "cashflow.actual_series": CapabilityDefinition(
+        key="cashflow.actual_series",
+        description="Canonical monthly actual cash in/out series (JSON-safe).",
+        required_params=set(),
+        optional_params={"months"},
+        handler=_handle_cashflow_actual_series,
+    ),
+    "cashflow.current_period": CapabilityDefinition(
+        key="cashflow.current_period",
+        description="Latest actual period income/costs/difference summary.",
+        required_params=set(),
+        optional_params=set(),
+        handler=_handle_cashflow_current_period,
+    ),
+    "loans.summary": CapabilityDefinition(
+        key="loans.summary",
+        description="Debt register totals and next loan to clear (read-only).",
+        required_params=set(),
+        optional_params=set(),
+        handler=_handle_loans_summary,
+    ),
+    "budgets.variance": CapabilityDefinition(
+        key="budgets.variance",
+        description="Category-level budget vs actual variance analysis.",
+        required_params=set(),
+        optional_params={"months"},
+        handler=_handle_budgets_variance,
     ),
 }
 
